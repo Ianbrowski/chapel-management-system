@@ -75,7 +75,7 @@
         <div class="inbox-split-left">
 
             <!-- Search & Filter Bar (Comfortable Single-Row) -->
-            <div class="panel" style="flex: none !important; height: auto !important; background: var(--panel-bg); border: var(--panel-border); border-radius: var(--panel-radius, 14px);">
+            <div class="panel inbox-search-panel" style="flex: none !important; height: auto !important; background: var(--panel-bg); border: var(--panel-border); border-radius: var(--panel-radius, 14px);">
                 <div class="panel-body" style="padding: 10px 14px;">
                     <form method="GET" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; width: 100%;">
                         <input type="hidden" name="section" value="public_inquiries">
@@ -125,7 +125,7 @@
             </div>
 
             <!-- Inbox Table Panel -->
-            <div class="panel" style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: var(--panel-bg); border: var(--panel-border);">
+            <div class="panel inbox-table-panel" style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: var(--panel-bg); border: var(--panel-border);">
                 <div class="panel-header" style="background: var(--panel-header-bg); padding: 10px 14px; border-bottom: var(--panel-border);">
                     <div class="panel-title" style="font-size: 0.88rem; display: flex; align-items: center; gap: 8px;">
                         <i class="fa-solid fa-<?php echo ($isArchived || $isMember) ? 'box-archive' : 'inbox'; ?>" style="color: var(--accent);"></i>
@@ -210,10 +210,14 @@
                                             </div>
                                         </div>
                                     </td>
+                                    <?php
+                                        $rawDate = trim((string)($inq['target_date'] ?? ''));
+                                        $ts = ($rawDate !== '' && $rawDate !== '0000-00-00') ? strtotime($rawDate) : false;
+                                    ?>
                                     <td style="font-weight: 600; color: #111111; font-size: 12px;">
-                                        <?php echo $inq['target_date'] ? date('M d, Y', strtotime($inq['target_date'])) : '—'; ?>
+                                        <?php echo ($ts !== false && $ts > 0) ? date('M d, Y', $ts) : '—'; ?>
                                     </td>
-                                    <td>
+                                    <td style="text-align: center;">
                                         <span class="badge" style="font-size: 11.5px; padding: 2px 8px; border-radius: 6px; font-weight: 600; <?php echo $badgeStyle; ?>"><?php echo htmlspecialchars($st); ?></span>
                                     </td>
                                 </tr>
@@ -254,7 +258,7 @@
 
         <!-- ══ RIGHT COLUMN: Inspector Panel ══ -->
         <div class="inbox-split-right">
-            <div class="panel" style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden;">
+            <div class="panel inbox-inspector-panel" style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden;">
                 <div class="panel-header">
                     <div class="panel-title">
                         <i class="fa-solid fa-circle-info"></i>
@@ -308,7 +312,30 @@
     height: 100%;
     display: flex;
     flex-direction: column;
+    gap: 12px;
     min-height: 0;
+}
+.inbox-split-panel .panel {
+    margin-bottom: 0 !important;
+}
+.inbox-search-panel .panel-body {
+    padding: 10px 14px !important;
+}
+.inbox-table-panel .panel-header,
+.inbox-inspector-panel .panel-header {
+    padding: 11px 16px !important;
+}
+.inbox-table-panel .panel-body {
+    padding: 0 !important;
+}
+.inbox-table-panel .data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bg2, #FAFAFA);
+}
+.inbox-inspector-panel .panel-body {
+    padding: 12px 14px !important;
 }
 .inbox-split-right {
     flex: 0 0 36%;

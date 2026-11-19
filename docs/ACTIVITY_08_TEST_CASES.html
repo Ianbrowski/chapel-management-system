@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Activity 08 — Functional Button Testing (Login Page &amp; Home Page) — Cathedral Management System</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Calibri", "Segoe UI", Arial, sans-serif;
+      background: #f1f5f9;
+      color: #000000;
+      font-size: 11pt;
+      line-height: 1.35;
+    }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 12px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      font-family: "Segoe UI", sans-serif;
+    }
+    .toolbar-title {
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .toolbar-sub {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: #ffffff;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: #2563eb;
+      border-color: #1d4ed8;
+    }
+    .btn-emerald {
+      background: #059669;
+      border-color: #047857;
+    }
+    .page-container {
+      max-width: 1080px;
+      margin: 24px auto 48px;
+      background: #ffffff;
+      padding: 40px 48px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      border: 1px solid #cbd5e1;
+    }
+    .cvsu-header {
+      text-align: center;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #000000;
+      padding-bottom: 12px;
+    }
+    .cvsu-header p {
+      margin: 2px 0;
+      font-size: 11pt;
+    }
+    .cvsu-header h2 {
+      margin: 4px 0;
+      font-size: 13pt;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .cvsu-header h3 {
+      margin: 6px 0 2px;
+      font-size: 12pt;
+      font-weight: 700;
+    }
+    .meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 22px;
+      font-size: 10.5pt;
+    }
+    .meta-table td {
+      border: 1px solid #000000;
+      padding: 6px 10px;
+    }
+    .section-banner {
+      background: #1e293b;
+      color: #ffffff;
+      padding: 8px 14px;
+      font-size: 11.5pt;
+      font-weight: 700;
+      margin: 28px 0 14px;
+      letter-spacing: 0.02em;
+    }
+    .tc-wrapper {
+      margin-bottom: 26px;
+      page-break-inside: avoid;
+    }
+    table.tc-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1.5px solid #000000;
+      font-size: 10pt;
+    }
+    table.tc-table th,
+    table.tc-table td {
+      border: 1px solid #000000;
+      padding: 6px 8px;
+      vertical-align: top;
+      text-align: left;
+    }
+    table.tc-table .lbl {
+      font-weight: 700;
+      background: #f8fafc;
+      width: 18%;
+    }
+    table.tc-table .val {
+      width: 32%;
+    }
+    table.tc-table .steps-banner {
+      font-weight: 700;
+      background: #e2e8f0;
+      padding: 6px 8px;
+    }
+    table.tc-table .step-hdr th {
+      font-weight: 700;
+      background: #f1f5f9;
+    }
+    .status-pass {
+      color: #047857;
+      font-weight: 700;
+    }
+    .status-fail {
+      color: #b91c1c;
+      font-weight: 700;
+    }
+    @media print {
+      body { background: #ffffff; }
+      .toolbar { display: none !important; }
+      .page-container { margin: 0; padding: 15px; box-shadow: none; border: none; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div>
+    <div class="toolbar-title">📋 Activity 08 — Login Page &amp; Home Page Button Test Cases (CvSU Sample Output Format)</div>
+    <div class="toolbar-sub">Cathedral Management System • 20 Complete Test Cases Covering All Login &amp; Home Page Buttons</div>
+  </div>
+  <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+    <label style="font-size:12px; display:flex; align-items:center; gap:6px;">
+      <span>Group / Tester:</span>
+      <input type="text" id="testerNameInput" value="Capstone Group" oninput="updateTesterName(this.value)" style="padding:4px 8px; border-radius:4px; border:1px solid #475569; background:#0f172a; color:#fff; font-size:12px; width:150px;" />
+    </label>
+    <button class="btn btn-emerald" onclick="exportToWord()">📄 Download MS Word (.doc)</button>
+    <button class="btn btn-primary" onclick="window.print()">🖨️ Print / Save as PDF</button>
+  </div>
+</div>
+
+<div class="page-container" id="docContent">
+  <div class="cvsu-header">
+    <p>Republic of the Philippines</p>
+    <h2>CAVITE STATE UNIVERSITY</h2>
+    <p><strong>CvSU Bacoor City Campus</strong></p>
+    <p>City of Bacoor, Cavite | (046) 476-5029 | www.cvsu.edu.ph</p>
+    <h3>DEPARTMENT OF COMPUTER STUDIES</h3>
+    <h2 style="margin-top:10px; text-decoration:underline;">ACTIVITY 08: FUNCTIONAL TESTING OF LOGIN PAGE &amp; HOME PAGE BUTTONS</h2>
+  </div>
+
+  <table class="meta-table">
+    <tr>
+      <td><strong>Thesis / Capstone System:</strong></td>
+      <td>Cathedral Management System (IFI Cathedral of St. Michael the Archangel)</td>
+      <td><strong>Date Tested:</strong></td>
+      <td>11/17/2026</td>
+    </tr>
+    <tr>
+      <td><strong>Pages &amp; URLs Tested:</strong></td>
+      <td>
+        <strong>Login Page / Modal:</strong> <code>http://localhost/IFI/login.php</code> &amp; <code>http://localhost/IFI/register.php</code><br/>
+        <strong>Home Page (Public &amp; Dashboard):</strong> <code>http://localhost/IFI/index.php</code> &amp; <code>http://localhost/IFI/dashboard.php</code>
+      </td>
+      <td><strong>Test Browser / Env:</strong></td>
+      <td>Chrome 130 / Edge 130<br/>XAMPP (PHP 8.2 / MariaDB 10.4)</td>
+    </tr>
+  </table>
+
+  <div id="testCasesMount"></div>
+</div>
+
+<script>
+let testerName = 'Capstone Group';
+
+const TEST_CASES = [
+  // =========================================================================
+  // PART A: LOGIN PAGE & AUTHENTICATION PORTAL TEST CASES
+  // =========================================================================
+  {
+    part: 'A',
+    scenarioId: 'Login-1',
+    caseId: 'Login-1A',
+    description: 'Login – Positive test case (Valid Username/Email & Password via Login Button)',
+    priority: 'High',
+    preReq: 'A valid, active user account exists in the database',
+    postReq: 'Authenticated session created and redirected to Dashboard Home (dashboard.php)',
+    steps: [
+      {
+        sno: 1,
+        action: 'Launch application and click "Cathedral Portal Login" button (#heroLoginTrigger)',
+        inputs: 'http://localhost/IFI/index.php',
+        expected: 'Cathedral Portal Sign In modal (#cathedralLoginModal) opens with Login form and 3D Silver Cross',
+        actual: 'Cathedral Portal Sign In modal opened and focused Username input field',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:30 PM',
+        comments: 'Launch and Login modal trigger successful'
+      },
+      {
+        sno: 2,
+        action: 'Enter correct Username & Password and hit "Sign In to Portal" login button (#modalSubmitBtn)',
+        inputs: 'Username: admin\nPassword: ********',
+        expected: 'Login success; button shows "Welcome! Entering Portal..." and redirects to dashboard.php',
+        actual: 'Login success; redirected to dashboard.php',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:31 PM',
+        comments: 'Login successful'
+      }
+    ]
+  },
+  {
+    part: 'A',
+    scenarioId: 'Login-1',
+    caseId: 'Login-1B',
+    description: 'Login – Negative test case (Invalid Username or Incorrect Password)',
+    priority: 'High',
+    preReq: 'Application Login modal (#cathedralLoginModal) is open',
+    postReq: 'User remains on Login modal; failed login attempt is logged',
+    steps: [
+      {
+        sno: 1,
+        action: 'Launch application and click "Cathedral Portal Login" button (#heroLoginTrigger)',
+        inputs: 'http://localhost/IFI/login.php',
+        expected: 'Cathedral Portal Sign In modal opens automatically via ?open_login=1',
+        actual: 'Cathedral Portal Sign In modal opened',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:33 PM',
+        comments: 'Launch successful'
+      },
+      {
+        sno: 2,
+        action: 'Enter valid Username with incorrect Password and hit "Sign In to Portal" button (#modalSubmitBtn)',
+        inputs: 'Username: admin\nPassword: WrongPassword123',
+        expected: 'Login rejected; inline error banner (#modalLoginAlert) displays "Invalid username or password. Please verify credentials."',
+        actual: 'Inline error banner displayed "Invalid username or password. Please verify credentials."',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:34 PM',
+        comments: 'Invalid credentials properly blocked'
+      }
+    ]
+  },
+  {
+    part: 'A',
+    scenarioId: 'Login-1',
+    caseId: 'Login-1C',
+    description: 'Login – Negative test case (Empty Inputs & Brute-Force Lockout on 5th Failed Click)',
+    priority: 'High',
+    preReq: 'Application Login modal (#cathedralLoginModal) is open',
+    postReq: 'Account temporarily locked for 15 minutes after 5 consecutive failed attempts',
+    steps: [
+      {
+        sno: 1,
+        action: 'Leave Username and Password blank and click "Sign In to Portal" button (#modalSubmitBtn)',
+        inputs: 'Username: [Blank]\nPassword: [Blank]',
+        expected: 'Form validation prevents submission and prompts user to fill in required fields',
+        actual: 'Submission blocked; browser required-field validation prompted on #modalUsername',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:35 PM',
+        comments: 'Empty input validation working'
+      },
+      {
+        sno: 2,
+        action: 'Enter wrong password 5 consecutive times and click "Sign In to Portal" button (#modalSubmitBtn)',
+        inputs: 'Username: staff_user\nPassword: wrong1..wrong5 (5 attempts)',
+        expected: 'Account is locked for 15 minutes; alert displays "Account temporarily locked due to multiple failed attempts. Please wait 15 minutes."',
+        actual: 'Alert displayed "Account temporarily locked due to multiple failed attempts. Please wait 15 minutes."',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:37 PM',
+        comments: 'Rate-limiting lockout verified'
+      }
+    ]
+  },
+  {
+    part: 'A',
+    scenarioId: 'Login-2',
+    caseId: 'Login-2A',
+    description: 'Show/Hide Password Button – Toggle password visibility (#modalPwToggle & .pw-toggle-btn)',
+    priority: 'Medium',
+    preReq: 'Login modal (#cathedralLoginModal) is open with password typed in #modalPassword',
+    postReq: 'NA',
+    steps: [
+      {
+        sno: 1,
+        action: 'Enter password in Password field (#modalPassword) and click Show/Hide Password eye button (#modalPwToggle)',
+        inputs: 'Password: SecretPass123!\nAction: Click #modalPwToggle (1st click)',
+        expected: 'Password field changes from masked dots (type="password") to plain text "SecretPass123!" (type="text"); icon changes to fa-eye-slash',
+        actual: 'Password became visible as "SecretPass123!" and icon changed to fa-eye-slash',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:39 PM',
+        comments: 'Show password works'
+      },
+      {
+        sno: 2,
+        action: 'Click Show/Hide Password eye-slash button (#modalPwToggle) a second time',
+        inputs: 'Action: Click #modalPwToggle (2nd click)',
+        expected: 'Password field reverts to masked dots (type="password") and icon returns to fa-eye',
+        actual: 'Password masked into dots and icon reverted to fa-eye',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:40 PM',
+        comments: 'Hide password works'
+      }
+    ]
+  },
+  {
+    part: 'A',
+    scenarioId: 'Login-3',
+    caseId: 'Login-3A',
+    description: 'Forgot Password Button – Verify availability and Admin-managed password reset policy',
+    priority: 'Low',
+    preReq: 'Login modal (#cathedralLoginModal) is open',
+    postReq: 'NA',
+    steps: [
+      {
+        sno: 1,
+        action: 'Inspect Login modal (#cathedralLoginModal) for a "Forgot Password" button',
+        inputs: 'http://localhost/IFI/index.php?open_login=1',
+        expected: 'No public self-service Forgot Password button is exposed (password resets are restricted to Parish Admin in Settings -> Users for ecclesiastical security)',
+        actual: 'Confirmed no public Forgot Password button on Login modal; Admin reset button in Settings -> Users verified functional',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:42 PM',
+        comments: 'Verified by design (Admin-controlled reset)'
+      }
+    ]
+  },
+  {
+    part: 'A',
+    scenarioId: 'Login-4',
+    caseId: 'Login-4A',
+    description: 'Register or Sign Up Button – Positive test case ("Register as Member" & "Create Account" buttons)',
+    priority: 'High',
+    preReq: 'User is on Login modal (#cathedralLoginModal)',
+    postReq: 'New Member account created with status="pending" awaiting Parish Office verification',
+    steps: [
+      {
+        sno: 1,
+        action: 'Click "Register as Member" button (.modal-link-register) inside the Login modal',
+        inputs: 'Click: "Register as Member" (href="register.php")',
+        expected: 'Redirects to New Member Registration page (register.php)',
+        actual: 'Navigated to http://localhost/IFI/register.php',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:44 PM',
+        comments: 'Register navigation button successful'
+      },
+      {
+        sno: 2,
+        action: 'Fill in valid member details and click "Create Account" button (#submitBtn)',
+        inputs: 'Full Name: Juan Dela Cruz\nUsername: jdelacruz2026\nEmail: juan2026@email.com\nMobile: 09171234567\nChapel: IFI Cathedral\nPassword: Pass123!\nConfirm: Pass123!',
+        expected: 'Account is created with status="pending" and redirects to index.php?notice=registration_submitted with confirmation banner',
+        actual: 'Redirected to index.php?notice=registration_submitted showing "Registration submitted! The Parish Office will review and approve your account shortly."',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:46 PM',
+        comments: 'Registration submission successful'
+      }
+    ]
+  },
+  {
+    part: 'A',
+    scenarioId: 'Login-4',
+    caseId: 'Login-4B',
+    description: 'Register or Sign Up Button – Negative test case (Mismatched Passwords & Weak Password on "Create Account")',
+    priority: 'High',
+    preReq: 'User is on register.php',
+    postReq: 'Registration is blocked and user input is preserved',
+    steps: [
+      {
+        sno: 1,
+        action: 'Enter mismatched Password and Confirm Password and click "Create Account" button (#submitBtn)',
+        inputs: 'Full Name: Juan Dela Cruz\nUsername: jdelacruz\nEmail: juan@email.com\nPassword: Pass123!\nConfirm: Different999!',
+        expected: 'Form displays error alert "Passwords do not match. Please re-enter your password." and does not create account',
+        actual: 'Error banner displayed "Passwords do not match. Please re-enter your password."',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:48 PM',
+        comments: 'Negative registration validation passed'
+      }
+    ]
+  },
+  {
+    part: 'A',
+    scenarioId: 'Login-5',
+    caseId: 'Login-5A',
+    description: 'Login Modal Close / Reset Button (.login-modal-close-btn) & "Explore as Guest" Button (.modal-link-guest)',
+    priority: 'Medium',
+    preReq: 'Login modal (#cathedralLoginModal) is open on index.php',
+    postReq: 'Modal closes cleanly or enters Guest Preview session',
+    steps: [
+      {
+        sno: 1,
+        action: 'Click the Close (X) button (.login-modal-close-btn) on the top-right of the Login modal',
+        inputs: 'Click: .login-modal-close-btn',
+        expected: 'Login modal closes smoothly, 3D WebGL cross animation stops, and page returns to Home Page',
+        actual: 'Login modal closed and WebGL animation stopped cleanly',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:50 PM',
+        comments: 'Modal close button verified'
+      },
+      {
+        sno: 2,
+        action: 'Re-open Login modal and click "Explore as Guest" button (.modal-link-guest)',
+        inputs: 'Click: "Explore as Guest" (href="guest_access.php")',
+        expected: 'Initializes read-only Guest session and redirects to dashboard.php?section=events with Guest Preview Mode banner',
+        actual: 'Redirected to dashboard.php in Guest Preview Mode',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:51 PM',
+        comments: 'Guest access button verified'
+      }
+    ]
+  },
+
+  // =========================================================================
+  // PART B: HOME PAGE (PUBLIC PORTAL & DASHBOARD HOME) TEST CASES
+  // =========================================================================
+  {
+    part: 'B',
+    scenarioId: 'Home-1',
+    caseId: 'Home-1A',
+    description: 'Public Home Page Navigation Buttons, Brand Logo & Mobile Menu Toggle (index.php)',
+    priority: 'High',
+    preReq: 'User is on http://localhost/IFI/index.php',
+    postReq: 'Page scrolls to each selected section; mobile menu drawer toggles on mobile width',
+    steps: [
+      {
+        sno: 1,
+        action: 'Click top navigation buttons: "Mass Times", "Services", "Announcements", "Our Story", "Giving & Map", and "Parish Store"',
+        inputs: 'Clicks: #liturgy, #services, #bulletin, #about, #hub, #merchandise',
+        expected: 'Viewport smoothly scrolls to each corresponding section on index.php',
+        actual: 'All 6 navigation buttons scrolled smoothly to their target sections',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:53 PM',
+        comments: 'Header navigation buttons verified'
+      },
+      {
+        sno: 2,
+        action: 'Click the Cathedral Seal / Brand Logo (.logo) and Mobile Hamburger button (.menu-toggle)',
+        inputs: 'Click: .logo and .menu-toggle (at 375px mobile width)',
+        expected: 'Logo reloads index.php at the top; .menu-toggle opens/closes #mainNav and swaps fa-bars / fa-xmark icon',
+        actual: 'Logo reloaded index.php; mobile menu toggle opened and closed the navigation drawer',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:54 PM',
+        comments: 'Logo and responsive menu toggle verified'
+      }
+    ]
+  },
+  {
+    part: 'B',
+    scenarioId: 'Home-1',
+    caseId: 'Home-1B',
+    description: 'Public Home Page Category Filter Buttons – Church Services Tabs (.service-tab-btn) & Bulletin Filter Pills (.bulletin-pill)',
+    priority: 'Medium',
+    preReq: 'User is on http://localhost/IFI/index.php',
+    postReq: 'Service ledger rows and bulletin cards filter dynamically without page reload',
+    steps: [
+      {
+        sno: 1,
+        action: 'In Church Services (#services), click category tab buttons: "All Services", "Sacraments", "Mass Intentions", "Blessings", and "Certificates"',
+        inputs: 'Clicks on .service-tab-btn buttons',
+        expected: 'Active tab highlights and table displays only services belonging to the selected category',
+        actual: 'Each tab filtered the services table accurately and updated active styling',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:56 PM',
+        comments: 'Service filter buttons verified'
+      },
+      {
+        sno: 2,
+        action: 'In News & Announcements (#bulletin), click filter pill buttons: "All Notices", "Parish-Wide", and Chapel pills',
+        inputs: 'Clicks on .bulletin-pill buttons',
+        expected: 'Bulletin grid filters cards by chapel scope; if none exist for a chapel, "View All Parish Notices" reset button appears',
+        actual: 'Bulletin cards filtered by scope and reset button restored all notices',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:57 PM',
+        comments: 'Bulletin filter buttons verified'
+      }
+    ]
+  },
+  {
+    part: 'B',
+    scenarioId: 'Home-2',
+    caseId: 'Home-2A',
+    description: 'Dashboard Button & Sidebar Navigation Buttons (dashboard.php)',
+    priority: 'High',
+    preReq: 'Logged in as Admin on http://localhost/IFI/dashboard.php',
+    postReq: 'Selected module loads into #dynamic-content-area and active nav indicator updates',
+    steps: [
+      {
+        sno: 1,
+        action: 'Click Sidebar Collapse Toggle (#sidebarModeToggle), Mobile Hamburger (.hamburger), and Sidebar Logo (.sidebar-logo)',
+        inputs: 'Clicks: #sidebarModeToggle, .hamburger, .sidebar-logo',
+        expected: '#sidebarModeToggle switches sidebar between expanded and compact icon-rail mode; .sidebar-logo refreshes dashboard',
+        actual: 'Sidebar collapsed/expanded smoothly and logo refreshed dashboard',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 02:59 PM',
+        comments: 'Dashboard shell controls verified'
+      },
+      {
+        sno: 2,
+        action: 'Click Dashboard sidebar buttons: "Calendar", "Event Requests", "Priest Duty", "Records" dropdown ("Cathedral Records", "Chapel Records"), "Certificates", "Bulletin", "Giving & Store" dropdown ("Donations", "Parish Store"), and "Settings"',
+        inputs: 'Clicks on .nav-item and .dropdown-toggle in #sidebarNav',
+        expected: 'Dropdown menus expand sub-items; each button loads its module view without error',
+        actual: 'All sidebar navigation buttons and dropdown sub-items loaded their modules properly',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:01 PM',
+        comments: 'All Dashboard navigation buttons verified'
+      }
+    ]
+  },
+  {
+    part: 'B',
+    scenarioId: 'Home-2',
+    caseId: 'Home-2B',
+    description: 'Dashboard Calendar View Switcher Buttons (#btn-toggle-cal, #btn-toggle-table) & Month Navigation Buttons (calPrev, calNext)',
+    priority: 'Medium',
+    preReq: 'Logged in on Dashboard Home (dashboard.php?section=events)',
+    postReq: 'Workspace switches between Calendar Grid and Master Table; calendar month advances/rewinds',
+    steps: [
+      {
+        sno: 1,
+        action: 'Click Previous Month (<) button and Next Month (>) button (.cal-nav-btn) on the Calendar card header',
+        inputs: 'Clicks: calPrev() and calNext()',
+        expected: 'Calendar month heading (#cal-month-label) and day cells update to the previous/next month',
+        actual: 'Calendar grid updated to October 2026 and December 2026 accurately',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:02 PM',
+        comments: 'Month navigation buttons verified'
+      },
+      {
+        sno: 2,
+        action: 'Click "Table List" button (#btn-toggle-table) and then "Calendar" button (#btn-toggle-cal)',
+        inputs: 'Clicks: #btn-toggle-table, #btn-toggle-cal',
+        expected: 'Switches view between Master Schedule Table (#sched-view-table) and Monthly Calendar (#sched-view-cal)',
+        actual: 'View switched cleanly between Table List and Calendar Grid',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:03 PM',
+        comments: 'View switcher buttons verified'
+      }
+    ]
+  },
+  {
+    part: 'B',
+    scenarioId: 'Home-3',
+    caseId: 'Home-3A',
+    description: 'Profile Button – Open My Profile (.sidebar-user) & Save Profile / Password Buttons',
+    priority: 'High',
+    preReq: 'Logged in as an authenticated user on dashboard.php',
+    postReq: 'My Profile section opens and profile changes are saved',
+    steps: [
+      {
+        sno: 1,
+        action: 'Click the User Profile button (.sidebar-user) at the top of the sidebar',
+        inputs: 'Click: .sidebar-user (onclick="showSection(\'my_profile\', null)")',
+        expected: 'Dashboard loads My Profile view displaying account details, avatar upload, and password form',
+        actual: 'My Profile section loaded displaying user profile and security forms',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:04 PM',
+        comments: 'Profile button verified'
+      },
+      {
+        sno: 2,
+        action: 'Update Full Name / Phone and click "Save Changes" button in My Profile',
+        inputs: 'Full Name: Cathedral Administrator\nPhone: 0917-123-4567\nClick: Save Changes',
+        expected: 'Profile details are updated in users table and green confirmation toast appears',
+        actual: 'Profile updated and confirmation flash toast displayed',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:05 PM',
+        comments: 'Profile save button verified'
+      }
+    ]
+  },
+  {
+    part: 'B',
+    scenarioId: 'Home-4',
+    caseId: 'Home-4A',
+    description: 'Add Button – "+ New Event" Button (.btn-new-event-gold) & Schedule Conflict Validation',
+    priority: 'High',
+    preReq: 'Logged in as Admin on dashboard.php?section=events',
+    postReq: 'New event is inserted into events table; conflicting schedules are blocked',
+    steps: [
+      {
+        sno: 1,
+        action: 'Click "+ New Event" button (.btn-new-event-gold), enter valid event details, and click "Save / Schedule Event" submit button',
+        inputs: 'Title: Bautismo - Dela Cruz\nType: Baptism\nVenue: Main Cathedral\nDate/Time: 2026-11-15 10:00 AM\nPriest: Fr. Ruben',
+        expected: 'Add Event modal (#modal-add-event) opens; submitting valid non-conflicting inputs saves the event and shows green flash toast',
+        actual: 'Event saved to database and rendered on the Calendar and Table List',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:06 PM',
+        comments: 'Add Event button (positive) verified'
+      },
+      {
+        sno: 2,
+        action: 'Open "+ New Event" modal again, select the exact same Venue, Priest, and Date/Time, and click Submit',
+        inputs: 'Venue: Main Cathedral\nDate/Time: 2026-11-15 10:00 AM\nPriest: Fr. Ruben (overlapping)',
+        expected: 'EventConflictService detects double-booking and blocks submission with conflict error message',
+        actual: 'Submission blocked with conflict warning for overlapping venue/celebrant slot',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:07 PM',
+        comments: 'Add Event conflict prevention verified'
+      }
+    ]
+  },
+  {
+    part: 'B',
+    scenarioId: 'Home-5',
+    caseId: 'Home-5A',
+    description: 'View Button – Event Table "View Details" Button (.tbl-action-view) & Public Page "View Details" Buttons',
+    priority: 'Medium',
+    preReq: 'Events exist in Table List (dashboard.php) and Services/Bulletin items exist on index.php',
+    postReq: 'Detail modals/drawers open with complete record information',
+    steps: [
+      {
+        sno: 1,
+        action: 'In Dashboard Events Table List, click the View Details Eye button (.tbl-action-view) on an event row',
+        inputs: 'Click: .tbl-action-view (onclick="viewEventDetails(...)")',
+        expected: 'Event Details modal opens showing event title, schedule, venue, celebrant, and status',
+        actual: 'Event Details modal opened with complete event information',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:08 PM',
+        comments: 'Dashboard View button verified'
+      },
+      {
+        sno: 2,
+        action: 'On Public Home Page (index.php), click "View Details" button (.btn-ledger-toggle) on a Service row, a Chapel row (.chapel-compact-row), and a Bulletin card (.bulletin-post) along with "Copy Info" (#bModalCopyBtn) and "Print Notice"',
+        inputs: 'Clicks: .btn-ledger-toggle, .chapel-compact-row, .bulletin-post, #bModalCopyBtn',
+        expected: 'Service row expands docket drawer; Chapel and Bulletin cards open detail modals; Copy Info copies notice text and changes button to "Copied!"',
+        actual: 'All detail drawers/modals opened and Copy Info button changed to "Copied!"',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:09 PM',
+        comments: 'Public View & Copy Info buttons verified'
+      }
+    ]
+  },
+  {
+    part: 'B',
+    scenarioId: 'Home-6',
+    caseId: 'Home-6A',
+    description: 'Edit Button – Event Table "Edit Event" Button (.tbl-action-edit) & Update Submit Button',
+    priority: 'High',
+    preReq: 'Logged in as Admin on dashboard.php?section=events&sched_mode=table',
+    postReq: 'Event changes are saved to events table and logged in audit_logs',
+    steps: [
+      {
+        sno: 1,
+        action: 'Click the Edit Event pen button (.tbl-action-edit) on an event row in the Table List',
+        inputs: 'Click: .tbl-action-edit (onclick="openEditEventModal(...)")',
+        expected: 'Edit Event modal opens pre-filled with the event\'s existing fields',
+        actual: 'Edit Event modal opened with all current event fields populated',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:10 PM',
+        comments: 'Edit button opens populated modal'
+      },
+      {
+        sno: 2,
+        action: 'Update status to "Confirmed" and click the "Update / Save Changes" button',
+        inputs: 'Status: Confirmed\nClick: Submit button',
+        expected: 'Event record updates in database, badge changes to CONFIRMED, and flash confirmation appears',
+        actual: 'Event updated to CONFIRMED and green flash message displayed',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:11 PM',
+        comments: 'Edit update successful'
+      }
+    ]
+  },
+  {
+    part: 'B',
+    scenarioId: 'Home-7',
+    caseId: 'Home-7A',
+    description: 'Delete, Archive & Restore Buttons (.tbl-action-archive, .tbl-action-restore, .tbl-action-delete)',
+    priority: 'High',
+    preReq: 'Logged in as Admin on dashboard.php?section=events&sched_mode=table',
+    postReq: 'Confirmed events are soft-archived (is_archived=1), restored (is_archived=0), or test events deleted',
+    steps: [
+      {
+        sno: 1,
+        action: 'Click Archive button (.tbl-action-archive) on a Confirmed event row and click OK on confirmation prompt',
+        inputs: 'Click: .tbl-action-archive -> Confirm = OK',
+        expected: 'Event is soft-archived (is_archived=1) and moved to the "Archived History" subtab',
+        actual: 'Event moved to Archived History subtab without data loss',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:12 PM',
+        comments: 'Archive button verified'
+      },
+      {
+        sno: 2,
+        action: 'Open "Archived History" subtab and click Restore button (.tbl-action-restore), then click Delete Trash button (.tbl-action-delete) on a pending/cancelled test event',
+        inputs: 'Click: .tbl-action-restore / .tbl-action-delete -> Confirm = OK',
+        expected: 'Restore button returns event to Active Liturgies; Delete button removes the unconfirmed test event',
+        actual: 'Restore returned event to Active list; Delete removed the test event',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:13 PM',
+        comments: 'Restore and Delete buttons verified'
+      }
+    ]
+  },
+  {
+    part: 'B',
+    scenarioId: 'Home-8',
+    caseId: 'Home-8A',
+    description: 'Search, Sort, Clear Filters & Quick Jump (Ctrl+K) Buttons (.filter-search-submit, .btn-sort-toggle, .filter-clear-link, .topbar-quick-jump)',
+    priority: 'Medium',
+    preReq: 'Logged in on dashboard.php?section=events&sched_mode=table',
+    postReq: 'Table filters/sorts matching rows; Quick Jump navigates to selected module',
+    steps: [
+      {
+        sno: 1,
+        action: 'Enter keyword in Search box (name="ev_search"), click Search button (.filter-search-submit), click Sort button (.btn-sort-toggle), then click Clear Filters (X) button (.filter-clear-link)',
+        inputs: 'Search: "Bautismo" -> Click .filter-search-submit -> Click .btn-sort-toggle -> Click .filter-clear-link',
+        expected: 'Search filters matching rows; Sort toggles date_desc/date_asc; Clear (X) resets all filters; non-existent keyword shows "No events found."',
+        actual: 'Filtered rows for "Bautismo", toggled sort order, and Clear (X) restored full list',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:14 PM',
+        comments: 'Search, Sort, and Clear buttons verified'
+      },
+      {
+        sno: 2,
+        action: 'Click Topbar "Quick Jump... Ctrl K" button (.topbar-quick-jump), type "Donations", and click the matching result',
+        inputs: 'Click: .topbar-quick-jump -> Input: "Donations"',
+        expected: 'Command Palette modal (#modal-command-palette) opens, filters commands in real time, and navigates to Donations',
+        actual: 'Command Palette opened, filtered results, and navigated to Donations section',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:15 PM',
+        comments: 'Quick Jump search button verified'
+      }
+    ]
+  },
+  {
+    part: 'B',
+    scenarioId: 'Home-9',
+    caseId: 'Home-9A',
+    description: 'Logout Button – Sidebar Logout Button (.logout-link) & Confirmation Modal (#modal-logout)',
+    priority: 'High',
+    preReq: 'User is logged into dashboard.php',
+    postReq: 'Session is destroyed and browser redirects to index.php?success=logout',
+    steps: [
+      {
+        sno: 1,
+        action: 'Click "Logout" button (.logout-link) at the bottom of the sidebar',
+        inputs: 'Click: .logout-link (onclick="openModal(\'modal-logout\')")',
+        expected: 'Logout confirmation modal (#modal-logout) opens with "Cancel" and "Sign Out" buttons',
+        actual: 'Logout confirmation modal appeared',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:16 PM',
+        comments: 'Confirmation modal prevents accidental logout'
+      },
+      {
+        sno: 2,
+        action: 'Click the Confirm Sign Out button inside #modal-logout',
+        inputs: 'Click: Confirm Sign Out (href="logout.php")',
+        expected: 'Session is destroyed and redirects to index.php?success=logout showing toast "You have been safely logged out. God bless you."',
+        actual: 'Redirected to index.php?success=logout with green Parish Notice toast',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:17 PM',
+        comments: 'Logout successful'
+      }
+    ]
+  },
+  {
+    part: 'B',
+    scenarioId: 'Home-10',
+    caseId: 'Home-10A',
+    description: 'Other Home Page Buttons – Donation Modal, Store Reserve, Topbar Inbox/Chat, and Floating Theme Toggle Button (#themeToggleBtn)',
+    priority: 'Medium',
+    preReq: 'Test both Public Home Page (index.php) and Dashboard Topbar (dashboard.php)',
+    postReq: 'All remaining utility, modal, and theme toggle buttons perform their intended functions',
+    steps: [
+      {
+        sno: 1,
+        action: 'On index.php, click "Make a Donation" banner (.sacred-giving-banner), switch GCash/Maya/Bank tabs (.offering-tab), click "Copy" (.btn-copy), and test Parish Store "Reserve" (#reserveBtn) & "Confirm Reservation"',
+        inputs: 'Click: .sacred-giving-banner -> .offering-tab -> .btn-copy -> #reserveBtn -> Confirm Reservation',
+        expected: 'Donation modal opens and copies account numbers to clipboard; Store Reserve submits inquiry and shows green confirmation toast',
+        actual: 'Donation tabs, Copy buttons, and Store Reservation submission all executed as expected',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:18 PM',
+        comments: 'Donation & Store buttons verified'
+      },
+      {
+        sno: 2,
+        action: 'On dashboard.php topbar, click Inbox button (#topbarInboxBtn), Refresh (#inboxDdRefreshBtn), Parish Chat (#topbarChatBtn), and Dark Mode (#darkModeBtn)',
+        inputs: 'Clicks: #topbarInboxBtn, #inboxDdRefreshBtn, #topbarChatBtn, #darkModeBtn',
+        expected: 'Inbox dropdown opens and refreshes notifications; Chat drawer toggles; Dark Mode switches theme',
+        actual: 'All 4 topbar utility buttons executed their intended actions',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:19 PM',
+        comments: 'Topbar buttons verified'
+      },
+      {
+        sno: 3,
+        action: 'Click the bottom-right Floating Theme Toggle button (#themeToggleBtn) on index.php',
+        inputs: 'Click: #themeToggleBtn (.floating-theme-toggle)',
+        expected: 'Single floating theme toggle button switches page between Light and Dark mode, updates icon (fa-sun / fa-moon), and saves theme to localStorage',
+        actual: 'Page smoothly toggled between Light and Dark mode, updated the button icon, and persisted preference in localStorage',
+        browser: 'Chrome 130',
+        result: 'Pass',
+        time: '11/17/2026 03:20 PM',
+        comments: 'Floating theme toggle button verified (duplicate #floatingThemeToggleBtn removed)'
+      }
+    ]
+  }
+];
+
+function renderAllTestCases() {
+  const mount = document.getElementById('testCasesMount');
+  let html = '';
+  let currentPart = '';
+
+  TEST_CASES.forEach(tc => {
+    if (tc.part !== currentPart) {
+      currentPart = tc.part;
+      html += `<div class="section-banner">${
+        currentPart === 'A'
+          ? 'PART A: LOGIN PAGE & AUTHENTICATION PORTAL BUTTON TEST CASES'
+          : 'PART B: HOME PAGE (PUBLIC PORTAL & DASHBOARD HOME) BUTTON TEST CASES'
+      }</div>`;
+    }
+
+    const stepsRows = tc.steps.map(s => `
+      <tr>
+        <td style="text-align:center; width:5%;">${s.sno}</td>
+        <td style="width:19%;">${escapeHtml(s.action)}</td>
+        <td style="width:18%; white-space:pre-line; font-family:Consolas,monospace; font-size:9.5pt;">${escapeHtml(s.inputs)}</td>
+        <td style="width:19%;">${escapeHtml(s.expected)}</td>
+        <td style="width:19%;">${escapeHtml(s.actual)}</td>
+        <td style="width:8%; text-align:center;">${escapeHtml(s.browser)}</td>
+        <td style="width:6%; text-align:center;" class="${s.result.startsWith('Pass') ? 'status-pass' : 'status-fail'}">${escapeHtml(s.result)}</td>
+        <td style="width:14%;">[${escapeHtml(testerName)}<br/>${escapeHtml(s.time)}]:<br/>${escapeHtml(s.comments)}</td>
+      </tr>
+    `).join('');
+
+    html += `
+      <div class="tc-wrapper">
+        <table class="tc-table">
+          <tr>
+            <td class="lbl">Test Scenario ID</td>
+            <td class="val"><strong>${escapeHtml(tc.scenarioId)}</strong></td>
+            <td class="lbl">Test Case ID</td>
+            <td class="val"><strong>${escapeHtml(tc.caseId)}</strong></td>
+          </tr>
+          <tr>
+            <td class="lbl">Test Case Description</td>
+            <td class="val">${escapeHtml(tc.description)}</td>
+            <td class="lbl">Test Priority</td>
+            <td class="val">${escapeHtml(tc.priority)}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Pre-Requisite</td>
+            <td class="val">${escapeHtml(tc.preReq)}</td>
+            <td class="lbl">Post-Requisite</td>
+            <td class="val">${escapeHtml(tc.postReq)}</td>
+          </tr>
+          <tr>
+            <td colspan="4" class="steps-banner">Test Execution Steps:</td>
+          </tr>
+          <tr class="step-hdr">
+            <td colspan="4" style="padding:0; border:none;">
+              <table style="width:100%; border-collapse:collapse; border:none;">
+                <thead>
+                  <tr class="step-hdr">
+                    <th style="width:5%; text-align:center; border-left:none; border-top:none;">S.No</th>
+                    <th style="width:19%; border-top:none;">Action</th>
+                    <th style="width:18%; border-top:none;">Inputs</th>
+                    <th style="width:19%; border-top:none;">Expected Output</th>
+                    <th style="width:19%; border-top:none;">Actual Output</th>
+                    <th style="width:8%; text-align:center; border-top:none;">Test Browser</th>
+                    <th style="width:6%; text-align:center; border-top:none;">Test Result</th>
+                    <th style="width:14%; border-right:none; border-top:none;">Test Comments</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${stepsRows}
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
+  });
+
+  mount.innerHTML = html;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function updateTesterName(val) {
+  testerName = (val || '').trim() || 'Capstone Group';
+  renderAllTestCases();
+}
+
+function exportToWord() {
+  const content = document.getElementById('docContent').innerHTML;
+  const wordHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="utf-8">
+  <title>Activity 08 - Test Cases - Cathedral Management System</title>
+  <style>
+    @page { size: 8.5in 11in; margin: 0.5in; }
+    body { font-family: "Calibri", "Arial", sans-serif; font-size: 10pt; color: #000000; }
+    .cvsu-header { text-align: center; margin-bottom: 14pt; border-bottom: 1.5pt solid #000; padding-bottom: 8pt; }
+    .cvsu-header p { margin: 1pt 0; }
+    .cvsu-header h2, .cvsu-header h3 { margin: 3pt 0; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 14pt; }
+    th, td { border: 1pt solid #000000; padding: 4pt 6pt; vertical-align: top; text-align: left; font-size: 9pt; }
+    .lbl { font-weight: bold; background-color: #f1f5f9; }
+    .steps-banner { font-weight: bold; background-color: #e2e8f0; }
+    .step-hdr th { font-weight: bold; background-color: #f1f5f9; }
+    .section-banner { background-color: #1e293b; color: #ffffff; font-weight: bold; padding: 6pt 10pt; margin: 14pt 0 8pt; font-size: 10.5pt; }
+    .status-pass { color: #047857; font-weight: bold; }
+    .status-fail { color: #b91c1c; font-weight: bold; }
+  </style>
+</head>
+<body>${content}</body>
+</html>`;
+
+  const blob = new Blob(['\ufeff', wordHtml], { type: 'application/msword;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Activity_08_Test_Cases_Cathedral_Management_System.doc';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 250);
+}
+
+window.addEventListener('DOMContentLoaded', renderAllTestCases);
+</script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+Options -Indexes -MultiViews
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Clean direct-link alias for Super Admin Login Gateway
+    RewriteRule ^admin-login/?$ admin_login.php [L,QSA]
+
+    # Clean alias for Logout
+    RewriteRule ^logout/?$ logout.php [L,QSA]
+
+    # Clean URLs for Dashboard & Sections
+    RewriteRule ^dashboard/?$ dashboard.php [L,QSA]
+    RewriteRule ^dashboard/([a-zA-Z0-9_-]+)/?$ dashboard.php?section=$1 [L,QSA]
+
+    # Clean alias and nested fallbacks for controllers and ajax requests under /dashboard/
+    RewriteRule ^api/chat/?$ app/controllers/chat.php [L,QSA]
+    RewriteRule ^dashboard/app/controllers/(.*)$ app/controllers/$1 [L,QSA]
+    RewriteRule ^dashboard/dashboard\.php$ dashboard.php [L,QSA]
+
+    # Block hidden files except ACME challenge
+    RewriteRule "(^|/)\.(?!well-known/)" - [F]
+
+    # Block development/debug/migration scripts from the web root
+    RewriteRule ^(dev_login|test_archive|health_check|debug_event|check_schema|test_(columns|event_model|raw_insert|request|schema|archive)|add_image_col)\.php$ - [F,NC]
+
+    # Prevent direct access to internal and operational directories
+    # Allow specific public-facing controllers
+    RewriteRule ^app/controllers/authenticate\.php$ - [L]
+    RewriteRule ^app/controllers/get_[^/]+\.php$ - [L]
+    RewriteRule ^app/controllers/notifications\.php$ - [L]
+    RewriteRule ^app/controllers/chat\.php$ - [L]
+    RewriteRule ^app/controllers/inbox_preview\.php$ - [L]
+    RewriteRule ^views/pages/error_500\.php$ - [L]
+    RewriteRule ^views/pages/(donation_receipt|merchandise_receipt|finance_report_print|service_register_print)\.php$ - [L]
+    RewriteRule ^tools/(backup|backup_download|restore_web)\.php$ - [L,NC]
+    
+    RewriteCond %{REQUEST_URI} !^.*/app/controllers/(authenticate|chat|notifications|inbox_preview|get_[^/]+)\.php
+    RewriteRule ^(config|tools|tmp|backups|app|views|src|scratch)/ - [F,NC]
+
+    # Prevent direct download of SQL dumps and logs
+    RewriteRule \.(sql|log)$ - [F,NC]
+</IfModule>
+
+# ── Secondary log/dump protection (works even when mod_rewrite is OFF) ───────
+<FilesMatch "\.(log|sql|bak|env|json)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# ── Redirect PHP error log outside the web root ───────────────────────────────
+# Prevents php_errors.log from being created in / accessible from the document root.
+# Change the path below to a directory outside htdocs that the web server user can write to.
+<IfModule mod_php.c>
+    php_flag  log_errors      on
+    php_value error_log       C:/xampp/php/logs/cms_errors.log
+    php_flag  display_errors  off
+</IfModule>
+
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+    ExpiresByType text/javascript "access plus 7 days"
+    ExpiresByType image/webp "access plus 30 days"
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/jpeg "access plus 30 days"
+    ExpiresByType image/gif "access plus 30 days"
+    ExpiresByType image/svg+xml "access plus 30 days"
+    ExpiresByType font/woff2 "access plus 30 days"
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    <FilesMatch "\.(css|js|png|jpg|jpeg|gif|webp|svg|woff2)$">
+        Header set Cache-Control "public, max-age=2592000, immutable"
+    </FilesMatch>
+</IfModule>

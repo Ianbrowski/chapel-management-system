@@ -1,0 +1,351 @@
+/**
+ * ====================================================================
+ * SKELETON.CSS — High-Fidelity Theme-Aware Skeleton Loading System
+ * Chapel & Cathedral Information Management System
+ * ====================================================================
+ * Provides fluid shimmering placeholders matching the Sacred Cathedral
+ * theme (Obsidian & Candlelight Gold for Dark; Warm Parchment & Amber for Light).
+ */
+
+/* ── 1. THEME TOKENS FOR SKELETON ── */
+:root,
+[data-theme="dark"] {
+    --sk-bg-base: rgba(255, 255, 255, 0.05);
+    --sk-shimmer-highlight: rgba(201, 168, 76, 0.15);
+    --sk-border: rgba(255, 255, 255, 0.08);
+    --sk-card-bg: #161f30;
+    --sk-card-border: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="light"] {
+    --sk-bg-base: rgba(0, 0, 0, 0.04);
+    --sk-shimmer-highlight: rgba(255, 255, 255, 0.8);
+    --sk-border: rgba(0, 0, 0, 0.06);
+    --sk-card-bg: #ffffff;
+    --sk-card-border: #e2e8f0;
+}
+
+/* ── 2. CORE SHIMMER ANIMATION ── */
+@keyframes skeletonSweep {
+    0% {
+        background-position: -600px 0;
+    }
+    100% {
+        background-position: 600px 0;
+    }
+}
+
+@keyframes skeletonPulse {
+    0%, 100% {
+        opacity: 0.95;
+    }
+    50% {
+        opacity: 0.65;
+    }
+}
+
+/* ── 3. BASE SKELETON PRIMITIVE ── */
+.skeleton,
+.sk-block {
+    background: linear-gradient(
+        90deg,
+        var(--sk-bg-base) 0%,
+        var(--sk-bg-base) 30%,
+        var(--sk-shimmer-highlight) 50%,
+        var(--sk-bg-base) 70%,
+        var(--sk-bg-base) 100%
+    );
+    background-size: 1200px 100%;
+    animation: skeletonSweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    border-radius: var(--radius-sm, 6px);
+    display: inline-block;
+    position: relative;
+    overflow: hidden;
+    vertical-align: middle;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Width Utilities */
+.sk-w-15  { width: 15% !important; }
+.sk-w-20  { width: 20% !important; }
+.sk-w-25  { width: 25% !important; }
+.sk-w-30  { width: 30% !important; }
+.sk-w-40  { width: 40% !important; }
+.sk-w-50  { width: 50% !important; }
+.sk-w-60  { width: 60% !important; }
+.sk-w-70  { width: 70% !important; }
+.sk-w-75  { width: 75% !important; }
+.sk-w-80  { width: 80% !important; }
+.sk-w-90  { width: 90% !important; }
+.sk-w-100 { width: 100% !important; }
+
+/* Height Utilities */
+.sk-h-xs  { height: 8px !important; }
+.sk-h-sm  { height: 12px !important; }
+.sk-h-md  { height: 16px !important; }
+.sk-h-lg  { height: 22px !important; }
+.sk-h-xl  { height: 32px !important; }
+
+/* Shape Utilities */
+.sk-circle {
+    border-radius: 50% !important;
+    flex-shrink: 0;
+}
+.sk-pill {
+    border-radius: 9999px !important;
+}
+
+/* ── 4. SPECIFIC SKELETON MOLECULES ── */
+
+/* Text line */
+.sk-text {
+    height: 12px;
+    margin: 4px 0;
+    border-radius: 4px;
+}
+
+/* Header/Title */
+.sk-title {
+    height: 18px;
+    margin-bottom: 8px;
+    border-radius: 5px;
+}
+
+/* Button placeholder */
+.sk-btn {
+    height: 32px;
+    border-radius: var(--radius-md, 8px);
+    min-width: 80px;
+}
+
+/* Badge pill */
+.sk-badge {
+    height: 18px;
+    border-radius: 9999px;
+    display: inline-block;
+}
+
+/* Icon / Avatar */
+.sk-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.sk-avatar-sm {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* ── 5. SKELETON TELEMETRY / METRIC CARD ── */
+.sk-stat-card {
+    background: var(--sk-card-bg);
+    border: 1px solid var(--sk-card-border);
+    border-radius: var(--radius-lg, 10px);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-sizing: border-box;
+}
+.sk-stat-icon-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+.sk-stat-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* ── 6. SKELETON TABLE ── */
+.sk-table-container {
+    width: 100%;
+    background: var(--sk-card-bg);
+    border: 1px solid var(--sk-card-border);
+    border-radius: var(--radius-lg, 10px);
+    overflow: hidden;
+    box-sizing: border-box;
+}
+.sk-table-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--sk-border);
+    background: rgba(0, 0, 0, 0.08);
+    gap: 12px;
+}
+.sk-table-row {
+    display: flex;
+    align-items: center;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--sk-border);
+    gap: 12px;
+    transition: background 0.15s ease;
+}
+.sk-table-row:last-child {
+    border-bottom: none;
+}
+.sk-table-cell {
+    display: flex;
+    align-items: center;
+}
+
+/* ── 7. SKELETON CALENDAR ── */
+.sk-calendar-card {
+    background: var(--sk-card-bg);
+    border: 1px solid var(--sk-card-border);
+    border-radius: var(--radius-xl, 14px);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-sizing: border-box;
+}
+.sk-cal-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--sk-border);
+}
+.sk-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+}
+.sk-cal-day-cell {
+    min-height: 52px;
+    border-radius: 8px;
+    padding: 6px;
+    background: var(--sk-bg-base);
+    border: 1px solid var(--sk-border);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+/* ── 8. SKELETON TIMELINE / AGENDA ── */
+.sk-agenda-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.sk-agenda-item {
+    background: var(--sk-card-bg);
+    border: 1px solid var(--sk-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-sizing: border-box;
+}
+
+/* ── 9. SKELETON DETAIL INSPECTOR ── */
+.sk-inspector-card {
+    background: var(--sk-card-bg);
+    border: 1px solid var(--sk-card-border);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-sizing: border-box;
+}
+.sk-inspector-hero {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--sk-border);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.sk-inspector-field-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--sk-border);
+}
+
+/* ── 10. SKELETON CARD GRID (Services / Catalog) ── */
+.sk-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+.sk-card {
+    background: var(--sk-card-bg);
+    border: 1px solid var(--sk-card-border);
+    border-radius: var(--radius-lg, 10px);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-sizing: border-box;
+}
+
+/* ── 11. SKELETON SLOT PICKER ── */
+.sk-slot-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.sk-slot-card {
+    background: var(--sk-card-bg);
+    border: 1px solid var(--sk-border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-sizing: border-box;
+}
+
+/* ── 12. SKELETON CHART PLACEHOLDER ── */
+.sk-chart-card {
+    background: var(--sk-card-bg);
+    border: 1px solid var(--sk-card-border);
+    border-radius: var(--radius-lg, 10px);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-sizing: border-box;
+}
+.sk-chart-bars-wrap {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    height: 140px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--sk-border);
+    border-left: 1px solid var(--sk-border);
+    padding-left: 8px;
+}
+.sk-chart-bar {
+    flex: 1;
+    border-radius: 4px 4px 0 0;
+}
+
+/* ── 13. FULL SECTION SKELETON LAYOUT WRAPPER ── */
+.sk-section-container {
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 8px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-sizing: border-box;
+    animation: fadeIn 0.25s ease-out;
+}

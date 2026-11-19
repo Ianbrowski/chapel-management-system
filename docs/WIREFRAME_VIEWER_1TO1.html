@@ -1,0 +1,176 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1:1 Scale Level 1 Wireframe Hub â€” Cathedral Management System</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', Courier, monospace, system-ui;
+      background: #0f172a;
+      color: #f8fafc;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    header {
+      background: #18181b;
+      border-bottom: 2px solid #334155;
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      z-index: 100;
+    }
+    .badge {
+      background: #eab308;
+      color: #0f172a;
+      padding: 3px 8px;
+      font-weight: 800;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+    }
+    .title-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .title-area h1 {
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .title-area span {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .nav-tabs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-btn {
+      background: #27272a;
+      color: #e4e4e7;
+      border: 1.5px solid #52525b;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      font-family: inherit;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+    .nav-btn:hover {
+      background: #3f3f46;
+      color: #fff;
+    }
+    .nav-btn.active {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #f8fafc;
+    }
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .action-btn {
+      background: #0284c7;
+      color: #ffffff;
+      border: 1.5px solid #38bdf8;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: none;
+    }
+    .action-btn:hover {
+      background: #0369a1;
+    }
+    .frame-container {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: #ffffff;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title-area">
+      <span class="badge">1:1 EXACT SCALE</span>
+      <div>
+        <h1>LEVEL 1 LOW-FIDELITY WIREFRAME CLONE</h1>
+        <span>Live DOM geometry, exact dimensions, typography &amp; structural layout</span>
+      </div>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="nav-btn active" id="btn-home" onclick="loadView('home')">
+        1. Public Home (index.php) [1:1 Scale]
+      </button>
+      <button class="nav-btn" id="btn-dash" onclick="loadView('dash')">
+        2. Dashboard Shell (dashboard.php) [1:1 Scale]
+      </button>
+      <button class="nav-btn" id="btn-all" onclick="loadView('all')">
+        3. Specification Blueprint [7 Screens]
+      </button>
+    </div>
+
+    <div class="actions">
+      <a id="btn-open-new" href="homepage_1to1_level_1_wireframe.html" target="_blank" class="action-btn">
+        â†— Open Standalone
+      </a>
+    </div>
+  </header>
+
+  <div class="frame-container">
+    <iframe id="main-frame" src="homepage_1to1_level_1_wireframe.html"></iframe>
+  </div>
+
+  <script>
+    const views = {
+      home: {
+        url: 'homepage_1to1_level_1_wireframe.html',
+        btn: 'btn-home'
+      },
+      dash: {
+        url: 'dashboard_level_1_wireframe_1to1.html',
+        btn: 'btn-dash'
+      },
+      all: {
+        url: 'LEVEL_1_WIREFRAME_CLONE.html',
+        btn: 'btn-all'
+      }
+    };
+
+    function loadView(key) {
+      const cfg = views[key];
+      if (!cfg) return;
+
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(cfg.btn).classList.add('active');
+
+      const iframe = document.getElementById('main-frame');
+      iframe.src = cfg.url;
+
+      document.getElementById('btn-open-new').href = cfg.url;
+    }
+  </script>
+</body>
+</html>
+
+

@@ -1,0 +1,1001 @@
+/**
+ * ====================================================================
+ * LIQUID-SIDEBAR.CSS — Organic Liquid Transition & Fuller Attached Sidebar
+ * Full-height attached sidebar (no floating island) with centered
+ * luminous gliding active indicator (no opaque white background artifact).
+ * ====================================================================
+ */
+
+/* ── 1. ROOT VARIABLES ── */
+:root {
+    --liquid-sidebar-w-compact: 72px;
+    --liquid-sidebar-w-expanded: 250px;
+    --liquid-sidebar-bg: #121217;
+    --liquid-sidebar-border: rgba(255, 255, 255, 0.08);
+    --liquid-indicator-gold-1: #F5E5BE;
+    --liquid-indicator-gold-2: #C5A059;
+    --liquid-indicator-gold-3: #996515;
+    --liquid-indicator-shadow: rgba(197, 160, 89, 0.45);
+    --liquid-ease: cubic-bezier(0.34, 1.45, 0.7, 1);
+    --liquid-ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="light"] {
+    --liquid-sidebar-bg: #13131a;
+    --liquid-sidebar-border: rgba(255, 255, 255, 0.08);
+}
+
+/* ── 2. FULL-HEIGHT ATTACHED SIDEBAR (NOT AN ISLAND) ── */
+.sidebar {
+    width: var(--liquid-sidebar-w-compact) !important;
+    background: var(--liquid-sidebar-bg) !important;
+    border: none !important;
+    border-right: 1px solid var(--liquid-sidebar-border) !important;
+    border-radius: 0 !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    z-index: 100 !important;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.28) !important;
+    transition: width 0.35s var(--liquid-ease-smooth) !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+}
+
+/* Expanded state on desktop */
+.sidebar.is-expanded {
+    width: var(--liquid-sidebar-w-expanded) !important;
+    border-radius: 0 !important;
+}
+
+/* Sync main content margin on desktop (>= 1025px) */
+@media (min-width: 1025px) {
+    .main {
+        margin-left: var(--liquid-sidebar-w-compact) !important;
+        transition: margin-left 0.35s var(--liquid-ease-smooth) !important;
+    }
+    body.sidebar-expanded .main {
+        margin-left: var(--liquid-sidebar-w-expanded) !important;
+    }
+}
+
+/* Mobile drawer behavior (<= 1024px) */
+@media (max-width: 1024px) {
+    .sidebar {
+        top: 0 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        border-radius: 0 !important;
+        transform: translateX(-105%) !important;
+        width: 270px !important;
+        z-index: 9999 !important;
+    }
+    .sidebar.open {
+        transform: translateX(0) !important;
+        box-shadow: 16px 0 40px rgba(0, 0, 0, 0.6) !important;
+    }
+    .main {
+        margin-left: 0 !important;
+    }
+}
+
+/* ── 3. TOP HEADER & HAMBURGER ── */
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    position: relative;
+    min-height: 52px;
+    height: 52px;
+    box-sizing: border-box;
+}
+
+.sidebar-mode-toggle {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
+    color: #A3A3A3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.sidebar-mode-toggle:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--accent, #B8913A);
+    transform: scale(1.05);
+}
+
+.sidebar-header .sidebar-logo {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 0;
+    border: none;
+    cursor: pointer;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.sidebar-header .sidebar-logo img {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.sidebar.is-expanded .sidebar-header {
+    justify-content: space-between !important;
+    padding: 10px 16px !important;
+    min-height: 58px !important;
+    height: auto !important;
+}
+
+.sidebar.is-expanded .sidebar-header .sidebar-logo {
+    display: flex !important;
+    order: 1 !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+
+.sidebar.is-expanded .sidebar-header .sidebar-mode-toggle {
+    order: 2 !important;
+}
+
+/* ── 4. USER PROFILE ROW ── */
+.sidebar-user {
+    padding: 12px 10px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 12px !important;
+    cursor: pointer !important;
+    position: relative !important;
+    transition: background 0.18s ease !important;
+    box-sizing: border-box !important;
+}
+
+.sidebar-user:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.sidebar-avatar {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    border: 1.5px solid var(--accent, #B8913A) !important;
+    overflow: hidden !important;
+    flex-shrink: 0 !important;
+}
+
+.sidebar-user-info {
+    display: none;
+    min-width: 0;
+}
+
+.sidebar.is-expanded .sidebar-user {
+    justify-content: flex-start !important;
+    padding: 12px 16px !important;
+}
+
+.sidebar.is-expanded .sidebar-user-info {
+    display: block !important;
+}
+
+/* ── 5. NAVIGATION RAIL & ITEMS ── */
+.sidebar-nav {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 8px 0 !important;
+    position: relative !important;
+    scrollbar-width: none;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+    display: none;
+}
+
+/* Section labels */
+.nav-section-label {
+    display: none;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    color: #8E9AA8 !important;
+    padding: 14px 22px 4px !important;
+}
+
+.sidebar.is-expanded .nav-section-label {
+    display: block !important;
+}
+
+/* Nav Item Baseline */
+.nav-item {
+    height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 12px !important;
+    padding: 0 14px !important;
+    color: #94A3B8 !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    border: none !important;
+    position: relative !important;
+    background: transparent !important;
+    transition: color 0.18s ease, background 0.18s ease !important;
+    box-sizing: border-box !important;
+    white-space: nowrap !important;
+}
+
+.sidebar:not(.is-expanded) .nav-item:hover {
+    color: #FFFFFF !important;
+    transform: translateX(4px) !important;
+}
+
+.nav-item i {
+    width: 20px !important;
+    text-align: center !important;
+    font-size: 15px !important;
+    flex-shrink: 0 !important;
+    color: #8E9AA8 !important;
+    transition: color 0.18s ease !important;
+}
+
+.nav-item:hover i {
+    color: #FFFFFF !important;
+}
+
+.nav-item span {
+    display: none;
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+}
+
+.sidebar.is-expanded .nav-item {
+    justify-content: flex-start !important;
+    margin: 2px 10px !important;
+    padding: 0 12px !important;
+    border-radius: 8px !important;
+    transform: none !important;
+}
+
+.sidebar.is-expanded .nav-item:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    color: #FFFFFF !important;
+    transform: none !important;
+}
+
+.sidebar.is-expanded .nav-item:hover i {
+    color: #FFFFFF !important;
+    transform: none !important;
+}
+
+.sidebar.is-expanded .nav-item > span:not(.sub-active-dot):not(.sub-active-badge):not(.active-child-pip):not(.nav-badge) {
+    display: inline-block !important;
+    max-width: 175px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+}
+
+/* When an item is active in compact mode, hide standard icon so the liquid circle showcases it */
+.sidebar:not(.is-expanded) .nav-item.active i {
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+/* In expanded mode, active item has a rich subtle gold accent with aligned baseline */
+.sidebar.is-expanded .nav-item.active {
+    background: rgba(184, 145, 58, 0.14) !important;
+    color: var(--accent, #B8913A) !important;
+    border-radius: 8px !important;
+    margin: 2px 10px !important;
+    padding: 0 12px !important;
+    transform: none !important;
+}
+.sidebar.is-expanded .nav-item.active:hover {
+    background: rgba(184, 145, 58, 0.20) !important;
+    transform: none !important;
+}
+.sidebar.is-expanded .nav-item.active i {
+    color: var(--accent, #B8913A) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Floating notification badge in compact mode */
+.sidebar:not(.is-expanded) .nav-badge,
+.sidebar:not(.is-expanded) .badge {
+    position: absolute !important;
+    top: 7px !important;
+    right: 14px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    padding: 0 5px !important;
+    min-width: 18px !important;
+    height: 18px !important;
+    line-height: 16px !important;
+    border-radius: 999px !important;
+    background: var(--accent, #B8913A) !important;
+    color: #111116 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: 1.5px solid var(--liquid-sidebar-bg) !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+    margin: 0 !important;
+}
+
+/* ── 6. THE LIQUID INDICATOR (CENTERED LIQUID GLIDE, NO OPAQUE WHITE CUTOUT) ── */
+.liquid-indicator {
+    position: absolute;
+    left: 14px;
+    top: 0;
+    width: 44px;
+    height: 44px;
+    pointer-events: none;
+    z-index: 25;
+    opacity: 0;
+    transform: translateY(0);
+    transition: transform 0.36s var(--liquid-ease-smooth), opacity 0.2s ease, width 0.24s var(--liquid-ease-smooth), height 0.24s var(--liquid-ease-smooth), left 0.24s var(--liquid-ease-smooth);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* The Luminous Floating Circle Badge */
+.liquid-circle {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--liquid-indicator-gold-1) 0%, var(--liquid-indicator-gold-2) 55%, var(--liquid-indicator-gold-3) 100%);
+    color: #111116;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 18px var(--liquid-indicator-shadow), 0 0 16px rgba(197, 160, 89, 0.28);
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), border-radius 0.24s var(--liquid-ease-smooth), box-shadow 0.22s ease !important;
+}
+
+/* Active Indicator Hover Glide — moves right in unison with the hovered active item */
+.sidebar:not(.is-expanded):has(.nav-item.active:hover) .liquid-circle,
+.sidebar:not(.is-expanded):has(.nav-dropdown.has-active-child .dropdown-toggle:hover) .liquid-circle,
+.sidebar:not(.is-expanded) .liquid-indicator.is-hovered .liquid-circle {
+    transform: translateX(6px) !important;
+    box-shadow: 0 6px 24px rgba(197, 160, 89, 0.72), 0 0 20px rgba(184, 145, 58, 0.45) !important;
+}
+
+.liquid-circle-icon {
+    font-size: 16px;
+    color: #111116;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: font-size 0.2s ease;
+}
+
+/* Sub-item Morph State: Tailored 32px indented rounded-square tile */
+.liquid-indicator.is-sub-item {
+    left: 20px !important;
+    width: 32px !important;
+    height: 32px !important;
+}
+
+.liquid-indicator.is-sub-item .liquid-circle {
+    border-radius: 8px !important;
+    box-shadow: 0 2px 12px rgba(197, 160, 89, 0.55), 0 0 10px rgba(184, 145, 58, 0.35) !important;
+}
+
+.liquid-indicator.is-sub-item .liquid-circle-icon {
+    font-size: 13.5px !important;
+}
+
+/* Hide liquid indicator when in expanded mode on desktop or on mobile drawer */
+.sidebar.is-expanded .liquid-indicator {
+    display: none !important;
+}
+
+@media (max-width: 1024px) {
+    .liquid-indicator {
+        display: none !important;
+    }
+}
+
+/* ── 7. TOOLTIPS ON HOVER (COMPACT MODE) ── */
+.sidebar:not(.is-expanded) .nav-item:not(.dropdown-toggle)[data-tooltip]::after,
+.sidebar:not(.is-expanded) .sidebar-user[data-tooltip]::after,
+.sidebar:not(.is-expanded) .sidebar-mode-toggle[data-tooltip]::after,
+.sidebar:not(.is-expanded) .logout-link[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 18px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-6px);
+    background: rgba(18, 18, 24, 0.94);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #FFFFFF;
+    font-family: var(--font-sans, inherit);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 6px 12px;
+    border-radius: 8px;
+    white-space: nowrap;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s var(--liquid-ease-smooth);
+    z-index: 1000;
+}
+
+.sidebar:not(.is-expanded) .nav-item:not(.dropdown-toggle):hover::after,
+.sidebar:not(.is-expanded) .sidebar-user:hover::after,
+.sidebar:not(.is-expanded) .sidebar-mode-toggle:hover::after,
+.sidebar:not(.is-expanded) .logout-link:hover::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}
+
+/* ── 8. FOOTER / LOGOUT ── */
+.sidebar-footer {
+    padding: 12px 10px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 52px;
+    box-sizing: border-box;
+}
+
+.sidebar.is-expanded .sidebar-footer {
+    justify-content: flex-start !important;
+    padding: 10px 10px !important;
+}
+
+.logout-link {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 12px !important;
+    color: #8E9AA8 !important;
+    text-decoration: none !important;
+    font-size: 14px !important;
+    padding: 8px !important;
+    border-radius: 8px !important;
+    transition: all 0.18s ease !important;
+    position: relative !important;
+    width: 100% !important;
+}
+
+.sidebar.is-expanded .logout-link {
+    justify-content: flex-start !important;
+    padding: 8px 12px !important;
+}
+
+.logout-link:hover {
+    color: #EF4444 !important;
+    background: rgba(239, 68, 68, 0.1) !important;
+}
+
+.logout-link span {
+    display: none;
+}
+
+.sidebar.is-expanded .logout-link {
+    justify-content: flex-start !important;
+}
+
+.sidebar.is-expanded .logout-link span {
+    display: inline !important;
+}
+
+/* ── 9. DROPDOWNS & SUB-TOPIC VISUAL CLARITY ── */
+
+/* Active Child Indicator Pip on parent toggle */
+.active-child-pip {
+    display: none !important;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent, #B8913A);
+    box-shadow: 0 0 8px var(--accent, #B8913A);
+    margin-left: auto;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+.nav-dropdown.has-active-child .active-child-pip {
+    display: inline-block !important;
+}
+
+/* A. Compact Mode (Icon Rail, 72px) */
+.sidebar:not(.is-expanded) .dropdown-toggle i:last-child {
+    display: none !important;
+}
+
+/* Parent toggle open/active state in compact rail */
+.sidebar:not(.is-expanded) .nav-dropdown.open .dropdown-toggle i:first-child,
+.sidebar:not(.is-expanded) .nav-dropdown.flyout-open .dropdown-toggle i:first-child,
+.sidebar:not(.is-expanded) .nav-dropdown:hover .dropdown-toggle i:first-child {
+    color: var(--accent, #B8913A) !important;
+    transform: scale(1.15) !important;
+}
+
+.sidebar:not(.is-expanded) .nav-dropdown.flyout-open .dropdown-toggle,
+.sidebar:not(.is-expanded) .nav-dropdown:hover .dropdown-toggle {
+    transform: translateX(6px) !important;
+    color: #FFFFFF !important;
+}
+
+/* Gold active indicator dot on parent icon when a sub-topic inside is active */
+.sidebar:not(.is-expanded) .nav-dropdown.has-active-child .dropdown-toggle::after {
+    content: '';
+    position: absolute;
+    right: 12px;
+    bottom: 8px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent, #B8913A);
+    box-shadow: 0 0 8px var(--accent, #B8913A), 0 0 2px #FFFFFF;
+    z-index: 10;
+}
+
+/* In compact rail mode (72px), never expand sub-items inline inside the rail to prevent squishing! */
+.sidebar:not(.is-expanded) .dropdown-content {
+    display: none !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+}
+
+/* In compact mode, hide text header pill */
+.sidebar:not(.is-expanded) .sub-topic-header-pill {
+    display: none !important;
+}
+
+/* B. Expanded Mode (Full Sidebar, 250px) */
+.sidebar.is-expanded .nav-dropdown.open .dropdown-toggle i:last-child {
+    transform: rotate(180deg) !important;
+    color: var(--accent, #B8913A) !important;
+}
+
+.sidebar.is-expanded .nav-dropdown.has-active-child .dropdown-toggle {
+    color: #FFFFFF !important;
+}
+
+.sidebar.is-expanded .nav-dropdown.has-active-child .dropdown-toggle i:first-child {
+    color: var(--accent, #B8913A) !important;
+}
+
+.sidebar.is-expanded .nav-dropdown.open .dropdown-content {
+    margin-left: 18px !important;
+    padding: 6px 8px 8px 12px !important;
+    border-left: 2px solid rgba(184, 145, 58, 0.45) !important;
+    background: rgba(0, 0, 0, 0.25) !important;
+    border-radius: 0 10px 10px 0 !important;
+    margin-top: 4px !important;
+    margin-bottom: 8px !important;
+    margin-right: 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    position: relative !important;
+}
+
+/* Explicit Sub-topics Header Chip */
+.sub-topic-header-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent, #B8913A);
+    padding: 4px 6px;
+    opacity: 0.85;
+    border-bottom: 1px solid rgba(184, 145, 58, 0.15);
+    margin-bottom: 4px;
+}
+
+.sidebar.is-expanded .nav-item.sub-item {
+    height: 38px !important;
+    padding: 0 10px !important;
+    border-radius: 8px !important;
+    font-size: 13px !important;
+    color: #94A3B8 !important;
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    transition: all 0.18s ease !important;
+}
+
+.sidebar.is-expanded .nav-item.sub-item::before {
+    content: '└';
+    position: absolute;
+    left: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: rgba(184, 145, 58, 0.55);
+    font-family: monospace;
+}
+
+.sidebar.is-expanded .nav-item.sub-item i {
+    font-size: 12px !important;
+    width: 20px !important;
+    height: 20px !important;
+    border-radius: 4px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    color: #8E9AA8 !important;
+    transition: all 0.18s ease !important;
+}
+
+.sidebar.is-expanded .nav-item.sub-item:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    color: #FFFFFF !important;
+}
+
+.sidebar.is-expanded .nav-item.sub-item:hover i {
+    color: var(--accent, #B8913A) !important;
+    background: rgba(184, 145, 58, 0.15) !important;
+}
+
+.sidebar.is-expanded .nav-item.sub-item.active {
+    background: rgba(184, 145, 58, 0.18) !important;
+    border: 1px solid rgba(184, 145, 58, 0.35) !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+}
+
+.sidebar.is-expanded .nav-item.sub-item.active i {
+    color: var(--accent, #B8913A) !important;
+    background: rgba(184, 145, 58, 0.25) !important;
+}
+
+.sidebar.is-expanded .nav-item.sub-item span:not(.sub-active-dot):not(.sub-active-badge) {
+    flex: 1;
+    white-space: nowrap;
+}
+
+.sub-active-dot,
+.sub-active-badge {
+    display: none !important;
+    margin-left: auto;
+    margin-right: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent, #B8913A);
+    box-shadow: 0 0 8px var(--accent, #B8913A), 0 0 2px #FFFFFF;
+    flex-shrink: 0;
+}
+
+.sidebar.is-expanded .nav-item.sub-item.active .sub-active-dot,
+.sidebar.is-expanded .nav-item.sub-item.active .sub-active-badge {
+    display: inline-block !important;
+}
+
+/* C. Floating Subtopics Flyout Popover Menu for Compact Rail */
+.subtopic-flyout {
+    position: fixed;
+    left: 76px;
+    width: 244px;
+    background: rgba(17, 17, 22, 0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(184, 145, 58, 0.35);
+    border-radius: 14px;
+    box-shadow: 0 16px 42px rgba(0, 0, 0, 0.8), 0 0 1px rgba(255, 255, 255, 0.25);
+    padding: 12px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: flyoutFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Invisible hover bridge connecting 72px rail seamlessly with 76px flyout */
+.subtopic-flyout::before {
+    content: '';
+    position: absolute;
+    left: -24px;
+    top: -12px;
+    bottom: -12px;
+    width: 28px;
+    background: transparent;
+    pointer-events: auto;
+}
+
+@keyframes flyoutFadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-6px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+/* Left pointing notch */
+.subtopic-flyout-notch {
+    position: absolute;
+    left: -6px;
+    top: 24px;
+    width: 12px;
+    height: 12px;
+    background: rgba(17, 17, 22, 0.96);
+    border-left: 1px solid rgba(184, 145, 58, 0.32);
+    border-bottom: 1px solid rgba(184, 145, 58, 0.32);
+    transform: rotate(45deg);
+}
+
+.subtopic-flyout-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 8px;
+    margin-bottom: 2px;
+}
+
+.subtopic-flyout-eyebrow {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent, #B8913A);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 2px;
+}
+
+.subtopic-flyout-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #F8FAFC;
+    letter-spacing: -0.01em;
+}
+
+.subtopic-flyout-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.subtopic-flyout-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    color: #CBD5E1;
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 500;
+    transition: color 0.16s ease, background 0.16s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.16s ease;
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+
+.subtopic-flyout-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #FFFFFF;
+    border-color: rgba(184, 145, 58, 0.3);
+    transform: translateX(4px);
+}
+
+.subtopic-flyout-item i {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13.5px;
+    color: #94A3B8;
+    flex-shrink: 0;
+    transition: all 0.16s ease;
+}
+
+.subtopic-flyout-item:hover i {
+    background: rgba(184, 145, 58, 0.2);
+    border-color: var(--accent, #B8913A);
+    color: var(--accent, #B8913A);
+}
+
+.subtopic-flyout-item.active {
+    background: rgba(184, 145, 58, 0.16);
+    border-color: rgba(184, 145, 58, 0.4);
+    color: #FFFFFF;
+    font-weight: 600;
+}
+
+.subtopic-flyout-item.active i {
+    background: var(--accent, #B8913A);
+    border-color: var(--accent, #B8913A);
+    color: #111116;
+}
+
+.subtopic-flyout-item .flyout-active-tag {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--accent, #B8913A);
+    color: #111116;
+}
+
+@keyframes subRailSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ── 10. MOBILE DRAWER COMPLETE RESPONSIVE OVERRIDES (<= 1024px) ── */
+@media (max-width: 1024px) {
+    /* Header & Branding */
+    .sidebar .sidebar-header {
+        justify-content: space-between !important;
+        padding: 10px 16px !important;
+        min-height: 58px !important;
+        height: auto !important;
+    }
+    .sidebar .sidebar-header .sidebar-logo {
+        display: flex !important;
+    }
+    .sidebar .sidebar-mode-toggle {
+        display: flex !important;
+        color: #CBD5E1 !important;
+    }
+
+    /* User Profile section */
+    .sidebar .sidebar-user {
+        justify-content: flex-start !important;
+        padding: 12px 16px !important;
+    }
+    .sidebar .sidebar-user-info {
+        display: block !important;
+    }
+
+    /* Navigation items & Labels */
+    .sidebar .nav-section-label {
+        display: block !important;
+    }
+    .sidebar .nav-item {
+        justify-content: flex-start !important;
+        padding: 0 16px !important;
+    }
+    .sidebar .nav-item > span:not(.sub-active-dot):not(.sub-active-badge):not(.active-child-pip):not(.nav-badge) {
+        display: inline !important;
+    }
+    .sidebar .nav-item i,
+    .sidebar:not(.is-expanded) .nav-item i,
+    .sidebar:not(.is-expanded) .nav-item.active i {
+        opacity: 1 !important;
+        visibility: visible !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    .sidebar .nav-item.active,
+    .sidebar:not(.is-expanded) .nav-item.active {
+        background: rgba(184, 145, 58, 0.14) !important;
+        color: var(--accent, #B8913A) !important;
+        border-radius: 10px !important;
+        margin: 0 10px !important;
+        padding: 0 12px !important;
+    }
+    .sidebar .nav-item.active i,
+    .sidebar:not(.is-expanded) .nav-item.active i {
+        color: var(--accent, #B8913A) !important;
+    }
+
+    /* Dropdown chevrons and collapsible accordions on mobile */
+    .sidebar .dropdown-toggle i:last-child,
+    .sidebar:not(.is-expanded) .dropdown-toggle i:last-child {
+        display: inline-block !important;
+        margin-left: auto !important;
+        font-size: 11px !important;
+        transition: transform 0.2s ease !important;
+    }
+    .sidebar .nav-dropdown.open .dropdown-toggle i:last-child,
+    .sidebar:not(.is-expanded) .nav-dropdown.open .dropdown-toggle i:last-child {
+        transform: rotate(180deg) !important;
+        color: var(--accent, #B8913A) !important;
+    }
+    .sidebar .nav-dropdown.open .dropdown-content,
+    .sidebar:not(.is-expanded) .nav-dropdown.open .dropdown-content {
+        display: flex !important;
+        margin-left: 18px !important;
+        padding: 6px 8px 8px 12px !important;
+        border-left: 2px solid rgba(184, 145, 58, 0.45) !important;
+        background: rgba(0, 0, 0, 0.25) !important;
+        border-radius: 0 10px 10px 0 !important;
+        margin-top: 4px !important;
+        margin-bottom: 8px !important;
+        margin-right: 12px !important;
+        flex-direction: column !important;
+        gap: 4px !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    .sidebar .nav-item.sub-item {
+        height: 38px !important;
+        padding: 0 10px !important;
+        border-radius: 8px !important;
+        font-size: 13px !important;
+        color: #94A3B8 !important;
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+    }
+    .sidebar .nav-item.sub-item span {
+        display: inline !important;
+    }
+    .sidebar .sub-topic-header-pill {
+        display: flex !important;
+    }
+
+    /* Footer and Logout */
+    .sidebar .sidebar-footer {
+        justify-content: flex-start !important;
+        padding: 12px 16px !important;
+    }
+    .sidebar .logout-link {
+        justify-content: flex-start !important;
+    }
+    .sidebar .logout-link span {
+        display: inline !important;
+    }
+
+    /* Hide desktop-only floating elements on mobile */
+    .subtopic-flyout,
+    .liquid-indicator,
+    .sidebar .nav-item[data-tooltip]::after,
+    .sidebar .sidebar-user[data-tooltip]::after,
+    .sidebar .sidebar-mode-toggle[data-tooltip]::after,
+    .sidebar .logout-link[data-tooltip]::after {
+        display: none !important;
+    }
+}
+

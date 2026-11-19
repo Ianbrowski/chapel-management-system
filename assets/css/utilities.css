@@ -1,0 +1,567 @@
+/* =========================================
+   UTILITIES.CSS
+   Design Tokens Â· Reset Â· Animations Â· Helpers
+   Migrated from dashboard.css (Phase 1)
+   ========================================= */
+
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   1. DESIGN TOKENS  (CSS Custom Properties)
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+:root {
+    /* Backgrounds — Sacred Alabaster & Elevated Panels */
+    --bg:  var(--color-bg, #f9f7f2);
+    --bg2: var(--color-surface, #ffffff);
+    --bg3: var(--color-surface-subtle, #f2ede4);
+
+    /* Sidebar — Deep Cathedral Walnut/Espresso */
+    --sidebar-w:          175px;
+    --sidebar-bg:         #16130e;
+    --sidebar-text:       #d5cec5;
+    --sidebar-hover-bg:   rgba(255, 255, 255, 0.06);
+    --sidebar-accent-bg:  rgba(184, 130, 12, 0.14);
+
+    /* Brand accent — Illuminated Cathedral Gold (Option 1) */
+    --accent:      var(--color-accent, #C5A059);
+    --accent2:     var(--color-accent-hover, #D8B56F);
+    --accent-glow: var(--color-accent-glow, rgba(197, 160, 89, 0.18));
+
+    /* Status colours */
+    --red:   var(--color-danger, #DC2626);
+    --green: var(--color-success, #16A34A);
+    --blue:  var(--color-navy, #0F172A);
+
+    /* Typography - Cohesive Font Families */
+    --font-heading:   'Playfair Display', 'Cinzel', Georgia, 'Times New Roman', serif;
+    --font-body:      'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-display:   'Playfair Display', 'Cinzel', Georgia, serif;
+    --font-mono:      'Fira Code', ui-monospace, SFMono-Regular, monospace;
+
+    /* Standardized Typography Scale (14px baseline) */
+    --fs-2xs: 0.714rem;   /* ~10px - micro badges, labels */
+    --fs-xs:  0.785rem;   /* ~11px - meta, secondary text, table headers */
+    --fs-sm:  0.857rem;   /* ~12px - table rows, inputs, sub-items */
+    --fs-md:  1rem;       /* 14px - standard body, buttons, cards */
+    --fs-base: 1rem;      /* 14px */
+    --fs-lg:  1.143rem;   /* ~16px - card section titles, metric labels */
+    --fs-xl:  1.285rem;   /* ~18px - page header titles */
+    --fs-2xl: 1.571rem;   /* ~22px - large stat metric values */
+    --fs-3xl: 1.857rem;   /* ~26px - major titles */
+
+    --text:  var(--color-text, #1e1810);
+    --text2: var(--color-text-muted, #5c5244);
+
+    /* Surfaces */
+    --border:     var(--color-border, #e4ddcf);
+    --radius:     12px;
+    --shadow:     0 1px 3px rgba(30, 24, 16, 0.05);
+    --shadow-lg:  0 10px 25px -3px rgba(30, 24, 16, 0.07);
+    --topbar-bg:  rgba(249, 247, 242, 0.94);
+    --hover-bg:   rgba(184, 130, 12, 0.04);
+
+    /* Easing tokens */
+    --ease-out-quart: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring:    cubic-bezier(0.34, 1.36, 0.64, 1);
+    --ease-smooth:    cubic-bezier(0.4, 0, 0.15, 1);
+    --dur-fast:  0.18s;
+    --dur-base:  0.32s;
+    --dur-slow:  0.5s;
+    --dur-page:  0.65s;
+}
+
+[data-theme="dark"] {
+    --bg:  var(--color-bg, #0c1017);
+    --bg2: var(--color-surface, #161f30);
+    --bg3: var(--color-surface-subtle, #1e293f);
+
+    --panel-bg: var(--color-surface, #161f30);
+    --panel-header-bg: #1e293f;
+    --panel-border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+    --panel-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 1px 4px 0 rgba(0, 0, 0, 0.35);
+    --panel-radius: 12px;
+
+    --sidebar-bg:  #0a0d14;
+    --sidebar-text: #94a3b8;
+
+    --accent:      var(--color-accent, #c9a84c);
+    --accent2:     var(--color-accent-hover, #f5cc6a);
+    --accent-glow: var(--color-accent-glow, rgba(232, 184, 75, 0.18));
+
+    --text:  var(--color-text, #f8f4ec);
+    --text2: var(--color-text-muted, #b8a88c);
+
+    --border:    var(--color-border, rgba(232, 184, 75, 0.14));
+    --shadow:    0 4px 18px rgba(0, 0, 0, 0.60);
+    --shadow-lg: 0 14px 40px rgba(0, 0, 0, 0.70);
+    --topbar-bg: rgba(7, 8, 15, 0.94);
+    --hover-bg:  rgba(232, 184, 75, 0.06);
+}
+
+[data-theme="light"] {
+    /* Bridged to theme.css tokens */
+    --bg:  var(--color-bg, #f9f7f2);
+    --bg2: var(--color-surface, #ffffff);
+    --bg3: var(--color-surface-subtle, #f2ede4);
+
+    --panel-bg: var(--color-surface, #ffffff);
+    --panel-header-bg: var(--color-surface-subtle, #f2ede4);
+    --panel-border: 1px solid var(--color-border, #e4ddcf);
+    --panel-shadow: 0 1px 3px rgba(30, 24, 16, 0.05), 0 1px 2px rgba(30, 24, 16, 0.03);
+    --panel-radius: 12px;
+
+    --sidebar-bg:  #16130e;
+    --sidebar-text: #d5cec5;
+
+    --accent:      var(--color-accent, #b8820c);
+    --accent2:     var(--color-accent-hover, #9c6d07);
+    --accent-glow: var(--color-accent-glow, rgba(184, 130, 12, 0.14));
+
+    --text:  var(--color-text, #1e1810);
+    --text2: var(--color-text-muted, #5c5244);
+
+    --border:    var(--color-border, #e4ddcf);
+    --shadow:    0 1px 3px rgba(30, 24, 16, 0.05);
+    --shadow-lg: 0 10px 25px -3px rgba(30, 24, 16, 0.07);
+    --topbar-bg: rgba(255, 255, 255, 0.96);
+    --hover-bg:  var(--color-surface-hover, rgba(184, 130, 12, 0.04));
+}
+
+
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   2. GLOBAL RESET
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Custom Scrollbar Styling (Global) */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border, rgba(150, 150, 150, 0.4));
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent, #c9a84c);
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border, rgba(150, 150, 150, 0.4)) transparent;
+}
+
+html {
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    font-size: 87.5%; /* 14px unified standard baseline */
+}
+
+/* ─── COHESIVE FONT CLASSIFICATIONS ─── */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-family-base, 'Inter', -apple-system, sans-serif);
+    color: var(--text);
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+h1 { font-size: var(--font-size-3xl, 24px); font-weight: 700; line-height: 1.3; }
+h2 { font-size: var(--font-size-2xl, 20px); font-weight: 600; line-height: 1.35; }
+h3 { font-size: var(--font-size-lg, 17px); font-weight: 600; line-height: 1.4; }
+h4 { font-size: var(--font-size-md, 15px); font-weight: 600; line-height: 1.4; }
+h5 { font-size: var(--font-size-base, 14px); font-weight: 600; line-height: 1.4; }
+h6 { font-size: var(--font-size-sm, 12px); font-weight: 600; line-height: 1.4; }
+
+p {
+    font-size: var(--font-size-base, 14px);
+    line-height: var(--line-height-relaxed, 1.5);
+    color: var(--text);
+}
+
+.heading-cinzel, .cathedral-display, .font-display {
+    font-family: var(--font-display) !important;
+}
+
+.metric-value, .stat-value, .ov-stat-val, .card-metric {
+    font-family: var(--font-family-base, var(--font-body));
+    font-size: var(--font-size-metric, 26px);
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+code, pre, .code-text, .user-id, .ticket-no, .badge-mono {
+    font-family: var(--font-mono) !important;
+}
+
+/* ─── 3. PAGE-LOAD FADE ─── */
+body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+    font-size: var(--fs-md);
+    opacity: 0;
+    overflow-x: hidden;
+    transition: opacity 0.85s var(--ease-out-quart);
+    animation: pageReveal 0.9s var(--ease-out-quart) 0.05s both;
+}
+
+body.sidebar-open {
+    overflow: hidden;
+    touch-action: none;
+}
+
+body.page-ready {
+    opacity: 1;
+    animation: none;
+}
+
+
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   4. DARK-MODE TRANSITION GATE
+   Add .theme-transitioning to <body> via JS for 400ms during theme
+   switch. Suppresses entry animations so nav items don't replay.
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.theme-transitioning,
+body.theme-transitioning * {
+    transition:
+        background-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        border-color     0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        color            0.28s cubic-bezier(0.4, 0, 0.2, 1),
+        box-shadow       0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        fill             0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        stroke           0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    animation-duration: 0.001s !important;
+    animation-delay: 0s !important;
+}
+
+body.theme-transitioning .sidebar {
+    transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+body.theme-transitioning .topbar {
+    transition:
+        background-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        border-color     0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        backdrop-filter  0s !important;
+}
+
+body.theme-transitioning .modal-overlay {
+    transition:
+        background-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity          0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+body.theme-transitioning canvas {
+    transition: opacity 0.2s ease !important;
+    opacity: 0.8;
+}
+
+body.theme-transitioning svg * {
+    transition:
+        fill   0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        stroke 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+body.theme-transitioning ::-webkit-scrollbar-thumb {
+    transition: background 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   5. ATOMIC UTILITY CLASSES
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+/* Layout helpers */
+.bg-blue-glow   { background: rgba(197, 160, 89, 0.1); color: var(--accent); border: 1px solid rgba(197, 160, 89, 0.2); }
+.bg-yellow-glow { background: rgba(197, 160, 89, 0.1); color: var(--accent); border: 1px solid rgba(197, 160, 89, 0.2); }
+.bg-green-glow  { background: rgba(22, 163, 74, 0.1); color: #16a34a; border: 1px solid rgba(22, 163, 74, 0.2); }
+.bg-accent-glow { background: rgba(197, 160, 89, 0.1); color: var(--accent); border: 1px solid rgba(197, 160, 89, 0.2); }
+
+.col-full      { grid-column: 1 / -1 !important; }
+.two-col       { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.two-col-grid-start { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.grid-7        { display: grid; grid-template-columns: repeat(7, 1fr); }
+.gap-3         { gap: 8px; }
+.gap-12        { gap: 8px; }
+.gap-16        { gap: 10px; }
+
+/* Typography helpers */
+.text-center   { text-align: center !important; }
+.text-muted    { color: var(--text2) !important; }
+.text-sm       { font-size: 13px; }
+.text-xs       { font-size: 12px; }
+.text-danger   { color: var(--red) !important; }
+.text-success  { color: #10b981 !important; }
+.text-white    { color: #ffffff !important; }
+.bg-danger     { background-color: var(--red) !important; }
+.bg-success    { background-color: #10b981 !important; }
+.text-helper   { color: var(--text2); font-size: 12px; }
+.text-helper-regular { font-size: 12px; color: var(--text2); font-weight: 400; }
+
+/* Position helpers */
+.pos-relative  { position: relative; }
+
+/* Spacing helpers */
+.mb-0  { margin-bottom: 0 !important; }
+.mb-4  { margin-bottom: 4px; }
+.mb-8  { margin-bottom: 8px; }
+.mb-16 { margin-bottom: 10px; }
+.mb-24 { margin-bottom: 14px; }
+.mt-4  { margin-top: 4px; }
+.mt-8  { margin-top: 8px; }
+.mt-16 { margin-top: 10px; }
+.pr-4  { padding-right: 4px; }
+
+/* Display helpers */
+.d-flex        { display: flex; }
+.align-center  { align-items: center; }
+.flex-wrap     { flex-wrap: wrap; }
+.img-cover     { width: 100%; height: 100%; object-fit: cover; }
+
+/* Divider */
+.divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 12px 0;
+}
+
+
+
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   6. CALENDAR UTILITY CLASSES
+   (used by the mini calendar + overview calendar)
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.cal-day-cell {
+    text-align: center;
+    padding: 7px 3px;
+    border-radius: 8px;
+    transition: all 0.22s var(--ease-out-quart);
+    user-select: none;
+    position: relative;
+}
+.cal-day-cell:hover { background: var(--hover-bg); }
+.cal-day-cell.today {
+    background: var(--accent-glow) !important;
+    border: 1px solid var(--accent) !important;
+}
+.cal-event-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* Event-type dot colours */
+.dot-mass     { background: var(--accent) !important; }
+.dot-wedding  { background: var(--accent) !important; }
+.dot-baptism  { background: var(--text) !important; }
+.dot-funeral  { background: #6b7280 !important; }
+.dot-other    { background: var(--accent) !important; }
+
+/* Event-status dot borders */
+.dot-confirmed { border: 1px solid #16a34a !important; }
+.dot-pending   { border: 1px solid var(--accent, #c5a059) !important; }
+.dot-cancelled { border: 1px solid #dc2626 !important; }
+.dot-completed { border: 1px solid #6b7280 !important; }
+
+
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   7. SKELETON LOADING SHIMMER
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--bg3) 25%,
+        rgba(255, 255, 255, 0.06) 50%,
+        var(--bg3) 75%
+    );
+    background-size: 500px 100%;
+    animation: shimmerSweep 1.4s infinite linear;
+    border-radius: var(--radius);
+}
+
+
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   8. KEYFRAME ANIMATIONS
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+@keyframes pageReveal {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-20px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(12px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.94); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes countUp {
+    from { opacity: 0; transform: translateY(6px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes badgePop {
+    0%   { opacity: 0; transform: scale(0.5); }
+    70%  { transform: scale(1.15); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes accentBar {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+}
+
+@keyframes flashSlide {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes modalBackdropIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes modalSlideIn {
+    from { opacity: 0; transform: translateY(20px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes sidebarItemIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes topbarIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseDot {
+    0%, 100% { transform: scale(1);    opacity: 1; }
+    50%       { transform: scale(1.45); opacity: 0.65; }
+}
+
+@keyframes shimmerSweep {
+    from { background-position: -500px 0; }
+    to   { background-position:  500px 0; }
+}
+
+@keyframes sectionReveal {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+
+/* ─────────────────────────────────────────────────────────────────
+   9. RESPONSIVE HELPERS
+   ───────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .two-col              { grid-template-columns: 1fr; }
+    .two-col-grid-start   { grid-template-columns: 1fr; }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   10. FLEX LAYOUT UTILITIES
+   Replaces common inline style="display:flex; ..." patterns
+   ───────────────────────────────────────────────────────────────── */
+.d-flex       { display: flex; }
+.d-grid       { display: grid; }
+.flex-col     { display: flex; flex-direction: column; }
+.flex-row     { display: flex; flex-direction: row; align-items: center; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.flex-center  { display: flex; justify-content: center; align-items: center; }
+.flex-end     { display: flex; justify-content: flex-end; align-items: center; }
+.flex-wrap    { flex-wrap: wrap; }
+.flex-1       { flex: 1; }
+.flex-shrink-0 { flex-shrink: 0; }
+.align-start  { align-items: flex-start; }
+.align-end    { align-items: flex-end; }
+
+/* Gap utilities */
+.gap-1  { gap: 4px; }
+.gap-2  { gap: 6px; }
+.gap-3  { gap: 8px; }
+.gap-4  { gap: 12px; }
+.gap-5  { gap: 16px; }
+.gap-6  { gap: 20px; }
+.gap-7  { gap: 24px; }
+
+/* Min-height helpers for flex children */
+.min-h-0    { min-height: 0; }
+.h-full     { height: 100%; }
+.overflow-h { overflow: hidden; }
+.overflow-ya { overflow-y: auto; }
+
+/* ─────────────────────────────────────────────────────────────────
+   11. COLOR MODIFIER UTILITIES
+   Apply as class alongside other classes e.g. class="sc-icon color-blue"
+   ───────────────────────────────────────────────────────────────── */
+.color-blue   { color: var(--text); }
+.color-green  { color: #16a34a; }
+.color-amber  { color: var(--accent); }
+.color-red    { color: #dc2626; }
+.color-purple { color: var(--accent); }
+.color-pink   { color: var(--accent); }
+.color-gray   { color: #6b7280; }
+.color-teal   { color: #16a34a; }
+.color-accent { color: var(--accent); }
+.color-text   { color: var(--text); }
+.color-muted  { color: var(--text2); }
+
+/* Text size utilities matching design-system tokens */
+.text-xs   { font-size: var(--text-xs, 12px); }
+.text-sm   { font-size: var(--text-sm, 13px); }
+.text-base { font-size: var(--text-base, 14px); }
+.text-lg   { font-size: var(--text-lg, 16px); }
+
+/* Font weight */
+.fw-400 { font-weight: 400; }
+.fw-500 { font-weight: 500; }
+.fw-600 { font-weight: 600; }
+.fw-700 { font-weight: 700; }
+.fw-800 { font-weight: 800; }
+
+/* Text transform */
+.text-upper { text-transform: uppercase; }
+
+/* Margin / padding resets */
+.m-0 { margin: 0; }
+.p-0 { padding: 0; }
+.mt-1 { margin-top: 4px; }
+.mt-2 { margin-top: 8px; }
+.mb-0 { margin-bottom: 0; }

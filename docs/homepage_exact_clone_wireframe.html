@@ -1,0 +1,612 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Level 1 Wireframe — Iglesia Filipina Independiente (Cathedral of St. Michael the Archangel)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #f4f4f5;
+      color: #18181b;
+      font-family: 'Courier New', Courier, monospace, system-ui;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    /* ── TOP HEADER (EXACT REPLICA) ── */
+    .wf-header {
+      background: #ffffff;
+      border-bottom: 2px solid #27272a;
+      padding: 12px 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .wf-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .wf-seal {
+      width: 44px;
+      height: 44px;
+      border: 2px solid #27272a;
+      background: #e4e4e7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 11px;
+      position: relative;
+      background-image:
+        linear-gradient(to top right, transparent calc(50% - 1px), #a1a1aa, transparent calc(50% + 1px)),
+        linear-gradient(to bottom right, transparent calc(50% - 1px), #a1a1aa, transparent calc(50% + 1px));
+    }
+
+    .wf-seal span {
+      background: #fff;
+      border: 1px solid #27272a;
+      padding: 2px 4px;
+      font-size: 9px;
+    }
+
+    .wf-brand-text h2 {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      line-height: 1.15;
+    }
+
+    .wf-brand-text p {
+      font-size: 11px;
+      color: #52525b;
+      margin-top: 2px;
+      font-weight: 600;
+    }
+
+    .wf-nav {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .wf-nav a {
+      color: #18181b;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 700;
+      padding-bottom: 2px;
+      border-bottom: 2px solid transparent;
+    }
+
+    .wf-nav a:hover {
+      border-bottom-color: #18181b;
+    }
+
+    /* ── HERO BANNER (EXACT 1:1 WITH USER SCREENSHOT) ── */
+    .wf-hero {
+      width: 100%;
+      height: 600px;
+      border-bottom: 2px solid #27272a;
+      background: #e4e4e7;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      background-image:
+        linear-gradient(to top right, transparent calc(50% - 1px), #d4d4d8, transparent calc(50% + 1px)),
+        linear-gradient(to bottom right, transparent calc(50% - 1px), #d4d4d8, transparent calc(50% + 1px));
+    }
+
+    .wf-hero-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.45);
+    }
+
+    .wf-hero-center {
+      position: relative;
+      z-index: 10;
+      max-width: 900px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* Massive Primary Title */
+    .wf-hero-title {
+      font-size: 56px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      line-height: 1.05;
+      text-transform: uppercase;
+      color: #18181b;
+      border: 3px dashed #71717a;
+      padding: 16px 28px;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 6px 6px 0px rgba(24, 24, 27, 0.15);
+    }
+
+    .wf-hero-sub {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: #ffffff;
+      border: 2px solid #27272a;
+      padding: 8px 24px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #27272a;
+      box-shadow: 3px 3px 0px rgba(24, 24, 27, 0.12);
+    }
+
+    .wf-hero-sub .flourish {
+      color: #71717a;
+      font-size: 14px;
+    }
+
+    /* Portal Login CTA Button (Pill Shaped) */
+    .wf-btn-portal-login {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: #27272a;
+      color: #ffffff;
+      border: 2px solid #18181b;
+      padding: 14px 34px;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 800;
+      text-transform: capitalize;
+      cursor: pointer;
+      box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.25);
+      text-decoration: none;
+      font-family: inherit;
+    }
+
+    .wf-btn-portal-login:hover {
+      background: #3f3f46;
+      transform: translate(1px, 1px);
+      box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.25);
+    }
+
+    /* Floating Theme Toggle (Bottom-Right Circle) */
+    .wf-floating-theme {
+      position: absolute;
+      bottom: 24px;
+      right: 28px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2px solid #27272a;
+      box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 20;
+    }
+
+    /* ── WIREFRAME SECTION CONTAINERS ── */
+    .wf-section {
+      max-width: 1280px;
+      margin: 48px auto;
+      padding: 0 24px;
+    }
+
+    .wf-section-head {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .wf-section-head h2 {
+      font-size: 26px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    .wf-section-head p {
+      color: #52525b;
+      font-size: 13px;
+    }
+
+    /* ── DUAL COLUMN MASS TIMES & CHAPELS ── */
+    .wf-liturgy-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+    }
+
+    @media (max-width: 900px) {
+      .wf-liturgy-grid {
+        grid-template-columns: 1fr;
+      }
+      .wf-header {
+        flex-direction: column;
+        gap: 14px;
+        padding: 14px;
+      }
+      .wf-hero-title {
+        font-size: 32px;
+      }
+    }
+
+    .wf-card {
+      background: #ffffff;
+      border: 2px solid #27272a;
+      box-shadow: 4px 4px 0px rgba(24, 24, 27, 0.12);
+      padding: 24px;
+    }
+
+    .wf-badge-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border: 1.5px solid #27272a;
+      font-size: 11px;
+      font-weight: 700;
+      background: #e4e4e7;
+      margin-bottom: 8px;
+    }
+
+    .wf-time-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border: 1.5px solid #d4d4d8;
+      background: #fafafa;
+      margin-bottom: 8px;
+    }
+
+    .wf-chips {
+      display: flex;
+      gap: 6px;
+    }
+
+    .wf-chip {
+      padding: 3px 8px;
+      background: #27272a;
+      color: #fff;
+      font-weight: 700;
+      font-size: 11px;
+      border-radius: 3px;
+    }
+
+    /* ── SERVICES GRID ── */
+    .wf-services-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+    }
+
+    @media (max-width: 900px) {
+      .wf-services-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .wf-service-card {
+      background: #ffffff;
+      border: 2px solid #27272a;
+      padding: 16px;
+      text-align: center;
+      box-shadow: 3px 3px 0px rgba(24, 24, 27, 0.1);
+    }
+
+    .wf-media-box {
+      width: 100%;
+      height: 110px;
+      border: 1.5px solid #71717a;
+      background: #e4e4e7;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 11px;
+      background-image:
+        linear-gradient(to top right, transparent calc(50% - 1px), #a1a1aa, transparent calc(50% + 1px)),
+        linear-gradient(to bottom right, transparent calc(50% - 1px), #a1a1aa, transparent calc(50% + 1px));
+    }
+
+    /* ── ANNOUNCEMENTS BULLETIN ── */
+    .wf-bulletin-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    @media (max-width: 900px) {
+      .wf-bulletin-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .wf-bulletin-card {
+      background: #ffffff;
+      border: 2px solid #27272a;
+      padding: 18px;
+      box-shadow: 3px 3px 0px rgba(24, 24, 27, 0.1);
+    }
+
+    .wf-line {
+      height: 8px;
+      background: #d4d4d8;
+      margin: 6px 0;
+      border-radius: 2px;
+    }
+
+    /* ── FOOTER ── */
+    .wf-footer {
+      background: #18181b;
+      color: #f4f4f5;
+      padding: 32px 24px;
+      text-align: center;
+      border-top: 3px solid #27272a;
+      margin-top: 64px;
+    }
+
+    .wf-badge-bottom {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: #18181b;
+      color: #fff;
+      border: 2px solid #52525b;
+      padding: 8px 16px;
+      font-weight: 700;
+      font-size: 11px;
+      box-shadow: 4px 4px 0px rgba(0,0,0,0.3);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Level 1 Wireframe Watermark Badge -->
+  <div class="wf-badge-bottom">
+    <span>📐 LEVEL 1 LOW-FIDELITY WIREFRAME (HOMEPAGE 1:1 CLONE)</span>
+    <span style="background: #3f3f46; padding: 2px 6px;">MATCHES SCREENSHOT</span>
+  </div>
+
+  <!-- ── 1. TOP HEADER (1:1 NAVIGATION) ── -->
+  <header class="wf-header">
+    <div class="wf-brand">
+      <div class="wf-seal"><span>SEAL</span></div>
+      <div class="wf-brand-text">
+        <h2>IGLESIA FILIPINA<br>INDEPENDIENTE</h2>
+        <p>Cathedral of St. Michael the Archangel</p>
+      </div>
+    </div>
+
+    <nav class="wf-nav">
+      <a href="#liturgy">Mass Times</a>
+      <a href="#services">Services</a>
+      <a href="#bulletin">Announcements</a>
+      <a href="#about">Our Story</a>
+      <a href="#hub">Giving &amp; Map</a>
+      <a href="#merchandise">Parish Store</a>
+    </nav>
+  </header>
+
+  <!-- ── 2. HERO SECTION (EXACT 1:1 WITH USER SCREENSHOT) ── -->
+  <section class="wf-hero">
+    <div class="wf-hero-overlay"></div>
+
+    <div class="wf-hero-center">
+      <!-- Massive Hero Title -->
+      <h1 class="wf-hero-title">
+        IGLESIA FILIPINA<br>INDEPENDIENTE
+      </h1>
+
+      <!-- Cathedral Subtitle with Flourishes -->
+      <div class="wf-hero-sub">
+        <span class="flourish">✦</span>
+        <span>Cathedral of St. Michael the Archangel</span>
+        <span class="flourish">✦</span>
+      </div>
+
+      <!-- Hero Portal Login CTA Button (Pill-Shaped) -->
+      <a href="http://127.0.0.1/ORIGINAL/login.php" class="wf-btn-portal-login">
+        <span>→]</span>
+        <span>Cathedral Portal Login</span>
+        <span>→</span>
+      </a>
+    </div>
+
+    <!-- Floating Theme Toggle (Bottom-Right Circle matching screenshot) -->
+    <div class="wf-floating-theme" title="Theme Toggle (Light / Dark)">
+      <span>☾</span>
+    </div>
+  </section>
+
+  <!-- ── 3. MASS TIMES & COMMUNITY CHAPELS (DUAL COLUMN) ── -->
+  <section id="liturgy" class="wf-section">
+    <div class="wf-section-head">
+      <h2>Mass Times &amp; Schedule</h2>
+      <p>Weekly Mass schedules, prayers, confession times, and our local community chapels.</p>
+    </div>
+
+    <div class="wf-liturgy-grid">
+      <!-- Column 1: Main Cathedral Schedule -->
+      <div class="wf-card">
+        <span class="wf-badge-pill">[Main Cathedral]</span>
+        <h3 style="font-size: 16px; font-weight: 800; margin-bottom: 4px;">Cathedral of St. Michael the Archangel</h3>
+        <p style="font-size: 12px; color: #52525b; margin-bottom: 16px;">064 Prof, H.F. Rubio St, Bacoor, Cavite &bull; Patron: St. Michael</p>
+
+        <h4 style="font-size: 12px; font-weight: 800; text-transform: uppercase; margin-bottom: 10px;">Cathedral Mass Schedule</h4>
+        <div class="wf-time-row">
+          <span style="font-weight: 700;">Sunday Mass</span>
+          <div class="wf-chips">
+            <span class="wf-chip">6:00 AM</span>
+            <span class="wf-chip">8:00 AM</span>
+            <span class="wf-chip">10:00 AM</span>
+            <span class="wf-chip">5:00 PM</span>
+          </div>
+        </div>
+        <div class="wf-time-row">
+          <span style="font-weight: 700;">Weekday Mass</span>
+          <div class="wf-chips">
+            <span class="wf-chip">6:00 AM</span>
+            <span class="wf-chip">6:00 PM</span>
+          </div>
+        </div>
+        <div class="wf-time-row">
+          <span style="font-weight: 700;">Saturday (Anticipated)</span>
+          <div class="wf-chips">
+            <span class="wf-chip">6:00 AM</span>
+            <span class="wf-chip">5:00 PM</span>
+          </div>
+        </div>
+
+        <h4 style="font-size: 12px; font-weight: 800; text-transform: uppercase; margin: 18px 0 10px;">Prayers &amp; Confession</h4>
+        <div style="font-size: 12px; line-height: 1.6; border: 1.5px dashed #a1a1aa; padding: 12px;">
+          <div>&bull; <strong>Confession:</strong> Saturdays 4:00 PM &ndash; 5:00 PM (or by appointment)</div>
+          <div>&bull; <strong>Our Lady of Perpetual Help:</strong> Wednesdays 5:30 PM Novena</div>
+          <div>&bull; <strong>First Friday Adoration:</strong> Holy Hour after 6:00 PM Mass</div>
+        </div>
+      </div>
+
+      <!-- Column 2: Community Chapels Network -->
+      <div class="wf-card">
+        <span class="wf-badge-pill">[Community Chapels]</span>
+        <h3 style="font-size: 16px; font-weight: 800; margin-bottom: 4px;">Local Parish Chapels Network</h3>
+        <p style="font-size: 12px; color: #52525b; margin-bottom: 16px;">Active Sub-Parish Chapels across Bacoor City</p>
+
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div class="wf-time-row">
+            <div>
+              <div style="font-weight: 700;">San Isidro Labrador Chapel</div>
+              <div style="font-size: 11px; color: #52525b;">Brgy. Alima &bull; Fiesta: May 15</div>
+            </div>
+            <span class="wf-chip">Sun 7:00 AM</span>
+          </div>
+          <div class="wf-time-row">
+            <div>
+              <div style="font-weight: 700;">Santa Rosa de Lima Chapel</div>
+              <div style="font-size: 11px; color: #52525b;">Brgy. Sineguelasan &bull; Fiesta: August 23</div>
+            </div>
+            <span class="wf-chip">Sun 8:30 AM</span>
+          </div>
+          <div class="wf-time-row">
+            <div>
+              <div style="font-weight: 700;">Nuestra Señora dela Paz y Buen Viaje</div>
+              <div style="font-size: 11px; color: #52525b;">Brgy. Daang Bukid &bull; Fiesta: May 24</div>
+            </div>
+            <span class="wf-chip">Sat 6:00 PM</span>
+          </div>
+          <div class="wf-time-row">
+            <div>
+              <div style="font-weight: 700;">San Roque Chapel</div>
+              <div style="font-size: 11px; color: #52525b;">Brgy. Kaingin &bull; Fiesta: August 16</div>
+            </div>
+            <span class="wf-chip">Sun 5:00 PM</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 4. SACRAMENTAL SERVICES & MINISTRIES ── -->
+  <section id="services" class="wf-section">
+    <div class="wf-section-head">
+      <h2>Sacramental Services &amp; Ministries</h2>
+      <p>Holy sacraments, blessings, ecclesiastical certificates, and pastoral assistance.</p>
+    </div>
+
+    <div class="wf-services-grid">
+      <div class="wf-service-card">
+        <div class="wf-media-box"><span>BAPTISM PHOTO</span></div>
+        <h3 style="font-size: 14px; font-weight: 800; margin-bottom: 4px;">Holy Baptism</h3>
+        <p style="font-size: 11px; color: #52525b; margin-bottom: 12px;">Welcoming children and adults into the Christian faith.</p>
+        <button style="width: 100%; padding: 6px; background: #27272a; color: #fff; border: 1.5px solid #27272a; font-weight: bold; cursor: pointer;">[View Requirements]</button>
+      </div>
+
+      <div class="wf-service-card">
+        <div class="wf-media-box"><span>CONFIRMATION PHOTO</span></div>
+        <h3 style="font-size: 14px; font-weight: 800; margin-bottom: 4px;">Confirmation</h3>
+        <p style="font-size: 11px; color: #52525b; margin-bottom: 12px;">Strengthening in the gifts of the Holy Spirit.</p>
+        <button style="width: 100%; padding: 6px; background: #27272a; color: #fff; border: 1.5px solid #27272a; font-weight: bold; cursor: pointer;">[View Requirements]</button>
+      </div>
+
+      <div class="wf-service-card">
+        <div class="wf-media-box"><span>MATRIMONY PHOTO</span></div>
+        <h3 style="font-size: 14px; font-weight: 800; margin-bottom: 4px;">Holy Matrimony</h3>
+        <p style="font-size: 11px; color: #52525b; margin-bottom: 12px;">Sacred union of husband and wife before God.</p>
+        <button style="width: 100%; padding: 6px; background: #27272a; color: #fff; border: 1.5px solid #27272a; font-weight: bold; cursor: pointer;">[View Requirements]</button>
+      </div>
+
+      <div class="wf-service-card">
+        <div class="wf-media-box"><span>FUNERAL PHOTO</span></div>
+        <h3 style="font-size: 14px; font-weight: 800; margin-bottom: 4px;">Funeral Rites</h3>
+        <p style="font-size: 11px; color: #52525b; margin-bottom: 12px;">Commending departed souls to God's eternal peace.</p>
+        <button style="width: 100%; padding: 6px; background: #27272a; color: #fff; border: 1.5px solid #27272a; font-weight: bold; cursor: pointer;">[View Requirements]</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 5. PARISH BULLETIN & ANNOUNCEMENTS ── -->
+  <section id="bulletin" class="wf-section">
+    <div class="wf-section-head">
+      <h2>Parish Announcements</h2>
+      <p>Latest bulletins, diocesan events, and liturgical advisories.</p>
+    </div>
+
+    <div class="wf-bulletin-grid">
+      <div class="wf-bulletin-card">
+        <div style="font-size: 10px; font-weight: 700; color: #71717a; text-transform: uppercase;">Main Cathedral &bull; Nov 2026</div>
+        <h3 style="font-size: 14px; font-weight: 800; margin: 6px 0;">Advent Liturgical Schedule &amp; Dawn Masses</h3>
+        <div class="wf-line"></div>
+        <div class="wf-line" style="width: 80%;"></div>
+        <div class="wf-line" style="width: 90%;"></div>
+      </div>
+
+      <div class="wf-bulletin-card">
+        <div style="font-size: 10px; font-weight: 700; color: #71717a; text-transform: uppercase;">Parish Chancery &bull; Oct 2026</div>
+        <h3 style="font-size: 14px; font-weight: 800; margin: 6px 0;">Pre-Cana &amp; Catechesis Seminars Schedule</h3>
+        <div class="wf-line"></div>
+        <div class="wf-line" style="width: 75%;"></div>
+        <div class="wf-line" style="width: 85%;"></div>
+      </div>
+
+      <div class="wf-bulletin-card">
+        <div style="font-size: 10px; font-weight: 700; color: #71717a; text-transform: uppercase;">San Isidro Chapel &bull; Oct 2026</div>
+        <h3 style="font-size: 14px; font-weight: 800; margin: 6px 0;">Chapel Pastoral Council General Assembly</h3>
+        <div class="wf-line"></div>
+        <div class="wf-line" style="width: 70%;"></div>
+        <div class="wf-line" style="width: 95%;"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 6. FOOTER ── -->
+  <footer class="wf-footer">
+    <div style="font-weight: 800; font-size: 14px; margin-bottom: 6px;">IGLESIA FILIPINA INDEPENDIENTE</div>
+    <div style="font-size: 12px; color: #a1a1aa;">Cathedral of St. Michael the Archangel &bull; Diocese of Rizal and Pampanga</div>
+    <div style="font-size: 11px; color: #71717a; margin-top: 12px;">LEVEL 1 LOW-FIDELITY WIREFRAME &bull; EXACT 1:1 CLONE OF ORIGINAL/index.php</div>
+  </footer>
+
+</body>
+</html>

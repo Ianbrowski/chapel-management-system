@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Entity-Relationship Diagram — Modules 1 to 5 (IFI Cathedral CMS)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1e293b;
+      min-width: 2900px;
+      min-height: 1650px;
+      padding: 40px;
+      position: relative;
+    }
+
+    /* Diagram Canvas */
+    #erd-canvas {
+      position: relative;
+      width: 2820px;
+      height: 1560px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+      background-image: radial-gradient(#e2e8f0 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      overflow: hidden;
+    }
+
+    /* Top Legend & Header */
+    .erd-title-bar {
+      position: absolute;
+      top: 24px;
+      left: 32px;
+      z-index: 50;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 16px 24px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+    .erd-title-bar h1 {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0369a1;
+      margin-bottom: 4px;
+    }
+    .erd-title-bar p {
+      font-size: 12px;
+      color: #64748b;
+    }
+    .badge-legend {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .badge-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* SVG Connector Overlay */
+    #connector-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    /* Entity Cards (Matching User Image) */
+    .entity-card {
+      position: absolute;
+      z-index: 20;
+      background: #ffffff;
+      border: 1.5px solid #0284c7;
+      border-radius: 10px;
+      box-shadow: 0 6px 16px -2px rgba(2, 132, 199, 0.12), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+      width: 330px;
+      overflow: hidden;
+      font-size: 12px;
+    }
+
+    .entity-header {
+      background: #0284c7;
+      color: #ffffff;
+      padding: 8px 14px;
+    }
+    .entity-title {
+      font-size: 13.5px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+    .entity-sub {
+      font-size: 10px;
+      opacity: 0.9;
+      margin-top: 2px;
+      font-weight: 500;
+    }
+
+    .entity-body {
+      padding: 4px 0;
+    }
+
+    .entity-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 12px;
+      font-size: 11px;
+      border-bottom: 1px solid #f1f5f9;
+      position: relative;
+    }
+    .entity-row:last-child {
+      border-bottom: none;
+    }
+    .entity-row:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    .attr-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Badges */
+    .key-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 800;
+      padding: 1px 4px;
+      border-radius: 3px;
+      min-width: 22px;
+      text-align: center;
+    }
+    .badge-pk {
+      background: #ea580c;
+      color: #ffffff;
+    }
+    .badge-fk {
+      background: #0284c7;
+      color: #ffffff;
+    }
+    .badge-uk {
+      background: #059669;
+      color: #ffffff;
+    }
+
+    .attr-name {
+      font-weight: 600;
+      color: #0f172a;
+    }
+    .attr-type {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 10px;
+      color: #64748b;
+    }
+
+    /* Module Category Pills */
+    .module-pill {
+      position: absolute;
+      top: -12px;
+      right: 12px;
+      background: #0f172a;
+      color: #ffffff;
+      font-size: 9px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="erd-canvas">
+
+    <!-- Title & Legend -->
+    <div class="erd-title-bar">
+      <h1>CENTRALIZED CHAPEL INFORMATION MANAGEMENT SYSTEM</h1>
+      <p>Complete Entity-Relationship Diagram (ERD) — Modules 1 to 5 (Database Schema 1:1 Accurate)</p>
+      <div class="badge-legend">
+        <span><span class="key-badge badge-pk">PK</span> Primary Key</span>
+        <span><span class="key-badge badge-fk">FK</span> Foreign Key</span>
+        <span><span class="key-badge badge-uk">UK</span> Unique Key</span>
+        <span style="color: #0284c7; margin-left: 12px;">─── Crow's Foot Cardinality (1:N)</span>
+      </div>
+    </div>
+
+    <!-- SVG Layer for Interconnecting Lines -->
+    <svg id="connector-svg"></svg>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- COLUMN 1: CHAPELS & PARISHIONERS (SPINE)                           -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- chapels -->
+    <div class="entity-card" id="card-chapels" style="left: 40px; top: 120px;">
+      <span class="module-pill">Core Spine</span>
+      <div class="entity-header">
+        <div class="entity-title">chapels</div>
+        <div class="entity-sub">Core Spine • 7 Attributes</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row" id="row-chapels-chapel_id">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">chapel_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">chapel_name*</span></div>
+          <span class="attr-type">varchar(100)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">location*</span></div>
+          <span class="attr-type">varchar(255)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">patron_saint</span></div>
+          <span class="attr-type">varchar(255)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">seating_capacity</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">status*</span></div>
+          <span class="attr-type">enum('Active'..)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- users (Module 4 & 5 Actor) -->
+    <div class="entity-card" id="card-users" style="left: 40px; top: 400px; width: 340px;">
+      <span class="module-pill">M4 &amp; M5 Actors</span>
+      <div class="entity-header">
+        <div class="entity-title">users</div>
+        <div class="entity-sub">M4/M5 Actor • Member | Priest | Admin (10 Attributes)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row" id="row-users-id">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="key-badge badge-uk">UK</span><span class="attr-name">user*</span></div>
+          <span class="attr-type">varchar(50)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">role*</span></div>
+          <span class="attr-type">varchar(20)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">status*</span></div>
+          <span class="attr-type">varchar(20)</span>
+        </div>
+        <div class="entity-row" id="row-users-chapel_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">chapel_id</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">full_name*</span></div>
+          <span class="attr-type">varchar(100)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">email*</span></div>
+          <span class="attr-type">varchar(150)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">phone</span></div>
+          <span class="attr-type">varchar(30)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- pastor_event_types (Module 5) -->
+    <div class="entity-card" id="card-pastor_event_types" style="left: 40px; top: 760px;">
+      <span class="module-pill">Module 5</span>
+      <div class="entity-header">
+        <div class="entity-title">pastor_event_types</div>
+        <div class="entity-sub">M5 Entity • Clergy Availability (3 Attributes)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-pastortypes-pastor_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">pastor_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">event_type*</span></div>
+          <span class="attr-type">varchar(50)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- COLUMN 2: LITURGICAL CALENDAR & CLERGY SCHEDULES (MODULE 1)        -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- mass_schedules -->
+    <div class="entity-card" id="card-mass_schedules" style="left: 460px; top: 120px;">
+      <span class="module-pill">Module 1</span>
+      <div class="entity-header">
+        <div class="entity-title">mass_schedules</div>
+        <div class="entity-sub">M1 Entity • Liturgical Calendar (6 Attributes)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-masssched-chapel_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">chapel_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">day_of_week*</span></div>
+          <span class="attr-type">varchar(20)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">time_slot*</span></div>
+          <span class="attr-type">time</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">language</span></div>
+          <span class="attr-type">varchar(50)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- schedules -->
+    <div class="entity-card" id="card-schedules" style="left: 460px; top: 400px;">
+      <span class="module-pill">Module 1</span>
+      <div class="entity-header">
+        <div class="entity-title">schedules</div>
+        <div class="entity-sub">M1 Entity • Time Slots &amp; Availability (7 Attributes)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-schedules-chapel_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">chapel_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-schedules-pastor_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">pastor_id</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">schedule_date*</span></div>
+          <span class="attr-type">date</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">start_time*</span></div>
+          <span class="attr-type">time</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">end_time*</span></div>
+          <span class="attr-type">time</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">status*</span></div>
+          <span class="attr-type">varchar(20)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- COLUMN 3: BOOKING REQUESTS QUEUE & EVENTS (MODULE 2)               -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- events (Module 2 Central Hub) -->
+    <div class="entity-card" id="card-events" style="left: 880px; top: 280px; width: 360px;">
+      <span class="module-pill" style="background:#0284c7;">Module 2 Central Hub</span>
+      <div class="entity-header" style="background:#0369a1;">
+        <div class="entity-title">events</div>
+        <div class="entity-sub">M2 Central Transactional Entity • Maker-Checker (14 Attributes)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row" id="row-events-event_id">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">event_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-events-requested_by">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">requested_by*</span></div>
+          <span class="attr-type">int(11) [Member]</span>
+        </div>
+        <div class="entity-row" id="row-events-service_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">service_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-events-variant_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">variant_id</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-events-chapel_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">chapel_id*</span></div>
+          <span class="attr-type">int(11) [Venue]</span>
+        </div>
+        <div class="entity-row" id="row-events-pastor_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">pastor_id</span></div>
+          <span class="attr-type">int(11) [Celebrant]</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">scheduled_start*</span></div>
+          <span class="attr-type">datetime</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">scheduled_end*</span></div>
+          <span class="attr-type">datetime</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">status*</span></div>
+          <span class="attr-type">varchar(20) [Pending..]</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">total_fee*</span></div>
+          <span class="attr-type">decimal(10,2)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- service_request_addons -->
+    <div class="entity-card" id="card-service_request_addons" style="left: 880px; top: 780px;">
+      <span class="module-pill">Module 2</span>
+      <div class="entity-header">
+        <div class="entity-title">service_request_addons</div>
+        <div class="entity-sub">M2 Entity • Add-on Line Items (4 Attributes)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-addons-event_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">event_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-addons-addon_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">addon_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">amount*</span></div>
+          <span class="attr-type">decimal(10,2)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- COLUMN 4: SACRAMENTAL SERVICE CATALOG (MATCHES YOUR IMAGE EXACTLY)  -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- service_categories -->
+    <div class="entity-card" id="card-service_categories" style="left: 1340px; top: 60px;">
+      <span class="module-pill">Module 2</span>
+      <div class="entity-header">
+        <div class="entity-title">service_categories</div>
+        <div class="entity-sub">M2 Entity • 5 Core Attributes (of 7)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row" id="row-categories-id">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="key-badge badge-uk">UK</span><span class="attr-name">code*</span></div>
+          <span class="attr-type">varchar(50)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">name*</span></div>
+          <span class="attr-type">varchar(100)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">display_order*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">status*</span></div>
+          <span class="attr-type">enum('active'..)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- services (Exact layout as user image) -->
+    <div class="entity-card" id="card-services" style="left: 1340px; top: 350px;">
+      <span class="module-pill">Module 2</span>
+      <div class="entity-header">
+        <div class="entity-title">services</div>
+        <div class="entity-sub">M2 Entity • 7 Core Attributes (of 11)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row" id="row-services-id">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-services-category_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">category_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="key-badge badge-uk">UK</span><span class="attr-name">code*</span></div>
+          <span class="attr-type">varchar(50)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">name*</span></div>
+          <span class="attr-type">varchar(150)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">reference_source*</span></div>
+          <span class="attr-type">varchar(255)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">effective_date*</span></div>
+          <span class="attr-type">date</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">status*</span></div>
+          <span class="attr-type">enum('active'..)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- service_schedules -->
+    <div class="entity-card" id="card-service_schedules" style="left: 1340px; top: 690px;">
+      <span class="module-pill">Module 2</span>
+      <div class="entity-header">
+        <div class="entity-title">service_schedules</div>
+        <div class="entity-sub">M2 Entity • 7 Core Attributes (of 9)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-srvsched-service_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">service_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">schedule_type*</span></div>
+          <span class="attr-type">varchar(50)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">day_of_week*</span></div>
+          <span class="attr-type">varchar(50)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">start_time</span></div>
+          <span class="attr-type">time</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">end_time</span></div>
+          <span class="attr-type">time</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">status*</span></div>
+          <span class="attr-type">enum('active'..)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- service_variants -->
+    <div class="entity-card" id="card-service_variants" style="left: 1800px; top: 60px;">
+      <span class="module-pill">Module 2</span>
+      <div class="entity-header">
+        <div class="entity-title">service_variants</div>
+        <div class="entity-sub">M2 Entity • 8 Core Attributes (of 13)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row" id="row-variants-id">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-variants-service_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">service_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">name*</span></div>
+          <span class="attr-type">varchar(100)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">price*</span></div>
+          <span class="attr-type">decimal(10,2)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">schedule_type*</span></div>
+          <span class="attr-type">varchar(50)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">status*</span></div>
+          <span class="attr-type">enum('active'..)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- service_requirements -->
+    <div class="entity-card" id="card-service_requirements" style="left: 1800px; top: 380px;">
+      <span class="module-pill">Module 2</span>
+      <div class="entity-header">
+        <div class="entity-title">service_requirements</div>
+        <div class="entity-sub">M2 Entity • 5 Core Attributes (of 7)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-reqs-service_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">service_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">requirement*</span></div>
+          <span class="attr-type">varchar(255)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">is_required*</span></div>
+          <span class="attr-type">tinyint(1)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">status*</span></div>
+          <span class="attr-type">enum('active'..)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- service_additional_charges -->
+    <div class="entity-card" id="card-service_additional_charges" style="left: 1800px; top: 690px;">
+      <span class="module-pill">Module 2</span>
+      <div class="entity-header">
+        <div class="entity-title">service_additional_charges</div>
+        <div class="entity-sub">M2 Entity • 6 Core Attributes (of 8)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row" id="row-charges-id">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-charges-service_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">service_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">name*</span></div>
+          <span class="attr-type">varchar(100)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">price*</span></div>
+          <span class="attr-type">decimal(10,2)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">is_optional*</span></div>
+          <span class="attr-type">tinyint(1)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- COLUMN 5: CANONICAL SACRAMENTAL REGISTRY & CERTIFICATES (MODULE 3) -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- sacramental_records (Module 3) -->
+    <div class="entity-card" id="card-sacramental_records" style="left: 2260px; top: 120px; width: 360px;">
+      <span class="module-pill" style="background:#059669;">Module 3 Canonical</span>
+      <div class="entity-header" style="background:#047857;">
+        <div class="entity-title">sacramental_records</div>
+        <div class="entity-sub">M3 Canonical Registry • Baptism | Matrimony (12 Attributes)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row" id="row-records-record_id">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">record_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-records-chapel_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">chapel_id</span></div>
+          <span class="attr-type">int(11) [Branch Scope]</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">record_type*</span></div>
+          <span class="attr-type">enum('Baptism'..)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">person_name*</span></div>
+          <span class="attr-type">varchar(150)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">event_date*</span></div>
+          <span class="attr-type">date</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">book_number</span></div>
+          <span class="attr-type">varchar(20)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">page_number</span></div>
+          <span class="attr-type">varchar(20)</span>
+        </div>
+        <div class="entity-row" id="row-records-encoded_by">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">encoded_by</span></div>
+          <span class="attr-type">int(11) [Staff]</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- certificate_types -->
+    <div class="entity-card" id="card-certificate_types" style="left: 2260px; top: 510px;">
+      <span class="module-pill">Module 3</span>
+      <div class="entity-header">
+        <div class="entity-title">certificate_types</div>
+        <div class="entity-sub">M3 Entity • 5 Core Attributes (of 7)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-certtypes-service_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">service_id</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="key-badge badge-uk">UK</span><span class="attr-name">name*</span></div>
+          <span class="attr-type">varchar(100)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">price_per_copy*</span></div>
+          <span class="attr-type">decimal(10,2)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">status*</span></div>
+          <span class="attr-type">enum('active'..)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- certificate_issuances -->
+    <div class="entity-card" id="card-certificate_issuances" style="left: 2260px; top: 810px;">
+      <span class="module-pill">Module 3</span>
+      <div class="entity-header">
+        <div class="entity-title">certificate_issuances</div>
+        <div class="entity-sub">M3 Certified Copies Issued (7 Attributes)</div>
+      </div>
+      <div class="entity-body">
+        <div class="entity-row">
+          <div class="attr-left"><span class="key-badge badge-pk">PK</span><span class="attr-name">issuance_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row" id="row-issuances-record_id">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">record_id*</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">certificate_no</span></div>
+          <span class="attr-type">varchar(30)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">issued_to*</span></div>
+          <span class="attr-type">varchar(150)</span>
+        </div>
+        <div class="entity-row" id="row-issuances-issued_by">
+          <div class="attr-left"><span class="key-badge badge-fk">FK</span><span class="attr-name">issued_by</span></div>
+          <span class="attr-type">int(11)</span>
+        </div>
+        <div class="entity-row">
+          <div class="attr-left"><span class="attr-name">issued_at*</span></div>
+          <span class="attr-type">timestamp</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SCRIPT TO RENDER SMOOTH ORTHOGONAL CROW-FOOT CONNECTORS -->
+  <script>
+    window.addEventListener('load', function() {
+      const svg = document.getElementById('connector-svg');
+      const canvasRect = document.getElementById('erd-canvas').getBoundingClientRect();
+
+      function getRowPoint(rowId, side) {
+        const el = document.getElementById(rowId);
+        if (!el) return null;
+        const rect = el.getBoundingClientRect();
+        return {
+          x: (side === 'left' ? rect.left : rect.right) - canvasRect.left,
+          y: rect.top + (rect.height / 2) - canvasRect.top
+        };
+      }
+
+      function drawCrowFootConnector(fromPt, toPt, color = '#0284c7') {
+        const midX = (fromPt.x + toPt.x) / 2;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const d = `M ${fromPt.x} ${fromPt.y} C ${midX} ${fromPt.y}, ${midX} ${toPt.y}, ${toPt.x} ${toPt.y}`;
+        path.setAttribute('d', d);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', color);
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(path);
+
+        // Crow foot symbol on target
+        const isLeftToRight = toPt.x > fromPt.x;
+        const dir = isLeftToRight ? -1 : 1;
+        const crow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const crowD = `
+          M ${toPt.x + dir * 12} ${toPt.y - 7} L ${toPt.x} ${toPt.y} L ${toPt.x + dir * 12} ${toPt.y + 7}
+          M ${toPt.x + dir * 14} ${toPt.y - 8} L ${toPt.x + dir * 14} ${toPt.y + 8}
+        `;
+        crow.setAttribute('d', crowD);
+        crow.setAttribute('fill', 'none');
+        crow.setAttribute('stroke', color);
+        crow.setAttribute('stroke-width', '1.8');
+        svg.appendChild(crow);
+
+        // Circle or Hash on source (1-side)
+        const hash = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const sDir = isLeftToRight ? 1 : -1;
+        const hashD = `
+          M ${fromPt.x + sDir * 6} ${fromPt.y - 6} L ${fromPt.x + sDir * 6} ${fromPt.y + 6}
+          M ${fromPt.x + sDir * 10} ${fromPt.y - 6} L ${fromPt.x + sDir * 10} ${fromPt.y + 6}
+        `;
+        hash.setAttribute('d', hashD);
+        hash.setAttribute('fill', 'none');
+        hash.setAttribute('stroke', color);
+        hash.setAttribute('stroke-width', '1.8');
+        svg.appendChild(hash);
+      }
+
+      // Connectors
+      const connections = [
+        // chapels -> users
+        { from: 'row-chapels-chapel_id', fromSide: 'left', to: 'row-users-chapel_id', toSide: 'left', color: '#0369a1' },
+        // chapels -> mass_schedules
+        { from: 'row-chapels-chapel_id', fromSide: 'right', to: 'row-masssched-chapel_id', toSide: 'left', color: '#0369a1' },
+        // chapels -> schedules
+        { from: 'row-chapels-chapel_id', fromSide: 'right', to: 'row-schedules-chapel_id', toSide: 'left', color: '#0369a1' },
+        // chapels -> events
+        { from: 'row-chapels-chapel_id', fromSide: 'right', to: 'row-events-chapel_id', toSide: 'left', color: '#0369a1' },
+        // chapels -> sacramental_records
+        { from: 'row-chapels-chapel_id', fromSide: 'right', to: 'row-records-chapel_id', toSide: 'left', color: '#047857' },
+
+        // users -> pastor_event_types
+        { from: 'row-users-id', fromSide: 'left', to: 'row-pastortypes-pastor_id', toSide: 'left', color: '#0284c7' },
+        // users -> schedules
+        { from: 'row-users-id', fromSide: 'right', to: 'row-schedules-pastor_id', toSide: 'left', color: '#0284c7' },
+        // users -> events (requested_by)
+        { from: 'row-users-id', fromSide: 'right', to: 'row-events-requested_by', toSide: 'left', color: '#0284c7' },
+        // users -> events (pastor_id)
+        { from: 'row-users-id', fromSide: 'right', to: 'row-events-pastor_id', toSide: 'left', color: '#0284c7' },
+
+        // service_categories -> services (As in user image)
+        { from: 'row-categories-id', fromSide: 'right', to: 'row-services-category_id', toSide: 'left', color: '#0284c7' },
+
+        // services -> service_variants
+        { from: 'row-services-id', fromSide: 'right', to: 'row-variants-service_id', toSide: 'left', color: '#0284c7' },
+        // services -> service_requirements
+        { from: 'row-services-id', fromSide: 'right', to: 'row-reqs-service_id', toSide: 'left', color: '#0284c7' },
+        // services -> service_additional_charges
+        { from: 'row-services-id', fromSide: 'right', to: 'row-charges-service_id', toSide: 'left', color: '#0284c7' },
+        // services -> service_schedules
+        { from: 'row-services-id', fromSide: 'left', to: 'row-srvsched-service_id', toSide: 'left', color: '#0284c7' },
+
+        // services -> events
+        { from: 'row-services-id', fromSide: 'left', to: 'row-events-service_id', toSide: 'right', color: '#0284c7' },
+        // service_variants -> events
+        { from: 'row-variants-id', fromSide: 'left', to: 'row-events-variant_id', toSide: 'right', color: '#0284c7' },
+
+        // events -> service_request_addons
+        { from: 'row-events-event_id', fromSide: 'left', to: 'row-addons-event_id', toSide: 'left', color: '#0284c7' },
+        // service_additional_charges -> service_request_addons
+        { from: 'row-charges-id', fromSide: 'left', to: 'row-addons-addon_id', toSide: 'right', color: '#0284c7' },
+
+        // services -> certificate_types
+        { from: 'row-services-id', fromSide: 'right', to: 'row-certtypes-service_id', toSide: 'left', color: '#0284c7' },
+
+        // sacramental_records -> certificate_issuances
+        { from: 'row-records-record_id', fromSide: 'right', to: 'row-issuances-record_id', toSide: 'right', color: '#047857' },
+        // users -> sacramental_records (encoded_by)
+        { from: 'row-users-id', fromSide: 'right', to: 'row-records-encoded_by', toSide: 'left', color: '#047857' }
+      ];
+
+      connections.forEach(c => {
+        const pt1 = getRowPoint(c.from, c.fromSide);
+        const pt2 = getRowPoint(c.to, c.toSide);
+        if (pt1 && pt2) {
+          drawCrowFootConnector(pt1, pt2, c.color);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

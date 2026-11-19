@@ -1,0 +1,710 @@
+/**
+ * ====================================================================
+ * THEME.CSS — Unified Design Tokens & Light/Dark Theme System
+ * Chapel Information Management System (Capstone Project)
+ * ====================================================================
+ * Sacred Cathedral Aesthetic & Unified Color Tokens across Portal,
+ * Login, and Management Dashboard.
+ * Dark: Obsidian Cathedral Stone & Candlelight Gold
+ * Light: Warm Sacred Parchment & Illuminated Amber
+ */
+
+/* ── 1. UNIFIED GOOGLE FONTS IMPORT ── */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
+
+html {
+    font-size: 93.75%; /* 15px standard: ensures clear legibility, generous touch targets, and balanced density */
+}
+
+@media screen and (max-width: 1024px) {
+    html {
+        font-size: 87.5%; /* 14px on tablet and mobile viewports */
+    }
+}
+
+/* Global Font Rendering Enhancements */
+*, *::before, *::after {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+input, button, select, textarea, optgroup {
+    font-family: inherit;
+}
+
+/* ── 2. BASELINE TOKENS (Option 1: Imperial Cathedral) ── */
+:root {
+    /* Deep Obsidian Brand Anchors */
+    --color-navy: #0B0F19;
+    --color-navy-surface: #12141A;
+    --color-navy-subtle: #1A1D24;
+    --color-navy-border: rgba(255, 255, 255, 0.08);
+
+    /* Primary Design Tokens */
+    --ink: #0B0F19;
+    --muted: #64748B;
+    --line: #E2E8F0;
+    --surface: #FFFFFF;
+    --accent: #C5A059;
+    --accent-soft: rgba(197, 160, 89, 0.14);
+    --accent-hover: #D8B56F;
+    --bg-page: #FFFFFF;
+
+    /* Semantic Status Palette (Strict: Emerald, Crimson & Gold) */
+    --status-confirmed-bg: #DCFCE7;
+    --status-confirmed-text: #15803D;
+    --status-pending-bg: rgba(197, 160, 89, 0.14);
+    --status-pending-text: #8C6A18;
+    --status-cancelled-bg: #FEE2E2;
+    --status-cancelled-text: #B91C1C;
+    --status-neutral-bg: #F1F5F9;
+    --status-neutral-text: #64748B;
+
+    /* Strict Color Rules — Option 1 Imperial Cathedral */
+    --bg-white: #FFFFFF;
+    --text-black: #0B0F19;
+    --color-gold: #C5A059;
+    --color-gold-hover: #D8B56F;
+    --color-gold-soft: rgba(197, 160, 89, 0.14);
+    --color-green: #16A34A;
+    --color-red: #DC2626;
+    --gray-hover: #F8FAFC;
+    --gray-border: var(--line);
+    --gray-text: var(--muted);
+
+    /* Button Confirmation & Action Tokens */
+    --action-confirm-bg: #16A34A;
+    --action-confirm-hover: #15803D;
+    --action-confirm-soft-bg: #DCFCE7;
+    --action-confirm-soft-txt: #15803D;
+
+    --action-cancel-bg: #DC2626;
+    --action-cancel-hover: #B91C1C;
+    --action-cancel-soft-bg: #FEE2E2;
+    --action-cancel-soft-txt: #B91C1C;
+
+    /* Unified Typography Stack */
+    --font-family-base: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+    --font-sans: var(--font-family-base);
+    --font-serif: 'Playfair Display', 'Cinzel', Georgia, 'Times New Roman', serif;
+    --font-display: 'Playfair Display', 'Cinzel', Georgia, serif;
+    --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --font-badge: 'Outfit', 'Inter', sans-serif;
+
+    --font-family: var(--font-sans);
+    --font-family-sans: var(--font-sans);
+    --font-family-serif: var(--font-serif);
+    --font-family-mono: var(--font-mono);
+    --font-family-display: var(--font-display);
+    --font-family-badge: var(--font-badge);
+
+    /* Semantic Typography Mappings */
+    --font-body: var(--font-sans);
+    --font-heading: var(--font-serif);
+
+    /* Standardized Typography Scale */
+    --font-size-xs: 11px;
+    --font-size-sm: 12px;
+    --font-size-base: 14px;
+    --font-size-md: 15px;
+    --font-size-lg: 17px;
+    --font-size-xl: 18px;
+    --font-size-2xl: 20px;
+    --font-size-3xl: 24px;
+    --font-size-metric: 26px;
+
+    /* Specialized Hierarchy Tokens */
+    --font-page-title: 20px;
+    --font-page-subtitle: 14px;
+    --font-card-title: 16px;
+    --font-table-header: 12px;
+    --font-table-body: 13px;
+    --font-form-label: 13px;
+    --font-input: 14px;
+    --font-btn: 13px;
+    --font-badge: 11.5px;
+    --font-modal-title: 18px;
+
+    /* Rem-based compatibility aliases */
+    --font-size-2xs: 0.714rem;
+    --font-size-2xl-rem: 1.571rem;
+    --font-size-3xl-rem: 1.857rem;
+
+    /* Typography Weights */
+    --font-weight-regular: 400;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+
+    /* Line Heights */
+    --line-height-tight: 1.3;
+    --line-height-normal: 1.4;
+    --line-height-relaxed: 1.5;
+
+    /* Spacing Tokens */
+    --space-1: 3px;
+    --space-2: 6px;
+    --space-3: 9px;
+    --space-4: 12px;
+    --space-5: 15px;
+    --space-6: 18px;
+
+    /* Border Radius */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 10px;
+    --radius-xl: 12px;
+    --radius-pill: 9999px;
+
+    /* Base Colors mapped to unified tokens */
+    --color-bg: var(--bg-page);
+    --color-surface: var(--surface);
+    --color-surface-subtle: #F8FAFC;
+    --color-surface-hover: #F8FAFC;
+    --color-surface-active: #F1F5F9;
+    --color-text: var(--ink);
+    --color-text-muted: var(--muted);
+    --color-text-dim: var(--muted);
+    --color-border: var(--line);
+    --color-border-subtle: var(--line);
+
+    /* Brand & Functional Colors */
+    --color-primary: var(--color-navy);
+    --color-accent: var(--accent);
+    --color-accent-hover: var(--accent-hover);
+    --color-accent-glow: rgba(197, 160, 89, 0.20);
+    --color-accent-gradient: var(--accent);
+    --color-success: var(--color-green);
+    --color-warning: var(--accent);
+    --color-danger: var(--color-red);
+
+    /* Backward-Compatibility Bridges */
+    --bg: var(--bg-page);
+    --bg-body: var(--bg-page);
+    --bg2: var(--surface);
+    --bg3: #F8FAFC;
+    --text: var(--ink);
+    --text2: var(--muted);
+    --border: var(--line);
+    --hover-bg: #F8FAFC;
+    --panel-bg: var(--surface);
+    --panel-border: 1px solid var(--line);
+    --panel-header-bg: var(--surface);
+    --panel-radius: 12px;
+    --shadow: none;
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+    --shadow-card: none;
+    --sidebar-bg: #0B0F19;
+    --sidebar-text: #94A3B8;
+}
+
+/* ── 4. THEME SPECIFIC OVERRIDES ── */
+
+/* Light Theme (Crisp Cathedral Alabaster & Minimal Deep Obsidian) */
+[data-theme="light"],
+:root:not([data-theme="dark"]) {
+    --color-bg: #FFFFFF;
+    --color-surface: #FFFFFF;
+    --color-surface-subtle: #F8FAFC;
+    --color-surface-hover: #F8FAFC;
+    --color-surface-active: #F1F5F9;
+    --color-text: #0B0F19;
+    --color-text-muted: #64748B;
+    --color-text-dim: #64748B;
+    --color-border: #E2E8F0;
+    --color-border-subtle: #E2E8F0;
+
+    --color-primary: #0B0F19;
+    --color-accent: #C5A059;
+    --color-accent-hover: #D8B56F;
+    --color-accent-glow: rgba(197, 160, 89, 0.16);
+    --color-accent-gradient: #C5A059;
+    --color-success: #16A34A;
+    --color-warning: #C5A059;
+    --color-danger: #DC2626;
+
+    --bg: #FFFFFF;
+    --bg-body: #FFFFFF;
+    --bg2: #FFFFFF;
+    --bg3: #F8FAFC;
+    --text: #0B0F19;
+    --text2: #64748B;
+    --border: #E2E8F0;
+    --accent: #C5A059;
+    --hover-bg: #F8FAFC;
+    --panel-bg: #FFFFFF;
+    --panel-border: 1px solid #E2E8F0;
+    --panel-header-bg: #FFFFFF;
+    --shadow: none;
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+    --shadow-card: none;
+    --sidebar-bg: #0B0F19;
+    --sidebar-text: #94A3B8;
+    --topbar-bg: #FFFFFF;
+    --input-bg: #FFFFFF;
+    --input-color: #0B0F19;
+    --input-border: #E2E8F0;
+    --card-bg: #FFFFFF;
+
+    --bg-white: #FFFFFF;
+    --text-black: #0B0F19;
+    --color-gold: #C5A059;
+    --gray-hover: #F8FAFC;
+    --gray-border: #E2E8F0;
+    --gray-text: #64748B;
+    --color-surface-card: #FFFFFF;
+    --color-card: #FFFFFF;
+}
+
+/* Dark Theme (Pure Obsidian Black & Luminous Cathedral Gold) */
+[data-theme="dark"] {
+    --ink: #F8FAFC;
+    --muted: #94A3B8;
+    --line: rgba(255, 255, 255, 0.1);
+    --surface: #12141A;
+    --accent: #C5A059;
+    --accent-soft: rgba(197, 160, 89, 0.14);
+    --accent-hover: #D8B56F;
+    --bg-page: #09090B;
+
+    --status-confirmed-bg: rgba(22, 163, 74, 0.18);
+    --status-confirmed-text: #4ADE80;
+    --status-pending-bg: rgba(197, 160, 89, 0.16);
+    --status-pending-text: #D8B56F;
+    --status-cancelled-bg: rgba(220, 38, 38, 0.18);
+    --status-cancelled-text: #F87171;
+    --status-neutral-bg: rgba(255, 255, 255, 0.08);
+    --status-neutral-text: #CBD5E1;
+
+    --color-bg: var(--bg-page);
+    --color-surface: var(--surface);
+    --color-surface-subtle: #181A20;
+    --color-surface-hover: #1E2128;
+    --color-surface-active: #282C36;
+    --color-text: var(--ink);
+    --color-text-muted: var(--muted);
+    --color-text-dim: var(--muted);
+    --color-border: var(--line);
+    --color-border-subtle: var(--line);
+
+    --color-primary: #FFFFFF;
+    --color-accent: var(--accent);
+    --color-accent-hover: var(--accent-hover);
+    --color-accent-glow: rgba(197, 160, 89, 0.22);
+    --color-accent-gradient: var(--accent);
+    --color-success: #16A34A;
+    --color-warning: var(--accent);
+    --color-danger: #DC2626;
+
+    --bg: var(--bg-page);
+    --bg-body: var(--bg-page);
+    --bg2: var(--surface);
+    --bg3: #181A20;
+    --text: var(--ink);
+    --text2: var(--muted);
+    --border: var(--line);
+    --hover-bg: #181A20;
+    --panel-bg: var(--surface);
+    --panel-border: 1px solid var(--line);
+    --panel-header-bg: #12141A;
+    --shadow: none;
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+    --shadow-card: none;
+    --sidebar-bg: #09090B;
+    --sidebar-text: #94A3B8;
+    --topbar-bg: #12141A;
+    --input-bg: #181A20;
+    --input-color: var(--ink);
+    --input-border: var(--line);
+    --card-bg: var(--surface);
+
+    /* Baseline token overrides for dark mode — replaces pure light colors */
+    --bg-white: var(--surface);
+    --text-black: var(--ink);
+    --color-gold: var(--accent);
+    --gray-hover: #181A20;
+    --gray-border: var(--line);
+    --gray-text: var(--muted);
+    --color-surface-card: var(--surface);
+    --color-card: var(--surface);
+}
+
+/* ── 5. GLOBAL ROOT APPLICATION ── */
+body {
+    font-family: var(--font-family);
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    transition: var(--transition-theme);
+}
+
+/* ── 6. COMPREHENSIVE DARK MODE READABILITY GUARANTEES ── */
+[data-theme="dark"] .main,
+[data-theme="dark"] .content,
+[data-theme="dark"] .workspace {
+    background-color: var(--bg);
+    color: var(--text);
+}
+
+[data-theme="dark"] .card,
+[data-theme="dark"] .panel,
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .ent-card {
+    background-color: var(--panel-bg);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+[data-theme="dark"] .card-title,
+[data-theme="dark"] .panel-title,
+[data-theme="dark"] .stat-num,
+[data-theme="dark"] .workspace-title {
+    color: var(--text) !important;
+}
+
+[data-theme="dark"] .modal {
+    background-color: var(--panel-bg);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer,
+[data-theme="dark"] .panel-header,
+[data-theme="dark"] .panel-footer {
+    background-color: var(--panel-header-bg);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+[data-theme="dark"] .modal-body {
+    background-color: var(--panel-bg);
+    color: var(--text);
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+    background-color: var(--input-bg) !important;
+    color: var(--input-color) !important;
+    border-color: var(--input-border) !important;
+}
+
+[data-theme="dark"] select option {
+    background-color: var(--bg2);
+    color: var(--text);
+}
+
+[data-theme="dark"] table,
+[data-theme="dark"] .table-wrap {
+    background-color: var(--panel-bg);
+}
+
+[data-theme="dark"] th {
+    background-color: var(--panel-header-bg) !important;
+    border-color: var(--border) !important;
+    color: var(--text2) !important;
+}
+
+[data-theme="dark"] td {
+    background-color: var(--panel-bg) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+}
+
+[data-theme="dark"] tr:hover td,
+[data-theme="dark"] tr[onclick]:hover td {
+    background-color: var(--hover-bg) !important;
+}
+
+[data-theme="dark"] .topbar {
+    background-color: var(--topbar-bg) !important;
+    border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .badge-pending,
+[data-theme="dark"] .badge-warning {
+    background-color: var(--hover-bg);
+    color: var(--text2);
+    border-color: var(--border);
+}
+
+/* ── 7. DASHBOARD INLINE STYLES OVERRIDES & BLEED ELIMINATION ── */
+[data-theme="dark"] .inspector-card,
+[data-theme="dark"] .inspector-mini-card,
+[data-theme="dark"] .inspector-hero {
+    background-color: var(--surface, #12141A) !important;
+    border-color: var(--border, rgba(255, 255, 255, 0.1)) !important;
+    color: var(--ink, #f0f0f0) !important;
+}
+
+[data-theme="dark"] .inspector-title,
+[data-theme="dark"] .inspector-hero-name,
+[data-theme="dark"] .inspector-mini-val,
+[data-theme="dark"] .inspector-section-title {
+    color: var(--ink, #f0f0f0) !important;
+}
+
+[data-theme="dark"] .inspector-seal,
+[data-theme="dark"] .inspector-meta-row,
+[data-theme="dark"] .inspector-mini-label,
+[data-theme="dark"] .inspector-field-label {
+    color: var(--muted, #94a3b8) !important;
+}
+
+[data-theme="dark"] .inspector-header,
+[data-theme="dark"] .inspector-field-row {
+    border-color: var(--line, rgba(255, 255, 255, 0.1)) !important;
+}
+
+[data-theme="dark"] .inspector-ref-badge {
+    background-color: #181A20 !important;
+    border-color: var(--line, rgba(255, 255, 255, 0.1)) !important;
+    color: var(--muted, #94a3b8) !important;
+}
+
+[data-theme="dark"] .btn-table-action {
+    background-color: #181A20 !important;
+    border-color: var(--line, rgba(255, 255, 255, 0.1)) !important;
+    color: var(--muted, #94a3b8) !important;
+}
+
+[data-theme="dark"] .btn-table-action:hover {
+    background-color: var(--accent, #c5a059) !important;
+    color: #111111 !important;
+    border-color: var(--accent, #c5a059) !important;
+}
+
+/* Universal override for inline legacy white backgrounds across dashboard partials */
+[data-theme="dark"] [style*="background: #FFFFFF"],
+[data-theme="dark"] [style*="background:#FFFFFF"],
+[data-theme="dark"] [style*="background: #ffffff"],
+[data-theme="dark"] [style*="background:#ffffff"],
+[data-theme="dark"] [style*="background: white"],
+[data-theme="dark"] [style*="background:#fff"],
+[data-theme="dark"] [style*="background: #fff"] {
+    background-color: var(--surface, #12141A) !important;
+    border-color: var(--line, rgba(255, 255, 255, 0.1)) !important;
+}
+
+[data-theme="dark"] [style*="background: #F6F6F6"],
+[data-theme="dark"] [style*="background:#F6F6F6"],
+[data-theme="dark"] [style*="background: #f6f6f6"],
+[data-theme="dark"] [style*="background:#f6f6f6"] {
+    background-color: #181A20 !important;
+    border-color: var(--line, rgba(255, 255, 255, 0.1)) !important;
+}
+
+[data-theme="dark"] [style*="color: #111111"],
+[data-theme="dark"] [style*="color:#111111"] {
+    color: var(--ink, #f0f0f0) !important;
+}
+
+[data-theme="dark"] [style*="color: #737373"],
+[data-theme="dark"] [style*="color:#737373"] {
+    color: var(--muted, #94a3b8) !important;
+}
+
+[data-theme="dark"] [style*="border: 1px solid #E5E5E5"],
+[data-theme="dark"] [style*="border:1px solid #E5E5E5"],
+[data-theme="dark"] [style*="border-bottom: 1px solid #E5E5E5"],
+[data-theme="dark"] [style*="border-top: 1px solid #E5E5E5"] {
+    border-color: var(--line, rgba(255, 255, 255, 0.1)) !important;
+}
+
+/* Slot cards and schedule pickers */
+[data-theme="dark"] .slot-card {
+    background-color: var(--surface, #161f30) !important;
+    border-color: var(--line, rgba(255, 255, 255, 0.1)) !important;
+    color: var(--ink, #f0f0f0) !important;
+}
+
+[data-theme="dark"] .slot-card.selected {
+    border-color: var(--accent, #b8963e) !important;
+    background-color: rgba(184, 150, 62, 0.12) !important;
+}
+
+/* Modals and dialogs */
+[data-theme="dark"] .modal,
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer,
+[data-theme="dark"] .modal-body {
+    background-color: var(--surface, #161f30) !important;
+    border-color: var(--line, rgba(255, 255, 255, 0.1)) !important;
+    color: var(--ink, #f0f0f0) !important;
+}
+
+/* Form inputs & selects across dashboard */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+    background-color: var(--input-bg, #181A20) !important;
+    color: var(--ink, #f0f0f0) !important;
+    border-color: var(--line, rgba(255, 255, 255, 0.1)) !important;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+    color: var(--muted, #94a3b8) !important;
+}
+
+/* ── 8. UNIFIED CONFIRM / CANCEL BUTTON STYLES (Option 1) ── */
+.btn-confirm,
+.btn-success,
+.btn-green {
+    background-color: var(--action-confirm-bg) !important;
+    border: 1px solid var(--action-confirm-bg) !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    border-radius: var(--radius-md) !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.btn-confirm:hover,
+.btn-success:hover,
+.btn-green:hover {
+    background-color: var(--action-confirm-hover) !important;
+    border-color: var(--action-confirm-hover) !important;
+    color: #FFFFFF !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.28) !important;
+}
+
+.btn-cancel,
+.btn-danger,
+.btn-red {
+    background-color: var(--action-cancel-bg) !important;
+    border: 1px solid var(--action-cancel-bg) !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    border-radius: var(--radius-md) !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.btn-cancel:hover,
+.btn-danger:hover,
+.btn-red:hover {
+    background-color: var(--action-cancel-hover) !important;
+    border-color: var(--action-cancel-hover) !important;
+    color: #FFFFFF !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.28) !important;
+}
+
+/* Subtle / Ghost Confirmation Variants */
+.btn-confirm-soft,
+.btn-success-soft {
+    background-color: var(--action-confirm-soft-bg) !important;
+    border: 1px solid rgba(22, 163, 74, 0.35) !important;
+    color: var(--action-confirm-soft-txt) !important;
+    font-weight: 600 !important;
+    border-radius: var(--radius-md) !important;
+    transition: all 0.2s ease !important;
+}
+.btn-confirm-soft:hover,
+.btn-success-soft:hover {
+    background-color: #BBF7D0 !important;
+    color: #166534 !important;
+}
+
+.btn-cancel-soft,
+.btn-danger-soft {
+    background-color: var(--action-cancel-soft-bg) !important;
+    border: 1px solid rgba(220, 38, 38, 0.35) !important;
+    color: var(--action-cancel-soft-txt) !important;
+    font-weight: 600 !important;
+    border-radius: var(--radius-md) !important;
+    transition: all 0.2s ease !important;
+}
+.btn-cancel-soft:hover,
+.btn-danger-soft:hover {
+    background-color: #FECACA !important;
+    color: #991B1B !important;
+}
+
+[data-theme="dark"] .btn-confirm-soft,
+[data-theme="dark"] .btn-success-soft {
+    background-color: rgba(22, 163, 74, 0.18) !important;
+    border-color: rgba(74, 222, 128, 0.35) !important;
+    color: #4ADE80 !important;
+}
+[data-theme="dark"] .btn-confirm-soft:hover,
+[data-theme="dark"] .btn-success-soft:hover {
+    background-color: rgba(22, 163, 74, 0.28) !important;
+    color: #86EFAC !important;
+}
+
+[data-theme="dark"] .btn-cancel-soft,
+[data-theme="dark"] .btn-danger-soft {
+    background-color: rgba(220, 38, 38, 0.18) !important;
+    border-color: rgba(248, 113, 113, 0.35) !important;
+    color: #F87171 !important;
+}
+[data-theme="dark"] .btn-cancel-soft:hover,
+[data-theme="dark"] .btn-danger-soft:hover {
+    background-color: rgba(220, 38, 38, 0.28) !important;
+    color: #FCA5A5 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CIRCULAR FLOATING DARK-MODE TOGGLE (UNIVERSAL)
+   ═══════════════════════════════════════════════════════════════ */
+.floating-theme-toggle {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #FFFFFF;
+    border: 1.5px solid var(--accent, #C5A059);
+    color: var(--accent, #C5A059);
+    font-size: 1.15rem;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), 0 0 10px rgba(197, 160, 89, 0.25);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+    outline: none;
+}
+
+.floating-theme-toggle:hover {
+    transform: translateY(-2px) scale(1.06);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), 0 0 18px rgba(197, 160, 89, 0.45);
+    background: var(--accent, #C5A059);
+    color: #FFFFFF;
+}
+
+.floating-theme-toggle:active {
+    transform: translateY(0) scale(0.96);
+}
+
+.floating-theme-toggle i {
+    transition: transform 0.25s ease;
+}
+
+.floating-theme-toggle:hover i {
+    transform: rotate(20deg);
+}
+
+[data-theme="dark"] .floating-theme-toggle {
+    background: #12141A;
+    border-color: rgba(197, 160, 89, 0.6);
+    color: #F6D06D;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 14px rgba(197, 160, 89, 0.35);
+}
+
+[data-theme="dark"] .floating-theme-toggle:hover {
+    background: #1A1D24;
+    border-color: #F6D06D;
+    color: #FFFFFF;
+}
+

@@ -1,0 +1,76 @@
+/* ====================================================================
+   FONTS.CSS — Canonical Typography Imports
+   - Primary UI: Inter (Clean, modern, crisp desktop baseline)
+   - Editorial / Cathedral Display: Playfair Display & Cinzel (Sacred elegance)
+   - Monospace: Fira Code (IDs, codes, timestamps, references)
+   ==================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
+
+:root {
+    /* ── Centralized Typography Base Stack ── */
+    --font-family-base: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+    --font-sans: var(--font-family-base);
+    --font-serif: 'Playfair Display', 'Cinzel', Georgia, 'Times New Roman', serif;
+    --font-display: 'Playfair Display', 'Cinzel', Georgia, serif;
+    --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --font-badge: 'Outfit', 'Inter', sans-serif;
+    
+    --font-body: var(--font-sans);
+    --font-heading: var(--font-serif);
+    --font-family: var(--font-sans);
+    --font-family-sans: var(--font-sans);
+    --font-family-serif: var(--font-serif);
+    --font-family-display: var(--font-display);
+    --font-family-badge: var(--font-badge);
+    --font-family-mono: var(--font-mono);
+
+    /* ── Centralized Typography Scale ── */
+    --font-size-xs: 11px;
+    --font-size-sm: 12px;
+    --font-size-base: 14px;
+    --font-size-md: 15px;
+    --font-size-lg: 17px;
+    --font-size-xl: 18px;
+    --font-size-2xl: 20px;
+    --font-size-3xl: 24px;
+    --font-size-metric: 26px;
+
+    /* ── Specialized Hierarchy Roles ── */
+    --font-page-title: 20px;
+    --font-page-subtitle: 14px;
+    --font-card-title: 16px;
+    --font-table-header: 12px;
+    --font-table-body: 13px;
+    --font-form-label: 13px;
+    --font-input: 14px;
+    --font-btn: 13px;
+    --font-badge: 11.5px;
+    --font-modal-title: 18px;
+
+    /* ── Font Weights ── */
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+
+    /* ── Line Heights ── */
+    --line-height-tight: 1.3;
+    --line-height-normal: 1.4;
+    --line-height-relaxed: 1.5;
+}
+
+/* Global Font Rendering Enhancements */
+*, *::before, *::after {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+body {
+    font-family: var(--font-body);
+}
+
+input, button, select, textarea, optgroup {
+    font-family: inherit;
+}

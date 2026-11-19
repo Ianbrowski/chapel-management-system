@@ -1,0 +1,36 @@
+# Environment / local secrets
+.env
+.env.*
+!.env.example
+
+# Local app configuration (contains DB/SMTP credentials)
+config/config.local.php
+
+# Local runtime artifacts
+tmp/
+*.log
+
+# Backup artifacts
+backups/*.zip
+backups/work_*/
+backups/tmp_restore_*/
+backups/*.sql
+
+# SQL dumps (may contain sensitive data)
+*.sql
+
+# Scratch / dev-only files
+scratch/
+
+# Browser test profiles
+chrome-test-profile/
+
+# Session / cookie files
+cookies.txt
+
+# Node modules (if any)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db

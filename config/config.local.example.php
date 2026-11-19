@@ -1,0 +1,20 @@
+<?php
+return [
+    'host' => '127.0.0.1',
+    'port' => 3307,
+    'user' => 'root',
+    'pass' => '',
+    'db' => 'cathedral_system2',
+    'smtp_host' => 'smtp.example.com',
+    'smtp_user' => 'no-reply@example.com',
+    'smtp_pass' => 'replace-with-app-password',
+    'smtp_secure' => 'tls',
+    'smtp_port' => 587,
+    'smtp_from_name' => 'IFI Cathedral System',
+    'timezone' => 'Asia/Manila',
+    'sms_provider' => 'mock',
+    'sms_api_key' => '',
+    'sms_sender_name' => 'SEMAPHORE',
+    'sms_base_url' => 'https://api.semaphore.co/api/v4/messages',
+    'sms_country' => 'PH',
+];

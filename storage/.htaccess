@@ -1,0 +1,17 @@
+# Secure Storage Configuration
+# Prevents execution of scripts in the upload directories
+# Even if a malicious .php file is uploaded, it cannot be executed
+
+<FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|jsp|asp|htm|html|shtml|sh|cgi)$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+
+# Prevent directory listing
+Options -Indexes
+
+# Ensure only images/documents are served (Optional but recommended)
+# <FilesMatch "\.(?i:jpe?g|gif|png|webp|pdf|docx?|xlsx?)$">
+#     Order Allow,Deny
+#     Allow from all
+# </FilesMatch>

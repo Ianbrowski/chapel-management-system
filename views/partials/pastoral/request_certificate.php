@@ -425,11 +425,16 @@ $readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_request
                                 </td>
 
                                 <td style="padding: 10px 16px; text-align: center;" onclick="event.stopPropagation();">
+                                    <?php
+                                        $currentUid = (int)($_SESSION['user_id'] ?? 0);
+                                        $isRowOwner = ($currentUid > 0 && (int)($req['requested_by'] ?? 0) === $currentUid);
+                                        $canDeleteRow = $isAdmin || $isRowOwner || in_array($st, ['Cancelled', 'Rejected']);
+                                    ?>
                                     <div class="portal-dropdown-wrapper" style="position: relative; display: inline-block;">
                                         <button class="btn-icon" onclick="togglePortalDropdown(this)" title="Actions" style="width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: #FFFFFF; color: var(--text); cursor: pointer;">
                                             <i class="fa-solid fa-ellipsis-vertical" style="font-size: 11px;"></i>
                                         </button>
-                                        <div class="dropdown-menu" style="display: none; position: absolute; right: 0; background: #FFFFFF; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 50; min-width: 140px; padding: 4px;">
+                                        <div class="dropdown-menu" style="display: none; position: absolute; top: calc(100% + 4px); right: 0; left: auto; background: #FFFFFF; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 50; min-width: 155px; padding: 4px; text-align: left;">
                                             <a class="dropdown-item" href="javascript:void(0)" onclick="viewCertDetailsFromRow(this.closest('tr'))" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); border-radius: 4px;">
                                                 <i class="fa-solid fa-eye" style="color: var(--accent);"></i> View Details
                                             </a>
@@ -438,7 +443,7 @@ $readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_request
                                                 <i class="fa-solid fa-ban"></i> Cancel Request
                                             </a>
                                             <?php endif; ?>
-                                            <?php if (in_array($st, ['Cancelled', 'Rejected'])): ?>
+                                            <?php if ($canDeleteRow): ?>
                                             <a class="dropdown-item" href="javascript:void(0)" data-id="<?php echo (int)$req['event_id']; ?>" data-title="<?php echo htmlspecialchars($req['title'], ENT_QUOTES, 'UTF-8'); ?>" onclick="deleteCertRequest(this)" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: #ef4444; border-radius: 4px;">
                                                 <i class="fa-solid fa-trash"></i> Delete
                                             </a>

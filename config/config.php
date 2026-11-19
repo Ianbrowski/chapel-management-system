@@ -109,7 +109,15 @@ if ($conn === false) {
 }
 
 $conn->options(MYSQLI_OPT_CONNECT_TIMEOUT, 3);
-$connected = @$conn->real_connect($host, $user, $pass, $db, $port);
+$dbSsl = (getenv('DB_SSL') === 'true') || (stripos($host, 'tidbcloud.com') !== false);
+$dbSslCa = getenv('DB_SSL_CA') ?: '/etc/ssl/certs/ca-certificates.crt';
+$connectFlags = 0;
+if ($dbSsl) {
+    $caPath = is_file($dbSslCa) ? $dbSslCa : null;
+    $conn->ssl_set(null, null, $caPath, null, null);
+    $connectFlags = MYSQLI_CLIENT_SSL;
+}
+$connected = @$conn->real_connect($host, $user, $pass, $db, $port, null, $connectFlags);
 
 // Automatic local port fallback (supports environments switching between 3306 and 3307, or remote fallback)
 if (!$connected || $conn->connect_error) {

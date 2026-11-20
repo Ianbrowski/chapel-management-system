@@ -1495,6 +1495,7 @@ document.addEventListener('click', e => {
     if (_activePortal && !_activePortal.contains(e.target) && e.target !== _activeBtn) _closePortal();
     if (e.target.classList && e.target.classList.contains('modal-overlay')) {
         e.target.classList.remove('open');
+        document.body.style.overflow = '';
     }
 });
 document.querySelectorAll('.ent-card-body').forEach(el => el.addEventListener('scroll', _closePortal));
@@ -1776,7 +1777,13 @@ function showConfirmationModal() {
                 By confirming, your certificate request will be submitted to the Parish Office for canonical record verification and issuance.
             </div>
         `;
-        document.getElementById('confirmation-modal').classList.add('open');
+        const reqModal = document.getElementById('request-event-modal');
+        if (reqModal) reqModal.classList.remove('open');
+        const confModal = document.getElementById('confirmation-modal');
+        if (confModal) {
+            confModal.style.zIndex = '99999';
+            confModal.classList.add('open');
+        }
         return;
     }
 
@@ -1834,15 +1841,15 @@ function showConfirmationModal() {
                 </div>
             </div>` : ''}
         </div>
-        <div style="background:rgba(197,160,89,0.12); border:1px solid rgba(197,160,89,0.3); border-radius:8px; padding:10px; font-size:12px; color:var(--text2);">
+        ${!isGuest ? `<div style="background:rgba(197,160,89,0.12); border:1px solid rgba(197,160,89,0.3); border-radius:8px; padding:10px; font-size:12px; color:var(--text2);">
             <i class="fa-solid fa-circle-info" style="color:var(--accent, #c5a059); margin-right:6px;"></i>
             By confirming, your request will be sent to the Cathedral Admin for review.
-        </div>
+        </div>` : ''}
     `;
 
     if (isGuest) {
         document.getElementById('confirmation-content').innerHTML += `
-            <div style="background: rgba(197,160,89,0.12); border: 1px solid rgba(197,160,89,0.35); border-radius: 8px; padding: 12px 14px; margin-top: 10px; display: flex; align-items: flex-start; gap: 10px;">
+            <div style="background: rgba(197,160,89,0.12); border: 1px solid rgba(197,160,89,0.35); border-radius: 8px; padding: 12px 14px; margin-top: 2px; display: flex; align-items: flex-start; gap: 10px;">
                 <i class="fa-solid fa-id-card-clip" style="color: var(--accent); font-size: 18px; margin-top: 2px;"></i>
                 <div>
                     <div style="font-weight: 700; color: var(--accent); font-size: 13px;">Parishioner Membership Required</div>
@@ -1863,15 +1870,34 @@ function showConfirmationModal() {
         if (footerGuest) footerGuest.style.display = 'none';
     }
 
-    document.getElementById('confirmation-modal').classList.add('open');
+    const reqModal = document.getElementById('request-event-modal');
+    if (reqModal) reqModal.classList.remove('open');
+    const confModal = document.getElementById('confirmation-modal');
+    if (confModal) {
+        confModal.style.zIndex = '99999';
+        confModal.classList.add('open');
+    }
+    document.body.style.overflow = 'hidden';
 }
 
-function closeConfirmationModal() { document.getElementById('confirmation-modal').classList.remove('open'); }
+function closeConfirmationModal(reopenForm = true) {
+    const confModal = document.getElementById('confirmation-modal');
+    if (confModal) confModal.classList.remove('open');
+    if (reopenForm) {
+        const reqModal = document.getElementById('request-event-modal');
+        if (reqModal) {
+            reqModal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            return;
+        }
+    }
+    document.body.style.overflow = '';
+}
 
 function confirmSubmission() {
     if (isGuest) {
         saveFormDraft();
-        closeConfirmationModal();
+        closeConfirmationModal(false);
         closeRequestEventModal();
         if (typeof openGuestAuthModal === 'function') {
             openGuestAuthModal('submit your sacramental or liturgical service request');

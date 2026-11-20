@@ -54,7 +54,7 @@ $dot_colors = [
     </div>
 
     <!-- ─── 2. MAIN ANNOUNCEMENT BOARD CONTAINER ─── -->
-    <div class="panel bulletin-board-panel" style="border-radius: 12px; overflow: hidden; background: var(--surface, #FFFFFF); border: 1px solid var(--border); box-shadow: none; display: flex; flex-direction: column; width: 100%; padding: 0 !important;">
+    <div class="panel bulletin-board-panel" style="border-radius: 12px; background: var(--surface, #FFFFFF); border: 1px solid var(--border); box-shadow: none; display: flex; flex-direction: column; width: 100%; padding: 0 !important;">
         
         <!-- Compact Filter & Search Toolbar inside panel header -->
         <div style="padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface, #FFFFFF); flex-shrink: 0;">
@@ -453,9 +453,17 @@ $dot_colors = [
 <?php endif; ?>
 
 <style>
+#sec-bulletin.workspace-fluid {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+}
 #sec-bulletin .bulletin-board-panel {
     padding: 0 !important;
     margin-bottom: 0 !important;
+    overflow: visible !important;
+    flex: none !important;
+    height: auto !important;
 }
 .bulletin-cards-grid {
     display: grid;

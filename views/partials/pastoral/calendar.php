@@ -2118,4 +2118,34 @@ $isCathedralStaff = ($role === 'Staff' && empty($chapel_id));
             }
         }
     }
+
+    window.openSpecificCalendarEvent = function(eventId) {
+        var targetId = Number(eventId || 0);
+        if (!targetId) return false;
+        var list = Array.isArray(window.priestEvents) ? window.priestEvents : [];
+        var match = list.find(function(ev) { return Number(ev.event_id) === targetId; });
+        if (!match && window.__allEventsMap) {
+            match = Object.values(window.__allEventsMap).find(function(ev) { return Number(ev.event_id) === targetId; });
+        }
+        if (!match) return false;
+        if (match.start_time && typeof ovShowAgenda === 'function') {
+            ovShowAgenda(String(match.start_time).substring(0, 10));
+        }
+        if (typeof window.viewEventDetails === 'function') {
+            window.viewEventDetails(match);
+            return true;
+        }
+        return false;
+    };
+
+    (function() {
+        var urlEventId = Number(new URLSearchParams(window.location.search).get('event_id') || 0);
+        var pendingEventId = Number(window.__pendingEventSelectId || <?php echo (int)($_GET['event_id'] ?? 0); ?> || urlEventId || 0);
+        if (pendingEventId > 0) {
+            window.__pendingEventSelectId = null;
+            setTimeout(function() {
+                window.openSpecificCalendarEvent(pendingEventId);
+            }, 150);
+        }
+    })();
 </script>

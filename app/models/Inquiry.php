@@ -45,13 +45,15 @@ class Inquiry {
     }
 
     public function getById($id) {
-        $stmt = $this->conn->prepare("SELECT * FROM public_inquiries WHERE inquiry_id = ? LIMIT 1");
+        $stmt = $this->conn->prepare("SELECT i.*, c.chapel_name FROM public_inquiries i LEFT JOIN chapels c ON i.chapel_id = c.chapel_id WHERE i.inquiry_id = ? LIMIT 1");
         if (!$stmt) {
             return null;
         }
         $stmt->bind_param('i', $id);
         $stmt->execute();
-        return $stmt->get_result()->fetch_assoc();
+        $res = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return $res;
     }
 
     /**

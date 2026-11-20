@@ -191,7 +191,8 @@
                                     elseif ($type === 'Merchandise') $typeIcon = 'fa-store';
                                     elseif ($type === 'Event Inquiry') $typeIcon = 'fa-calendar-day';
                                 ?>
-                                <tr data-inquiry="<?php echo htmlspecialchars(json_encode($inq, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
+                                <tr data-inquiry-id="<?php echo (int)$inq['inquiry_id']; ?>"
+                                    data-inquiry="<?php echo htmlspecialchars(json_encode($inq, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
                                     onclick="showWorkspaceInquiryDetails(this)"
                                     style="cursor: pointer; border-bottom: 1px solid var(--border);" class="inq-row" title="Click to view details">
                                     <td style="text-align: center; color: #737373; font-size: 11px; font-family: monospace; font-weight: 600;"><?php echo $startIdx + $idx; ?></td>
@@ -691,18 +692,49 @@ window.submitInquiryQuickContact = submitInquiryQuickContact;
 window.submitInquiryResolved = submitInquiryResolved;
 window.filterInquiries = filterInquiries;
 
-// Auto-select first request row upon load so inspector is immediately populated
-(function() {
-    function autoSelectFirstRow() {
-        const firstRow = document.querySelector('.inq-row');
-        if (firstRow && typeof showWorkspaceInquiryDetails === 'function') {
-            showWorkspaceInquiryDetails(firstRow);
+// Select deep-linked request (from notification inbox or URL ?inq_id=) or fall back to first row
+window.initWorkspaceInquirySelection = function() {
+    var serverSelectedId = <?php echo (int)($selected_inquiry_id ?? 0); ?>;
+    var serverSelectedData = <?php echo json_encode($selected_inquiry ?? null, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>;
+    var urlSelectedId = parseInt(new URLSearchParams(window.location.search).get('inq_id') || '0', 10) || 0;
+    var pendingId = parseInt(window.__pendingInboxSelectId || '0', 10) || 0;
+    var targetId = pendingId || urlSelectedId || serverSelectedId || 0;
+
+    if (pendingId) {
+        window.__pendingInboxSelectId = null;
+    }
+
+    if (targetId > 0) {
+        var targetRow = document.querySelector('.inq-row[data-inquiry-id="' + targetId + '"]');
+        if (targetRow && typeof showWorkspaceInquiryDetails === 'function') {
+            var searchInput = document.getElementById('inq-search');
+            if (targetRow.style.display === 'none') {
+                if (searchInput) searchInput.value = '';
+                document.querySelectorAll('.inq-row').forEach(function(r) { r.style.display = ''; });
+            }
+            showWorkspaceInquiryDetails(targetRow);
+            targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return true;
+        }
+        if (serverSelectedData && Number(serverSelectedData.inquiry_id) === targetId && typeof showWorkspaceInquiryDetails === 'function') {
+            showWorkspaceInquiryDetails(serverSelectedData, null);
+            return true;
         }
     }
+
+    var firstRow = document.querySelector('.inq-row');
+    if (firstRow && typeof showWorkspaceInquiryDetails === 'function') {
+        showWorkspaceInquiryDetails(firstRow);
+        return true;
+    }
+    return false;
+};
+
+(function() {
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', autoSelectFirstRow);
+        document.addEventListener('DOMContentLoaded', function() { window.initWorkspaceInquirySelection(); });
     } else {
-        setTimeout(autoSelectFirstRow, 80);
+        setTimeout(function() { window.initWorkspaceInquirySelection(); }, 80);
     }
 })();
 </script>

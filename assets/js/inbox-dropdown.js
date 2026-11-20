@@ -324,44 +324,101 @@
                 }
             } catch(err) {}
 
+            const baseUrl = (typeof window !== 'undefined' && window.BASE_URL) ? window.BASE_URL.replace(/\/+$/, '') : '';
+            const toFullUrl = (rel) => {
+                if (!rel) return '';
+                if (/^https?:\/\//i.test(rel) || rel.startsWith('/')) return rel;
+                return baseUrl ? `${baseUrl}/${rel.replace(/^\/+/, '')}` : rel;
+            };
+
+            // Member notification deep-linking (events calendar + specific event modal)
+            if (clickedItem && clickedItem.target_section === 'events' && Number(clickedItem.reference_id) > 0) {
+                const refEventId = Number(clickedItem.reference_id);
+                window.__pendingEventSelectId = refEventId;
+                if (typeof window.openSpecificCalendarEvent === 'function' && window.openSpecificCalendarEvent(refEventId)) {
+                    window.__pendingEventSelectId = null;
+                    return;
+                }
+                if (typeof window.navigateToSection === 'function') {
+                    window.navigateToSection('events', true, 'event_id=' + encodeURIComponent(refEventId)).then(() => {
+                        setTimeout(() => {
+                            if (typeof window.openSpecificCalendarEvent === 'function' && window.openSpecificCalendarEvent(refEventId)) {
+                                window.__pendingEventSelectId = null;
+                            }
+                        }, 200);
+                    });
+                } else {
+                    window.location.href = toFullUrl(clickedItem.target_url);
+                }
+                return;
+            }
+
             if (clickedItem && clickedItem.target_url) {
-                window.location.href = clickedItem.target_url;
+                window.location.href = toFullUrl(clickedItem.target_url);
                 return;
             }
 
             const targetSection = 'public_inquiries';
-            const currentSection = new URLSearchParams(window.location.search).get('section') || '';
+            const inInboxWorkspace = Boolean(document.querySelector('.inbox-workspace'));
 
-            if (currentSection === targetSection) {
-                // Already in public_inquiries: highlight matching row
-                this.highlightRowInWorkspace(id);
+            window.__pendingInboxSelectId = id;
+
+            // Already viewing the Inbox workspace and the specific row is in DOM: highlight & inspect immediately
+            if (inInboxWorkspace && this.highlightRowInWorkspace(id)) {
+                window.__pendingInboxSelectId = null;
+                return;
+            }
+
+            // Navigate to public_inquiries (passes inq_id so server loads exact item even if archived or on page 2+)
+            if (typeof window.navigateToSection === 'function') {
+                window.navigateToSection(targetSection, true, 'inq_id=' + encodeURIComponent(id)).then(() => {
+                    setTimeout(() => {
+                        if (typeof window.initWorkspaceInquirySelection === 'function') {
+                            window.initWorkspaceInquirySelection();
+                        } else {
+                            this.highlightRowInWorkspace(id);
+                        }
+                    }, 120);
+                });
             } else {
-                // Navigate to public_inquiries
-                if (typeof window.navigateToSection === 'function') {
-                    window.navigateToSection(targetSection).then(() => {
-                        setTimeout(() => this.highlightRowInWorkspace(id), 250);
-                    });
-                } else {
-                    window.location.href = `dashboard.php?section=${targetSection}&inq_id=${id}`;
-                }
+                window.location.href = toFullUrl(`dashboard.php?section=${targetSection}&inq_id=${encodeURIComponent(id)}`);
             }
         },
 
         highlightRowInWorkspace(id) {
-            const table = document.querySelector('.data-table');
-            if (!table) return;
+            const targetId = String(id);
+            const table = document.querySelector('.inbox-workspace .data-table') || document.querySelector('.data-table');
+            if (!table) return false;
 
-            // Search for row with matching inquiry id
+            const searchInput = document.getElementById('inq-search');
             const rows = table.querySelectorAll('tbody tr.inq-row');
             for (const row of rows) {
-                const onclickAttr = row.getAttribute('onclick') || '';
-                if (onclickAttr.includes(`"inquiry_id":"${id}"`) || onclickAttr.includes(`"inquiry_id":${id}`) || onclickAttr.includes(`inquiry_id: ${id}`)) {
+                let matches = row.getAttribute('data-inquiry-id') === targetId;
+                if (!matches) {
+                    const raw = row.getAttribute('data-inquiry');
+                    if (raw) {
+                        try {
+                            const parsed = JSON.parse(raw);
+                            matches = String(parsed.inquiry_id || '') === targetId;
+                        } catch (err) {}
+                    }
+                }
+                if (matches) {
+                    if (row.style.display === 'none') {
+                        if (searchInput) searchInput.value = '';
+                        rows.forEach(r => { r.style.display = ''; });
+                    }
+                    if (typeof window.showWorkspaceInquiryDetails === 'function') {
+                        window.showWorkspaceInquiryDetails(row);
+                    } else {
+                        row.click();
+                        row.classList.add('active-row');
+                    }
                     row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    row.click();
-                    row.classList.add('active-row');
-                    return;
+                    return true;
                 }
             }
+            return false;
         },
 
         handleFullView(e) {

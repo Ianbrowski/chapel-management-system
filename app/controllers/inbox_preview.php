@@ -172,22 +172,25 @@ try {
             }
 
             $isUnread = empty($n['is_read']);
+            $refId = !empty($n['reference_id']) ? (int)$n['reference_id'] : 0;
             $items[] = [
-                'id'           => (int)$n['id'],
-                'name'         => 'Cathedral Notice',
-                'email'        => '',
-                'request_type' => htmlspecialchars($n['title'], ENT_QUOTES, 'UTF-8'),
-                'category'     => ucfirst($type),
-                'chapel_name'  => 'Mother Cathedral',
-                'snippet'      => htmlspecialchars($n['message'], ENT_QUOTES, 'UTF-8'),
-                'status'       => $isUnread ? 'New' : 'Read',
-                'is_pending'   => $isUnread,
-                'is_unread'    => $isUnread,
-                'created_at'   => $n['created_at'] ?? '',
-                'time_ago'     => formatRelativeTime($n['created_at'] ?? ''),
-                'icon'         => $icon,
-                'icon_class'   => $iconClass,
-                'target_url'   => 'dashboard.php?section=events'
+                'id'             => (int)$n['id'],
+                'reference_id'   => $refId,
+                'name'           => 'Cathedral Notice',
+                'email'          => '',
+                'request_type'   => htmlspecialchars($n['title'], ENT_QUOTES, 'UTF-8'),
+                'category'       => ucfirst($type),
+                'chapel_name'    => 'Mother Cathedral',
+                'snippet'        => htmlspecialchars($n['message'], ENT_QUOTES, 'UTF-8'),
+                'status'         => $isUnread ? 'New' : 'Read',
+                'is_pending'     => $isUnread,
+                'is_unread'      => $isUnread,
+                'created_at'     => $n['created_at'] ?? '',
+                'time_ago'       => formatRelativeTime($n['created_at'] ?? ''),
+                'icon'           => $icon,
+                'icon_class'     => $iconClass,
+                'target_section' => 'events',
+                'target_url'     => $refId > 0 ? ('dashboard.php?section=events&event_id=' . $refId) : 'dashboard.php?section=events'
             ];
         }
 

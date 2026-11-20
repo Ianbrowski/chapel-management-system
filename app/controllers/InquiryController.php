@@ -321,6 +321,15 @@ class InquiryController extends BaseController {
                 $page = max(1, (int)($_GET['inq_page'] ?? 1));
                 $limit = 30;
                 $result = $this->inquiryModel->getByEmail($email, $page, $limit);
+
+                $selectedInqId = (int)($_GET['inq_id'] ?? 0);
+                $selectedInq = null;
+                if ($selectedInqId > 0) {
+                    $cand = $this->inquiryModel->getById($selectedInqId);
+                    if ($cand && strcasecmp((string)($cand['email'] ?? ''), (string)$email) === 0) {
+                        $selectedInq = $cand;
+                    }
+                }
                 
                 $data['inquiries']     = $result['records'];
                 $data['inq_total']     = $result['total'];
@@ -331,6 +340,8 @@ class InquiryController extends BaseController {
                 $data['inq_active_count']  = 0; // Not relevant for member view
                 $data['inq_archive_count'] = 0;
                 $data['inq_filters']       = [];
+                $data['selected_inquiry_id'] = $selectedInq ? $selectedInqId : 0;
+                $data['selected_inquiry']    = $selectedInq;
             } else {
                 if (in_array($this->role, ['Admin', 'Cathedral Admin'], true)) {
                     $chapelFilter = null;
@@ -339,7 +350,21 @@ class InquiryController extends BaseController {
                 } else {
                     $chapelFilter = 'cathedral';
                 }
-                $tab    = $_GET['inbox_tab'] ?? 'active';
+                $selectedInqId = (int)($_GET['inq_id'] ?? 0);
+                $selectedInq = null;
+                if ($selectedInqId > 0) {
+                    $cand = $this->inquiryModel->getById($selectedInqId);
+                    if ($cand) {
+                        $candChapel = (int)($cand['chapel_id'] ?? 0);
+                        $canAccess = ($chapelFilter === null)
+                            || ($chapelFilter === 'cathedral' && $candChapel === 0)
+                            || (is_int($chapelFilter) && $candChapel === $chapelFilter);
+                        if ($canAccess) {
+                            $selectedInq = $cand;
+                        }
+                    }
+                }
+                $tab    = $_GET['inbox_tab'] ?? (($selectedInq && !empty($selectedInq['is_archived'])) ? 'archived' : 'active');
                 $page   = max(1, (int)($_GET['inq_page'] ?? 1));
                 $status = $_GET['inquiry_status'] ?? null;
                 $sort   = $_GET['inq_sort'] ?? 'date_desc';
@@ -362,6 +387,8 @@ class InquiryController extends BaseController {
                 $data['inq_page']      = $result['page'];
                 $data['limit']         = $limit;
                 $data['inq_filters']   = $filters;
+                $data['selected_inquiry_id'] = $selectedInq ? $selectedInqId : 0;
+                $data['selected_inquiry']    = $selectedInq;
                 
                 $data['inbox_tab']         = $tab;
                 $data['inq_active_count']  = $this->inquiryModel->getActiveCount($chapelFilter);

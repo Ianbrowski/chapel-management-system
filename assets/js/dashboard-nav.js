@@ -5,9 +5,10 @@
 
 let dashboardHistory = [];
 let isNavigatingBack = false;
-let currentActiveSection = new URLSearchParams(window.location.search).get('section') || 'overview';
+let currentActiveSection = new URLSearchParams(window.location.search).get('section')
+    || (window.location.pathname.match(/\/dashboard\/([^/?#]+)/)?.[1] || 'overview');
 
-async function navigateToSection(id, pushState = true) {
+async function navigateToSection(id, pushState = true, extraQuery = '') {
     if (id === 'cathedral') id = 'schedule_cathedral';
     if (id === 'chapel' || id === 'chapels_schedule') id = 'schedule_chapel';
 
@@ -52,10 +53,14 @@ async function navigateToSection(id, pushState = true) {
     currentActiveSection = id;
     updateBackButtonVisibility();
 
+    const extraQs = typeof extraQuery === 'string'
+        ? extraQuery.replace(/^[?&]+/, '')
+        : (extraQuery && typeof extraQuery === 'object' ? new URLSearchParams(extraQuery).toString() : '');
+
     if (pushState) {
         const baseUrl = window.BASE_URL || '';
         const cleanUrl = (id === 'overview' || !id) ? `${baseUrl}/dashboard` : `${baseUrl}/dashboard/${id}`;
-        history.pushState({section: id}, '', cleanUrl);
+        history.pushState({section: id}, '', extraQs ? `${cleanUrl}?${extraQs}` : cleanUrl);
     }
     
     // 2. Fetch partial content
@@ -79,7 +84,7 @@ async function navigateToSection(id, pushState = true) {
 
     try {
         const baseUrl = window.BASE_URL || '';
-        const response = await fetch(`${baseUrl}/dashboard.php?section=${id}&ajax=1`);
+        const response = await fetch(`${baseUrl}/dashboard.php?section=${id}&ajax=1${extraQs ? '&' + extraQs : ''}`);
         if (!response.ok) {
             if (response.status === 401 || response.status === 403) {
                 window.location.href = 'index.php?error=session';
@@ -242,9 +247,13 @@ function reinitializeSectionComponents(id) {
 
     // 6. Messages / Inquiries Initializer
     if (id === 'public_inquiries') {
-        const firstRow = document.querySelector('.inq-row');
-        if (firstRow && typeof window.showWorkspaceInquiryDetails === 'function') {
-            window.showWorkspaceInquiryDetails(firstRow);
+        if (typeof window.initWorkspaceInquirySelection === 'function') {
+            window.initWorkspaceInquirySelection();
+        } else {
+            const firstRow = document.querySelector('.inq-row');
+            if (firstRow && typeof window.showWorkspaceInquiryDetails === 'function') {
+                window.showWorkspaceInquiryDetails(firstRow);
+            }
         }
     }
 

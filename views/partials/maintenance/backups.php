@@ -375,7 +375,8 @@ if (typeof window.triggerBackupKind !== 'function') {
             }, 2000);
         } catch (err) {
             result.style.color = '#ef4444';
-            result.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${err && err.message ? err.message : 'Backup failed.'}`;
+            result.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ';
+            result.appendChild(document.createTextNode(err && err.message ? err.message : 'Backup failed.'));
             state.textContent = 'Failed.';
         } finally {
             buttons.forEach(b => b.disabled = false);

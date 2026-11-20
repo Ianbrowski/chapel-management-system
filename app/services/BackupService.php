@@ -290,6 +290,19 @@ class BackupService
         return $row['status'] ?? null;
     }
 
+    private function buildSslArgs(string $host): array
+    {
+        $useSsl = (getenv('DB_SSL') === 'true') || (stripos($host, 'tidbcloud.com') !== false);
+        if (!$useSsl) {
+            return [];
+        }
+        $caPath = getenv('DB_SSL_CA') ?: '/etc/ssl/certs/ca-certificates.crt';
+        if (is_file($caPath)) {
+            return ['--ssl-ca=' . $caPath];
+        }
+        return ['--ssl'];
+    }
+
     private function runMysqldump(string $outputFile): void
     {
         $bin = $this->resolveMysqlBinary(true);
@@ -315,6 +328,10 @@ class BackupService
             '--result-file=' . $outputFile,
         ];
 
+        foreach ($this->buildSslArgs($host) as $sslArg) {
+            $args[] = $sslArg;
+        }
+
         if ($pass !== '') {
             $args[] = '--password=' . $pass;
         }
@@ -323,9 +340,84 @@ class BackupService
 
         $result = $this->runProcess($args);
         $code = $result['code'];
-        if ($code !== 0 || !is_file($outputFile) || filesize($outputFile) === 0) {
+        if ($code === 0 && is_file($outputFile) && filesize($outputFile) > 0) {
+            return;
+        }
+
+        // Fallback to pure-PHP mysqli export if mysqldump binary is missing or managed DB rejects dump flags
+        @unlink($outputFile);
+        $this->exportDatabaseViaPhp($outputFile, $db);
+        if (!is_file($outputFile) || filesize($outputFile) === 0) {
             $msg = trim($result['output']);
-            throw new RuntimeException('mysqldump failed. ' . ($msg !== '' ? $msg : 'No output.'));
+            throw new RuntimeException('mysqldump failed and PHP fallback produced empty file. ' . ($msg !== '' ? $msg : ''));
+        }
+    }
+
+    public function exportDatabaseViaPhp(string $outputFile, string $dbName = ''): void
+    {
+        $fh = @fopen($outputFile, 'wb');
+        if ($fh === false) {
+            throw new RuntimeException('Unable to open SQL backup output file.');
+        }
+
+        try {
+            $dbDisplay = $dbName !== '' ? $dbName : 'cathedral';
+            fwrite($fh, "-- IFI Cathedral Pure-PHP SQL Backup\n");
+            fwrite($fh, "-- Database: `{$dbDisplay}`\n");
+            fwrite($fh, "-- Generated: " . date('c') . "\n\n");
+            fwrite($fh, "SET NAMES utf8mb4;\n");
+            fwrite($fh, "SET FOREIGN_KEY_CHECKS = 0;\n\n");
+
+            $tables = [];
+            $tRes = $this->conn->query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'");
+            if ($tRes) {
+                while ($row = $tRes->fetch_row()) {
+                    $tables[] = (string)$row[0];
+                }
+                $tRes->free();
+            }
+
+            foreach ($tables as $table) {
+                $safeTable = str_replace('`', '``', $table);
+                $crtRes = $this->conn->query("SHOW CREATE TABLE `{$safeTable}`");
+                if (!$crtRes || !($crtRow = $crtRes->fetch_row())) {
+                    continue;
+                }
+                $createSql = (string)$crtRow[1];
+                $crtRes->free();
+
+                fwrite($fh, "DROP TABLE IF EXISTS `{$safeTable}`;\n");
+                fwrite($fh, $createSql . ";\n\n");
+
+                $dataRes = $this->conn->query("SELECT * FROM `{$safeTable}`");
+                if ($dataRes && $dataRes->num_rows > 0) {
+                    $colNames = [];
+                    foreach ($dataRes->fetch_fields() as $f) {
+                        $colNames[] = '`' . str_replace('`', '``', $f->name) . '`';
+                    }
+                    $colList = implode(', ', $colNames);
+
+                    while ($row = $dataRes->fetch_row()) {
+                        $vals = [];
+                        foreach ($row as $val) {
+                            if ($val === null) {
+                                $vals[] = 'NULL';
+                            } else {
+                                $vals[] = "'" . $this->conn->real_escape_string((string)$val) . "'";
+                            }
+                        }
+                        fwrite($fh, "INSERT INTO `{$safeTable}` ({$colList}) VALUES (" . implode(', ', $vals) . ");\n");
+                    }
+                    fwrite($fh, "\n");
+                }
+                if ($dataRes instanceof mysqli_result) {
+                    $dataRes->free();
+                }
+            }
+
+            fwrite($fh, "SET FOREIGN_KEY_CHECKS = 1;\n");
+        } finally {
+            fclose($fh);
         }
     }
 
@@ -348,6 +440,10 @@ class BackupService
             '--port=' . (string)$port,
             '--user=' . $user,
         ];
+
+        foreach ($this->buildSslArgs($host) as $sslArg) {
+            $args[] = $sslArg;
+        }
 
         if ($pass !== '') {
             $args[] = '--password=' . $pass;

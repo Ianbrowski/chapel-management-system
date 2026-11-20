@@ -56,7 +56,7 @@ function acStatusBadgeStyle(string $status): array {
     return ['label' => $status !== '' ? $status : 'Active', 'color' => '#52525b', 'bg' => '#f4f4f5'];
 }
 
-if ($scope === 'records') {
+if (in_array($scope, ['records', 'records_cathedral', 'records_chapel'], true)) {
     if (!$isStaffOrClergy) {
         echo json_encode(['suggestions' => []]);
         exit();
@@ -69,7 +69,22 @@ if ($scope === 'records') {
     $params = array_fill(0, 8, $likePattern);
     $types  = str_repeat('s', 8);
 
-    if (!$isGlobalAdmin && $sessionChapelId > 0) {
+    if ($scope === 'records_cathedral') {
+        $where[] = "(sr.scope = 'cathedral' OR sr.chapel_id IS NULL OR sr.chapel_id = 0)";
+    } elseif ($scope === 'records_chapel') {
+        $reqChapelId = (int)($_GET['chapel_id'] ?? 0);
+        if (!$isGlobalAdmin && $sessionChapelId > 0) {
+            $where[]  = 'sr.chapel_id = ?';
+            $params[] = $sessionChapelId;
+            $types   .= 'i';
+        } elseif ($reqChapelId > 0) {
+            $where[]  = 'sr.chapel_id = ?';
+            $params[] = $reqChapelId;
+            $types   .= 'i';
+        } else {
+            $where[] = "(sr.scope = 'chapel' OR (sr.chapel_id IS NOT NULL AND sr.chapel_id > 0))";
+        }
+    } elseif (!$isGlobalAdmin && $sessionChapelId > 0) {
         $where[]  = 'sr.chapel_id = ?';
         $params[] = $sessionChapelId;
         $types   .= 'i';

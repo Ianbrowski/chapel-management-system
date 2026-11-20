@@ -335,9 +335,17 @@
                 + encodeURIComponent(scope)
                 + '&q=' + encodeURIComponent(q);
 
+            const recTypeAttr = input.getAttribute('data-ac-record-type') || '';
             const recTypeSel = document.querySelector('select[name="record_type"]');
-            if (scope === 'records' && recTypeSel && recTypeSel.value) {
-                url += '&record_type=' + encodeURIComponent(recTypeSel.value);
+            const recTypeVal = recTypeAttr || (recTypeSel ? recTypeSel.value : '');
+            if (scope.startsWith('records') && recTypeVal) {
+                url += '&record_type=' + encodeURIComponent(recTypeVal);
+            }
+            if (scope === 'records_chapel') {
+                const chapelSel = document.getElementById('chapel-records-filter-select');
+                if (chapelSel && chapelSel.value) {
+                    url += '&chapel_id=' + encodeURIComponent(chapelSel.value);
+                }
             }
 
             fetch(url, { signal: abortCtrl.signal, credentials: 'same-origin' })

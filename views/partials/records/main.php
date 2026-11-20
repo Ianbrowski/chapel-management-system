@@ -306,7 +306,7 @@ $isAllActive = empty($curType);
 
                         <div style="position: relative; width: 100%;">
                             <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--text2); pointer-events: none; z-index: 2;"></i>
-                            <input type="text" name="search" data-ac-mode="server" data-ac-scope="records" placeholder="Search name, parents, ref ID..." 
+                            <input type="text" name="search" data-ac-mode="server" data-ac-scope="<?php echo ($scope === 'cathedral') ? 'records_cathedral' : 'records_chapel'; ?>" data-ac-record-type="<?php echo htmlspecialchars($curType); ?>" placeholder="Search name, parents, ref ID..." 
                                    value="<?php echo htmlspecialchars($searchQuery); ?>"
                                    style="width: 100%; height: 34px; padding-left: 32px !important; padding-right: <?php echo !empty($searchQuery) ? '26px' : '10px'; ?>; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12.5px; box-sizing: border-box; outline: none; transition: border-color 0.15s ease;">
                             <?php if (!empty($searchQuery)): ?>

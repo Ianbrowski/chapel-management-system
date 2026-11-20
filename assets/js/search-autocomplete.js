@@ -341,9 +341,9 @@
             if (scope.startsWith('records') && recTypeVal) {
                 url += '&record_type=' + encodeURIComponent(recTypeVal);
             }
-            if (scope === 'records_chapel') {
+            if (scope.startsWith('records')) {
                 const chapelSel = document.getElementById('chapel-records-filter-select');
-                if (chapelSel && chapelSel.value) {
+                if (chapelSel && chapelSel.value !== '') {
                     url += '&chapel_id=' + encodeURIComponent(chapelSel.value);
                 }
             }

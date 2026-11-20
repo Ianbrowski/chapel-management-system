@@ -34,12 +34,12 @@ if (!function_exists('renderSacramentBadge')) {
 <?php
 $curType = $rec_filters['record_type'] ?? '';
 $searchQuery = $rec_filters['search'] ?? '';
-$selected_chapel_id = $selected_chapel_id ?? (isset($_GET['chapel_id']) ? (int)$_GET['chapel_id'] : null);
+$selected_chapel_id = $selected_chapel_id ?? (isset($_GET['chapel_id']) && $_GET['chapel_id'] !== '' ? (int)$_GET['chapel_id'] : null);
 $curSort = $rec_filters['sort'] ?? ($_GET['rec_sort'] ?? ($_GET['sort'] ?? 'date_desc'));
 $curTimeframe = $rec_filters['timeframe'] ?? ($_GET['timeframe'] ?? '');
 $curPriest = $rec_filters['officiating_priest'] ?? ($_GET['priest'] ?? '');
 
-$chapelParam = !empty($selected_chapel_id) ? '&chapel_id=' . (int)$selected_chapel_id : '';
+$chapelParam = ($selected_chapel_id !== null && $selected_chapel_id !== '') ? '&chapel_id=' . (int)$selected_chapel_id : '';
 $searchParam = !empty($searchQuery) ? '&search=' . urlencode($searchQuery) : '';
 $sortParam = !empty($curSort) ? '&rec_sort=' . urlencode($curSort) : '';
 $timeParam = !empty($curTimeframe) ? '&timeframe=' . urlencode($curTimeframe) : '';
@@ -297,7 +297,7 @@ $isAllActive = empty($curType);
                         <?php if (!empty($curType)): ?>
                         <input type="hidden" name="record_type" value="<?php echo htmlspecialchars($curType); ?>">
                         <?php endif; ?>
-                        <?php if (!empty($selected_chapel_id)): ?>
+                        <?php if ($selected_chapel_id !== null && $selected_chapel_id !== ''): ?>
                         <input type="hidden" name="chapel_id" value="<?php echo (int)$selected_chapel_id; ?>">
                         <?php endif; ?>
                         <input type="hidden" name="timeframe" id="filter-timeframe-val" value="<?php echo htmlspecialchars($curTimeframe); ?>">
@@ -310,7 +310,7 @@ $isAllActive = empty($curType);
                                    value="<?php echo htmlspecialchars($searchQuery); ?>"
                                    style="width: 100%; height: 34px; padding-left: 32px !important; padding-right: <?php echo !empty($searchQuery) ? '26px' : '10px'; ?>; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12.5px; box-sizing: border-box; outline: none; transition: border-color 0.15s ease;">
                             <?php if (!empty($searchQuery)): ?>
-                            <a href="dashboard.php?section=<?php echo $active_section; ?><?php echo !empty($curType) ? '&record_type=' . urlencode($curType) : ''; ?><?php echo !empty($selected_chapel_id) ? '&chapel_id=' . (int)$selected_chapel_id : ''; ?><?php echo !empty($curSort) ? '&rec_sort=' . urlencode($curSort) : ''; ?><?php echo !empty($curTimeframe) ? '&timeframe=' . urlencode($curTimeframe) : ''; ?><?php echo !empty($curPriest) ? '&priest=' . urlencode($curPriest) : ''; ?>" 
+                            <a href="dashboard.php?section=<?php echo $active_section; ?><?php echo !empty($curType) ? '&record_type=' . urlencode($curType) : ''; ?><?php echo ($selected_chapel_id !== null && $selected_chapel_id !== '') ? '&chapel_id=' . (int)$selected_chapel_id : ''; ?><?php echo !empty($curSort) ? '&rec_sort=' . urlencode($curSort) : ''; ?><?php echo !empty($curTimeframe) ? '&timeframe=' . urlencode($curTimeframe) : ''; ?><?php echo !empty($curPriest) ? '&priest=' . urlencode($curPriest) : ''; ?>" 
                                title="Clear search" 
                                style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: var(--text2); text-decoration: none; font-size: 14px; line-height: 1; padding: 2px;">&times;</a>
                             <?php endif; ?>
@@ -319,14 +319,19 @@ $isAllActive = empty($curType);
 
                     <!-- Right: Dropdown Filters & Sort -->
                     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 0 0 auto;">
-                        <?php if ($scope === 'chapel' && in_array($role, ['Admin', 'Cathedral Admin']) && !empty($chapels)): ?>
+                        <?php if (in_array($role, ['Admin', 'Cathedral Admin']) && !empty($chapels)): ?>
                         <select id="chapel-records-filter-select"
-                                onchange="window.location.href='dashboard.php?section=<?php echo $active_section; ?>' + (this.value ? '&chapel_id=' + this.value : '') + '<?php echo !empty($curType) ? '&record_type=' . urlencode($curType) : ''; ?><?php echo !empty($searchQuery) ? '&search=' . urlencode($searchQuery) : ''; ?><?php echo !empty($curSort) ? '&rec_sort=' . urlencode($curSort) : ''; ?><?php echo !empty($curTimeframe) ? '&timeframe=' . urlencode($curTimeframe) : ''; ?><?php echo !empty($curPriest) ? '&priest=' . urlencode($curPriest) : ''; ?>'"
+                                onchange="window.location.href='dashboard.php?section=<?php echo $active_section; ?>' + (this.value !== '' ? '&chapel_id=' + this.value : '') + '<?php echo !empty($curType) ? '&record_type=' . urlencode($curType) : ''; ?><?php echo !empty($searchQuery) ? '&search=' . urlencode($searchQuery) : ''; ?><?php echo !empty($curSort) ? '&rec_sort=' . urlencode($curSort) : ''; ?><?php echo !empty($curTimeframe) ? '&timeframe=' . urlencode($curTimeframe) : ''; ?><?php echo !empty($curPriest) ? '&priest=' . urlencode($curPriest) : ''; ?>'"
                                 class="records-chapel-select"
                                 style="height: 34px; padding: 0 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; font-weight: 500; cursor: pointer; outline: none;">
+                            <?php if ($scope === 'cathedral'): ?>
+                            <option value="">All Branches (Centralized)</option>
+                            <option value="0" <?php echo ($selected_chapel_id === 0) ? 'selected' : ''; ?>>Main Cathedral Only</option>
+                            <?php else: ?>
                             <option value="">All Chapels (<?php echo count($chapels); ?>)</option>
+                            <?php endif; ?>
                             <?php foreach ($chapels as $c): ?>
-                            <option value="<?php echo (int)$c['chapel_id']; ?>" <?php echo ($selected_chapel_id == $c['chapel_id']) ? 'selected' : ''; ?>>
+                            <option value="<?php echo (int)$c['chapel_id']; ?>" <?php echo ($selected_chapel_id !== null && (int)$selected_chapel_id === (int)$c['chapel_id']) ? 'selected' : ''; ?>>
                                 <?php echo htmlspecialchars($c['chapel_name']); ?>
                             </option>
                             <?php endforeach; ?>
@@ -371,7 +376,7 @@ $isAllActive = empty($curType);
 
                         <!-- Reset Filters Button -->
                         <?php 
-                        $hasActiveFilters = !empty($searchQuery) || !empty($curTimeframe) || !empty($curPriest) || !empty($selected_chapel_id) || ($curSort !== 'date_desc');
+                        $hasActiveFilters = !empty($searchQuery) || !empty($curTimeframe) || !empty($curPriest) || ($selected_chapel_id !== null && $selected_chapel_id !== '') || ($curSort !== 'date_desc');
                         if ($hasActiveFilters): 
                         ?>
                         <a href="dashboard.php?section=<?php echo $active_section; ?><?php echo !empty($curType) ? '&record_type=' . urlencode($curType) : ''; ?>" 

@@ -526,8 +526,15 @@ class DashboardController extends BaseController
                 if (($_GET['export'] ?? '') === 'records_csv') {
                     $this->exportRecordsCsv('cathedral');
                 }
-                $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin']) ? $this->chapelId : null;
+                if (in_array($this->role, ['Admin', 'Cathedral Admin'])) {
+                    $chapelFilter = (isset($_GET['chapel_id']) && $_GET['chapel_id'] !== '')
+                        ? (int)$_GET['chapel_id']
+                        : ((isset($_GET['chapel']) && $_GET['chapel'] !== '') ? (int)$_GET['chapel'] : null);
+                } else {
+                    $chapelFilter = ($this->chapelId !== null && (int)$this->chapelId > 0) ? (int)$this->chapelId : null;
+                }
                 $data = array_merge($data, $this->sacramental->getRecordsViewData('cathedral', $chapelFilter));
+                $data['selected_chapel_id'] = $chapelFilter;
                 break;
 
             case 'records_chapel':

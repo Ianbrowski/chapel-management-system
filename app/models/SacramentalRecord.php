@@ -51,7 +51,18 @@ class SacramentalRecord
 
         if (!empty($filters['scope'])) {
             if ($filters['scope'] === 'cathedral') {
-                $where[] = "(sr.scope = 'cathedral' OR sr.chapel_id IS NULL OR sr.chapel_id = 0)";
+                // Centralized Cathedral view shows all records by default;
+                // allow filtering to Main Cathedral only (chapel_id = 0) or a specific chapel (> 0).
+                if (isset($filters['chapel_id']) && $filters['chapel_id'] !== null && $filters['chapel_id'] !== '') {
+                    $cid = (int)$filters['chapel_id'];
+                    if ($cid === 0) {
+                        $where[] = "(sr.scope = 'cathedral' OR sr.chapel_id IS NULL OR sr.chapel_id = 0)";
+                    } else {
+                        $where[] = 'sr.chapel_id = ?';
+                        $params[] = $cid;
+                        $types .= 'i';
+                    }
+                }
             } elseif ($filters['scope'] === 'chapel') {
                 if (!empty($filters['chapel_id'])) {
                     $where[] = 'sr.chapel_id = ?';

@@ -20,7 +20,15 @@ class SacramentalReportingService
         $types = '';
 
         if ($scope === 'cathedral') {
-            $sql .= " AND (sr.scope = 'cathedral' OR sr.chapel_id IS NULL OR sr.chapel_id = 0)";
+            if ($chapelId !== null) {
+                if ((int)$chapelId === 0) {
+                    $sql .= " AND (sr.scope = 'cathedral' OR sr.chapel_id IS NULL OR sr.chapel_id = 0)";
+                } else {
+                    $sql .= " AND sr.chapel_id = ?";
+                    $params[] = (int)$chapelId;
+                    $types .= 'i';
+                }
+            }
         } elseif ($scope === 'chapel') {
             if ($chapelId !== null) {
                 $sql .= " AND sr.chapel_id = ?";
@@ -111,14 +119,16 @@ class SacramentalReportingService
                 WHERE is_archived=0";
         $params = [];
         $types = '';
-        if ($chapelId) {
-            $sql .= " AND chapel_id = ?";
-            $params[] = (int)$chapelId;
-            $types .= 'i';
+        if ($chapelId !== null && $chapelId !== '') {
+            if ((int)$chapelId === 0) {
+                $sql .= " AND (scope = 'cathedral' OR chapel_id IS NULL OR chapel_id = 0)";
+            } else {
+                $sql .= " AND chapel_id = ?";
+                $params[] = (int)$chapelId;
+                $types .= 'i';
+            }
         } elseif ($scope === 'chapel') {
             $sql .= " AND (scope = 'chapel' OR (chapel_id IS NOT NULL AND chapel_id > 0))";
-        } elseif ($scope === 'cathedral') {
-            $sql .= " AND (scope = 'cathedral' OR chapel_id IS NULL OR chapel_id = 0)";
         }
 
         $stmt = $this->conn->prepare($sql);

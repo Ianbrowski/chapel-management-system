@@ -70,7 +70,20 @@ if (in_array($scope, ['records', 'records_cathedral', 'records_chapel'], true)) 
     $types  = str_repeat('s', 8);
 
     if ($scope === 'records_cathedral') {
-        $where[] = "(sr.scope = 'cathedral' OR sr.chapel_id IS NULL OR sr.chapel_id = 0)";
+        if (!$isGlobalAdmin && $sessionChapelId > 0) {
+            $where[]  = 'sr.chapel_id = ?';
+            $params[] = $sessionChapelId;
+            $types   .= 'i';
+        } elseif (isset($_GET['chapel_id']) && $_GET['chapel_id'] !== '') {
+            $reqCid = (int)$_GET['chapel_id'];
+            if ($reqCid === 0) {
+                $where[] = "(sr.scope = 'cathedral' OR sr.chapel_id IS NULL OR sr.chapel_id = 0)";
+            } elseif ($reqCid > 0) {
+                $where[]  = 'sr.chapel_id = ?';
+                $params[] = $reqCid;
+                $types   .= 'i';
+            }
+        }
     } elseif ($scope === 'records_chapel') {
         $reqChapelId = (int)($_GET['chapel_id'] ?? 0);
         if (!$isGlobalAdmin && $sessionChapelId > 0) {

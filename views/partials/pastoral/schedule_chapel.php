@@ -331,7 +331,7 @@ $canCreate = in_array($role, ['Admin', 'Cathedral Admin', 'Chapel Admin']);
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; border-top: 1px solid var(--border); background: rgba(0,0,0,0.05);">
             <div>
                 <?php if ($current_page > 1): ?>
-                <a href="?section=schedule_chapel&page=<?php echo $current_page - 1; ?><?php echo $pgParams; ?>" 
+                <a href="dashboard.php?section=schedule_chapel&page=<?php echo $current_page - 1; ?><?php echo $pgParams; ?>" 
                    class="btn btn-ghost btn-sm" style="padding: 3px 8px; font-size: 11.5px; text-decoration: none;">
                     &larr; Prev
                 </a>
@@ -342,7 +342,7 @@ $canCreate = in_array($role, ['Admin', 'Cathedral Admin', 'Chapel Admin']);
             </span>
             <div>
                 <?php if ($current_page < $total_pages): ?>
-                <a href="?section=schedule_chapel&page=<?php echo $current_page + 1; ?><?php echo $pgParams; ?>" 
+                <a href="dashboard.php?section=schedule_chapel&page=<?php echo $current_page + 1; ?><?php echo $pgParams; ?>" 
                    class="btn btn-ghost btn-sm" style="padding: 3px 8px; font-size: 11.5px; text-decoration: none;">
                     Next &rarr;
                 </a>

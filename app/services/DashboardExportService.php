@@ -12,17 +12,28 @@ class DashboardExportService
     {
         $from = trim((string) $from);
         $to = trim((string) $to);
+        if ($from === '') {
+            $from = date('Y-m-01');
+        }
+        if ($to === '') {
+            $to = date('Y-m-t');
+        }
 
         foreach (['from' => $from, 'to' => $to] as $label => $value) {
-            if ($value !== '' && !$this->isValidDate($value)) {
+            if (!$this->isValidDate($value)) {
                 throw new InvalidArgumentException(ucfirst($label) . ' date must use YYYY-MM-DD format.');
             }
         }
 
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+
         // We will output a highly styled multi-section CSV for professional Excel rendering.
-        header('Content-Type: text/csv');
+        header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="parish_detailed_report_' . date('Ymd_His') . '.csv"');
         $out = fopen('php://output', 'w');
+        fwrite($out, "\xEF\xBB\xBF");
 
         // Helper to output empty line
         $br = function() use ($out) { fputcsv($out, []); };

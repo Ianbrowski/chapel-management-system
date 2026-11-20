@@ -261,7 +261,7 @@ $categoryColors = [
             <div style="width: 1px; height: 22px; background: var(--border); flex-shrink: 0;"></div>
 
             <!-- Date range form -->
-            <form method="GET" id="reports-filter-form" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0;">
+            <form method="GET" action="dashboard.php" id="reports-filter-form" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0;">
                 <input type="hidden" name="section" value="reports">
 
                 <div style="display: flex; align-items: center; gap: 6px;">
@@ -286,8 +286,9 @@ $categoryColors = [
 
         <!-- Export actions -->
         <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
-            <a href="?section=reports&from=<?php echo urlencode($rfrom); ?>&to=<?php echo urlencode($rto); ?>&export=csv"
-               class="btn btn-ghost btn-sm" style="border: 1px solid var(--border); /* was: #10b981 */ color: var(--color-success);" title="Download raw event data CSV">
+            <a href="dashboard.php?section=reports&from=<?php echo urlencode($rfrom); ?>&to=<?php echo urlencode($rto); ?>&export=csv"
+               id="btn-export-report-csv"
+               class="btn btn-ghost btn-sm" style="border: 1px solid var(--border); /* was: #10b981 */ color: var(--color-success);" title="Download full detailed CSV report">
                 <i class="fa-solid fa-file-csv"></i> CSV
             </a>
             <a href="views/pages/finance_report_print.php?from=<?php echo urlencode($rfrom); ?>&to=<?php echo urlencode($rto); ?>&hide_ledgers=1"
@@ -524,9 +525,18 @@ $categoryColors = [
                 }
                 if (fromEl) fromEl.value = from;
                 if (toEl)   toEl.value   = to;
+                syncCsvLink();
                 if (form)   form.submit();
             });
         });
+
+        function syncCsvLink() {
+            const csvBtn = document.getElementById('btn-export-report-csv');
+            if (!csvBtn || !fromEl || !toEl) return;
+            csvBtn.href = 'dashboard.php?section=reports&from=' + encodeURIComponent(fromEl.value || '') + '&to=' + encodeURIComponent(toEl.value || '') + '&export=csv';
+        }
+        if (fromEl) fromEl.addEventListener('change', syncCsvLink);
+        if (toEl)   toEl.addEventListener('change', syncCsvLink);
     })();
 
     // ── Charts ──

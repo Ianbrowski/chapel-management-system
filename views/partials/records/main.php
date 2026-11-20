@@ -483,7 +483,7 @@ $isAllActive = empty($curType);
                 <div class="panel-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; border-top: 1px solid var(--border);">
                     <div>
                         <?php if ($current_page > 1): ?>
-                        <a href="?section=<?php echo $active_section; ?>&rec_page=<?php echo $current_page - 1; ?><?php echo $combinedParams; ?>&record_type=<?php echo urlencode($rec_filters['record_type'] ?? ''); ?>" 
+                        <a href="dashboard.php?section=<?php echo $active_section; ?>&rec_page=<?php echo $current_page - 1; ?><?php echo $combinedParams; ?>&record_type=<?php echo urlencode($rec_filters['record_type'] ?? ''); ?>" 
                            class="btn-sm btn-ghost" style="padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); text-decoration: none; color: var(--text);">
                             <i class="fa-solid fa-arrow-left"></i> Prev
                         </a>
@@ -492,7 +492,7 @@ $isAllActive = empty($curType);
                     <span style="font-size: 12px; color: var(--text2);">Page <?php echo $current_page; ?> of <?php echo $total_pages; ?></span>
                     <div>
                         <?php if ($current_page < $total_pages): ?>
-                        <a href="?section=<?php echo $active_section; ?>&rec_page=<?php echo $current_page + 1; ?><?php echo $combinedParams; ?>&record_type=<?php echo urlencode($rec_filters['record_type'] ?? ''); ?>" 
+                        <a href="dashboard.php?section=<?php echo $active_section; ?>&rec_page=<?php echo $current_page + 1; ?><?php echo $combinedParams; ?>&record_type=<?php echo urlencode($rec_filters['record_type'] ?? ''); ?>" 
                            class="btn-sm btn-ghost" style="padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); text-decoration: none; color: var(--text);">
                             Next <i class="fa-solid fa-arrow-right"></i>
                         </a>

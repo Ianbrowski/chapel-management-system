@@ -466,20 +466,20 @@ $defaultTab = $_GET['tab'] ?? ($isGuest ? 'catalog' : ($totalReqs > 0 ? 'request
         ?>
         <div class="ent-card-footer" style="display: flex; justify-content: center; gap: 6px; border-top: 1px solid var(--border); padding: 10px 16px; background: var(--bg3);">
             <?php if ($cp > 1): ?>
-            <a href="?section=request_event&page=<?php echo $cp - 1; ?><?php echo $baseQuery; ?>"
+            <a href="dashboard.php?section=request_event&page=<?php echo $cp - 1; ?><?php echo $baseQuery; ?>"
                class="btn btn-ghost btn-sm" style="padding: 4px 12px; height: 30px; font-size: 12px;">
                 <i class="fa-solid fa-arrow-left"></i> Prev
             </a>
             <?php endif; ?>
             <?php for ($i = max(1, $cp - 2); $i <= min($tp, $cp + 2); $i++): ?>
-            <a href="?section=request_event&page=<?php echo $i; ?><?php echo $baseQuery; ?>"
+            <a href="dashboard.php?section=request_event&page=<?php echo $i; ?><?php echo $baseQuery; ?>"
                class="btn btn-sm <?php echo $i === $cp ? 'btn-primary' : 'btn-ghost'; ?>"
                style="padding: 4px 12px; height: 30px; min-width: 32px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; border-radius: 6px;">
                 <?php echo $i; ?>
             </a>
             <?php endfor; ?>
             <?php if ($cp < $tp): ?>
-            <a href="?section=request_event&page=<?php echo $cp + 1; ?><?php echo $baseQuery; ?>"
+            <a href="dashboard.php?section=request_event&page=<?php echo $cp + 1; ?><?php echo $baseQuery; ?>"
                class="btn btn-ghost btn-sm" style="padding: 4px 12px; height: 30px; font-size: 12px;">
                 Next <i class="fa-solid fa-arrow-right"></i>
             </a>

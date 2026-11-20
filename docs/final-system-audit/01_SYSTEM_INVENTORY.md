@@ -3,7 +3,7 @@
 **System:** Cathedral Management System (IFI Cathedral of St. Michael the Archangel & Subsidiary Chapels)  
 **Active Repository / Web Root:** `C:\xampp\htdocs\IFILOCAL`  
 **Runtime Stack:** PHP 8.2 (Custom MVC, `mysqli`), MySQL / MariaDB (`cathedral` schema), Apache / Docker (`php:8.2-apache`), Vanilla JS + Chart.js  
-**Database Verified Scope:** 38 Tables + 1 View (`v_sacramental_records`), 0 Declared Foreign Key Constraints (`FOREIGN KEYS: none`)
+**Database Verified Scope:** 38 Tables + 1 View (`v_sacramental_records`), InnoDB (`utf8mb4_unicode_ci`), with 35 Foreign Key constraints and 44 secondary/unique indexes added alongside `audit_logs` indexes via `tools/migrate_fk_and_indexes.php`
 
 ---
 
@@ -90,13 +90,13 @@
 ## 4. Configuration, CLI Utilities & Database Inventory
 
 - **Config (`config/`):** `config.php`, `config.local.php`, `config.local.example.php` (Asia/Manila TZ, `utf8mb4` mysqli connection, cookie/session hardening).
-- **Tools (`tools/` — 8 files):** `backup.php`, `restore.php`, `backup_download.php`, `restore_web.php`, `health_check.php`, `migrate_system_notifications.php`, `backup_daily.bat`, `backup_weekly.bat`.
+- **Tools (`tools/` — 9 files):** `backup.php`, `restore.php`, `backup_download.php`, `restore_web.php`, `health_check.php`, `migrate_system_notifications.php`, `migrate_fk_and_indexes.php`, `backup_daily.bat`, `backup_weekly.bat`.
 - **Database (`cathedral` schema — 38 tables + 1 view):**
   - Core entities: `users` (23), `chapels` (3), `chapel_fiestas` (1), `pastor_event_types` (30)
   - Scheduling & Services: `events` (46), `mass_schedules` (4), `schedules` (0), `service_categories` (4), `services` (8), `service_variants` (21), `service_additional_charges` (4), `service_requirements` (11), `service_schedules` (4), `service_request_addons` (0), `certificate_types` (3)
   - Sacramental Records: `sacramental_records` (34), `certificate_issuances` (1), `sacramental_audit_log` (131), view `v_sacramental_records` (18)
   - Finance & Store: `donations` (8), `merchandise_items` (5), `merchandise_sales` (23)
   - Inquiries, Bulletin, Chat & System: `public_inquiries` (9), `bulletin_posts` (8), `parish_chat_rooms` (11), `parish_chat_participants` (25), `parish_chat_messages` (16), `system_notifications` (25), `notifications` (0), `tickets` (24), `ticket_comments` (0), `audit_logs` (954), `backup_logs` (39), `system_settings` (2), `parish_contact_info` (1), `parish_history` (4), `parish_history_intro` (1), `parish_leadership` (25), `parish_leadership_intro` (1).
-- **Disconnected / Legacy Schema & Code Observations:**
-  - `tickets` (24 rows), `ticket_comments` (0), `notifications` (0), `schedules` (0) are unused/superseded tables (`TicketController.php` & `BaseController` `'can_tickets'` still present while `ajax_renderer.php` line 19 disabled `case 'tickets'`; `system_notifications` replaced `notifications`).
-  - Zero SQL `FOREIGN KEY` constraints across the schema; only `audit_logs` defines secondary indexes (no index on `events.start_time`, `users.email`, `sacramental_records.event_date`, or `donations.date_received`).
+- **Schema Integrity & Indexes:**
+  - `tickets` (24 rows), `ticket_comments` (0), `notifications` (0), `schedules` (0) are legacy/superseded tables (`TicketController.php` & `BaseController` `'can_tickets'` still present while `ajax_renderer.php` line 19 disabled `case 'tickets'`; `system_notifications` replaced `notifications`).
+  - `tools/migrate_fk_and_indexes.php` introduced 35 InnoDB foreign keys (`chapels`, `users`, `services`, `service_categories`, `service_variants`, `service_additional_charges`, `events`, `sacramental_records`, `merchandise_items`, `parish_chat_rooms` hierarchies) and 44 indexes (including unique constraints on `users.user`, `sacramental_records.reference_id`, `certificate_issuances.certificate_no`, plus composite scheduling/lookup indexes). `sacramental_audit_log.record_id` and `audit_logs` are indexed without parent-delete FKs so historical audit trails stay intact (`67` historical `sacramental_audit_log` rows).

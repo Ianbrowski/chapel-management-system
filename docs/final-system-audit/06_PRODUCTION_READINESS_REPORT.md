@@ -27,8 +27,8 @@ Complete these operational steps when deploying to the live production server / 
    Verify `cookies.txt`, `guest_ajax.html`, `guest_page.html`, and `if0_43226821_cathedral.sql` are deleted from the live public document root (note: `.dockerignore` already excludes `.sql`, `cookies.txt`, `guest_*.html`, `scratch/`, and `docs/` from Docker container builds).
 2. **Production Environment Secrets & Debug Flag:**  
    Ensure `config/config.local.php` (or container env vars) uses dedicated least-privilege MySQL credentials (not `root` with blank password) and **`APP_DEBUG` is unset or `false`** so `dev_login.php` remains blocked at `403 Forbidden`.
-3. **Database Performance Indexes & Legacy Row Cleanup (Recommended Maintenance):**  
-   - Schedule addition of secondary indexes on `events(start_time, chapel_id, is_archived)`, `donations(reference_id, is_archived)`, `sacramental_records(chapel_id, record_type, is_archived)`, and `users(email)` as volume scales.
+3. **Database Migration on Live DB & Legacy Row Cleanup:**  
+   - Run `php tools/migrate_fk_and_indexes.php` during deployment cutover to apply the same **44 indexes** and **35 InnoDB foreign keys** on the production MySQL database (`--dry-run` supported first).
    - Review the 7 historical `rejected` QA user rows (`qa_staff@test.local`), 10 legacy empty `event_type` rows, 4 past-due `Pending` events, and the 1 existing liturgical collision group flagged by `health_check.php` (`165/167` checks passed; `98.8%`).
 4. **Runtime PHP Extensions (`gd`), SMTP & SMS Live Credentials Test:**  
    Verify `extension=gd` is enabled in production `php.ini` / container image (noted missing in local XAMPP CLI `health_check.php`), and after setting production SMTP (`parish_contact_info` / per-chapel `chapels` overrides) and Semaphore/iProgTech keys (`SmsService`), run a single live confirmation email/SMS test from the Settings hub.

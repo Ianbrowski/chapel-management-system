@@ -1113,8 +1113,21 @@ function viewCertDetailsFromRow(tr) {
 }
 
 function viewCertDetails(req) {
-    const statusColors = { Confirmed:'#16a34a', Pending:'#c5a059', Cancelled:'#dc2626', Rejected:'#dc2626' };
+    const statusColors = { Confirmed:'#16a34a', Completed:'#2563eb', Pending:'#c5a059', Cancelled:'#dc2626', Rejected:'#dc2626' };
+    const statusLabels = { Confirmed:'Ready', Completed:'Released', Pending:'Pending', Cancelled:'Cancelled', Rejected:'Rejected' };
     const sc = statusColors[req.status] || '#6b7280';
+    const sl = statusLabels[req.status] || req.status || 'Pending';
+
+    let stepGuide = '';
+    if (req.status === 'Pending') {
+        stepGuide = '<strong>Step 1 of 3 &mdash; Pending Archive Check:</strong> Look up the person in Records, verify the entry, then select <strong>Mark as Ready</strong> in Actions.';
+    } else if (req.status === 'Confirmed') {
+        stepGuide = '<strong>Step 2 of 3 &mdash; Ready for Pickup:</strong> Available at the Parish Office (Tue&ndash;Sun, 8am&ndash;5pm). Record payment if unpaid and select <strong>Mark as Released</strong> upon pickup.';
+    } else if (req.status === 'Completed') {
+        stepGuide = '<strong>Step 3 of 3 &mdash; Released:</strong> This certificate has been claimed and completed.';
+    } else {
+        stepGuide = '<strong>Closed:</strong> This certificate request was cancelled or declined.';
+    }
     
     let pickupFormatted = req.start_time || 'Pending';
     try {
@@ -1132,7 +1145,7 @@ function viewCertDetails(req) {
             <div style="min-width: 0; flex: 1;">
                 <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 2px;">
                     <span class="badge" style="background: #FFFFFF; border: 1px solid var(--border); font-size: 10px; font-weight: 600; padding: 2px 8px; color: var(--text);">Certificate Issuance</span>
-                    <span class="badge" style="background: ${sc}18; color: ${sc}; border: 1px solid ${sc}35; font-size: 10px; font-weight: 600; padding: 2px 8px;">${escapeHtml(req.status)}</span>
+                    <span class="badge" style="background: ${sc}18; color: ${sc}; border: 1px solid ${sc}35; font-size: 10px; font-weight: 600; padding: 2px 8px;">${escapeHtml(sl)}</span>
                     <span style="font-size: 10px; color: var(--text2); font-family: monospace;">#REQ-${String(req.event_id).padStart(4, '0')}</span>
                 </div>
                 <div style="font-family: var(--font-family, 'Inter', sans-serif); font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.3;">${escapeHtml(req.title)}</div>
@@ -1163,6 +1176,10 @@ function viewCertDetails(req) {
             <div style="font-size: 9.5px; text-transform: uppercase; color: #ef4444; font-weight: 700; margin-bottom: 2px;">Note from Office</div>
             <div style="font-size: 11.5px; color: #fca5a5; line-height: 1.35;">${escapeHtml(req.rejection_note)}</div>
         </div>` : ''}
+
+        <div style="background: #FAFAFA; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: var(--text); line-height: 1.45;">
+            <i class="fa-solid fa-list-check" style="color: var(--accent); margin-right: 6px;"></i>${stepGuide}
+        </div>
     `;
     
     const m = document.getElementById('cert-view-modal');

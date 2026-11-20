@@ -396,12 +396,12 @@ function openChapelHubModal(chapel) {
 
                         <div class="form-group" style="margin: 0;">
                             <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); margin-bottom: 5px; display: block;">
-                                Status
+                                Initial Step / Status
                             </label>
-                            <select name="status" style="height: 34px !important; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2, #FAFAFA); width: 100%;">
-                                <option>Confirmed</option>
-                                <option>Pending</option>
-                                <option>Completed</option>
+                            <select name="status" style="height: 34px !important; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2, #FAFAFA); width: 100%;">
+                                <option value="Confirmed">Confirmed (Schedule Now)</option>
+                                <option value="Pending">Pending (Queue for Review)</option>
+                                <option value="Completed">Completed (Already Done)</option>
                             </select>
                         </div>
                     </div>
@@ -866,6 +866,9 @@ function openChapelHubModal(chapel) {
                 </div>
                 <span id="ve-approved-at" style="font-size: 11px; color: var(--text2);">—</span>
             </div>
+
+            <!-- Guided Step Info Bar -->
+            <div id="ve-next-step-guide" style="background: var(--bg2); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--text); line-height: 1.45;"></div>
         </div>
 
         <!-- Action Toolbar Footer -->

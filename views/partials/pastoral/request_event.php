@@ -111,6 +111,28 @@ $defaultTab = $_GET['tab'] ?? ($isGuest ? 'catalog' : ($totalReqs > 0 ? 'request
 
     <!-- ─── 2A. SERVICES MENU & CATALOG PANE ─── -->
     <div id="service-view-catalog-pane" style="display: <?php echo ($defaultTab === 'catalog') ? 'flex' : 'none'; ?>; flex-direction: column; gap: 16px;">
+        <!-- Quick Step Guide: Choose What You Need -->
+        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-size: 12px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 7px;">
+                <i class="fa-solid fa-route" style="color: var(--accent);"></i>
+                <span>Step 1: Choose what you need</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px;">
+                <button type="button" onclick="openRequestEventModal('Baptism')" style="text-align: left; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 11px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; transition: border-color 0.15s ease;">
+                    <span style="font-size: 12px; font-weight: 700; color: var(--text);"><i class="fa-solid fa-calendar-check" style="color: var(--accent); margin-right: 6px;"></i>Schedule a Sacramental Rite</span>
+                    <span style="font-size: 11px; color: var(--text2);">Baptism, Wedding, Funeral, or Blessing &bull; Reserves a sanctuary time slot &amp; priest.</span>
+                </button>
+                <button type="button" onclick="openRequestEventModal('Thanksgiving Mass')" style="text-align: left; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 11px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; transition: border-color 0.15s ease;">
+                    <span style="font-size: 12px; font-weight: 700; color: var(--text);"><i class="fa-solid fa-church" style="color: var(--accent); margin-right: 6px;"></i>Offer a Mass Intention</span>
+                    <span style="font-size: 11px; color: var(--text2);">Thanksgiving or Requiem Mass &bull; Included in regular Mass without blocking other bookings.</span>
+                </button>
+                <a href="dashboard.php?section=request_certificate" style="text-decoration: none; text-align: left; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 11px 14px; display: flex; flex-direction: column; gap: 3px; transition: border-color 0.15s ease;">
+                    <span style="font-size: 12px; font-weight: 700; color: var(--text);"><i class="fa-solid fa-file-invoice" style="color: var(--accent); margin-right: 6px;"></i>Request a Certificate Copy</span>
+                    <span style="font-size: 11px; color: var(--text2);">Baptismal, Confirmation, Marriage, or Burial copy &bull; Prepared for office pickup.</span>
+                </a>
+            </div>
+        </div>
+
         <div class="services-catalog-header-bar" style="background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <div>
                 <div style="font-weight: 700; font-size: 14px; color: var(--text); display: flex; align-items: center; gap: 8px;">

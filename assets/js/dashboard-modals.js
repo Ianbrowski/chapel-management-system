@@ -616,6 +616,27 @@ function viewEventDetails(input, readonly = false, options = {}) {
         if (rejectBtn) rejectBtn.style.display = 'none';
     }
 
+    const guideEl = document.getElementById('ve-next-step-guide');
+    if (guideEl) {
+        const stLower = String(ev.status || 'Pending').toLowerCase();
+        const isStaffView = ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff', 'Priest'].includes(userRole);
+        let guideHtml = '';
+        if (stLower === 'pending') {
+            guideHtml = isStaffView
+                ? '<strong>Step 1 of 3 &mdash; Pending Review:</strong> Check venue &amp; priest schedule or message the requester, then click <strong>Approve Request</strong> or <strong>Reject</strong> below.'
+                : '<strong>Step 1 of 3 &mdash; Submitted:</strong> Waiting for Parish Office review and priest assignment. You can message the office anytime.';
+        } else if (stLower === 'confirmed') {
+            guideHtml = isStaffView
+                ? '<strong>Step 2 of 3 &mdash; Approved on Calendar:</strong> Record fee payment in Event Approvals if applicable, then mark <strong>Completed</strong> after the rite.'
+                : '<strong>Step 2 of 3 &mdash; Approved:</strong> Your schedule is confirmed on the parish calendar. Please settle any applicable stipend at the Parish Office.';
+        } else if (stLower === 'completed') {
+            guideHtml = '<strong>Step 3 of 3 &mdash; Completed:</strong> This booking has completed its lifecycle.';
+        } else {
+            guideHtml = '<strong>Closed:</strong> This request was cancelled or rejected.';
+        }
+        guideEl.innerHTML = `<i class="fa-solid fa-list-check" style="color: var(--accent); margin-right: 6px;"></i>${guideHtml}`;
+    }
+
     const chatBtn = document.getElementById('ve-chat-btn');
     if (chatBtn) {
         const reqUid = parseInt(ev.requested_by || 0, 10);

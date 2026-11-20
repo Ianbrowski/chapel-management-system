@@ -439,10 +439,11 @@ class DashboardController extends BaseController
                 $ev_page = (int) ($_GET['ev_page'] ?? 1);
                 $ev_tab  = $_GET['ev_tab'] ?? 'active';
                 $ev_filters = [
-                    'search'      => $_GET['ev_search'] ?? ($_GET['search'] ?? ''),
-                    'event_type'  => $_GET['ev_type'] ?? ($_GET['event_type'] ?? ''),
-                    'sort'        => $_GET['ev_sort'] ?? ($_GET['sort'] ?? 'date_desc'),
-                    'is_archived' => ($ev_tab === 'archived' ? 1 : 0)
+                    'search'               => $_GET['ev_search'] ?? ($_GET['search'] ?? ''),
+                    'event_type'           => $_GET['ev_type'] ?? ($_GET['event_type'] ?? ''),
+                    'sort'                 => $_GET['ev_sort'] ?? ($_GET['sort'] ?? 'date_desc'),
+                    'is_archived'          => ($ev_tab === 'archived' ? 1 : 0),
+                    'exclude_certificates' => true,
                 ];
                 if (!empty($_GET['ev_pastor']) || !empty($_GET['pastor_id']) || !empty($_GET['ev_pastor_id'])) {
                     $ev_filters['pastor_id'] = (int)($_GET['ev_pastor'] ?? ($_GET['ev_pastor_id'] ?? $_GET['pastor_id']));

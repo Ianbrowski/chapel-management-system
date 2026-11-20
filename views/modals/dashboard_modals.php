@@ -485,7 +485,16 @@ function openChapelHubModal(chapel) {
                         </div>
                     </div>
                     
-                    <!-- Row 5: Requester Contacts (2 cols) -->
+                    <!-- Row 5: Optional Booking Source & Requester Contacts -->
+                    <div class="form-group" style="margin: 0;">
+                        <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); margin-bottom: 5px; display: block;">
+                            Booking Source <span style="color: var(--text2); font-weight: 400; text-transform: none;">(optional)</span>
+                        </label>
+                        <select name="requester_source" style="height: 34px; padding: 0 10px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2, #FAFAFA); width: 100%; box-sizing: border-box;">
+                            <option value="office">Parish Office (Encoded by Me)</option>
+                            <option value="walkin">Walk-in Parishioner</option>
+                        </select>
+                    </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                         <div class="form-group" style="margin: 0;">
                             <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); margin-bottom: 5px; display: block;">
@@ -804,7 +813,7 @@ function openChapelHubModal(chapel) {
                             <div style="width: 26px; height: 26px; border-radius: 50%; background: var(--bg3); border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; font-size: 11px;">
                                 <i class="fa-solid fa-user"></i>
                             </div>
-                            <span id="ve-requester-name" style="font-weight: 700; font-size: 13px; color: var(--text);">Walk-in Parishioner</span>
+                            <span id="ve-requester-name" style="font-weight: 700; font-size: 13px; color: var(--text);">Parish Office</span>
                         </div>
                     </div>
 

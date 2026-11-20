@@ -102,7 +102,10 @@ class EventController extends BaseController {
                     break;
                 }
 
-                if ($this->eventModel->create($title, $type, $start, $loc, $pastor, $status, $scope, $customDuration, $phone, $email)) {
+                $reqSource = $_POST['requester_source'] ?? 'office';
+                $requestedBy = ($reqSource === 'walkin') ? null : $this->userId;
+
+                if ($this->eventModel->create($title, $type, $start, $loc, $pastor, $status, $scope, $customDuration, $phone, $email, $requestedBy)) {
                     $this->conn->commit();
                                         AuditLogger::logFromSession(
                         $this->conn,

@@ -75,22 +75,23 @@ class Event
     // CORE CRUD
     // ──────────────────────────────────────────────────────────────────────────
 
-    public function create($title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $customDuration = null, $phone = null, $email = null)
+    public function create($title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $customDuration = null, $phone = null, $email = null, $requestedBy = null)
     {
         $cd = ($customDuration !== null && (int)$customDuration > 0) ? (int)$customDuration : null;
         $chapelId = ($chapelId && (int)$chapelId > 0) ? (int)$chapelId : null;
         $pastorId = ($pastorId !== null && (int)$pastorId > 0) ? (int)$pastorId : null;
+        $reqById = ($requestedBy !== null && (int)$requestedBy > 0) ? (int)$requestedBy : null;
 
         if ($status === 'Confirmed') {
-            $sql = "INSERT INTO events (title, event_type, start_time, chapel_id, pastor_id, status, event_scope, custom_duration, approved_at, requester_phone, requester_email) VALUES (?,?,?,?,?,?,?,?, NOW(), ?, ?)";
+            $sql = "INSERT INTO events (title, event_type, start_time, chapel_id, pastor_id, status, event_scope, custom_duration, approved_at, requester_phone, requester_email, requested_by) VALUES (?,?,?,?,?,?,?,?, NOW(), ?, ?, ?)";
         } else {
-            $sql = "INSERT INTO events (title, event_type, start_time, chapel_id, pastor_id, status, event_scope, custom_duration, approved_at, requester_phone, requester_email) VALUES (?,?,?,?,?,?,?,?, NULL, ?, ?)";
+            $sql = "INSERT INTO events (title, event_type, start_time, chapel_id, pastor_id, status, event_scope, custom_duration, approved_at, requester_phone, requester_email, requested_by) VALUES (?,?,?,?,?,?,?,?, NULL, ?, ?, ?)";
         }
         $s = $this->conn->prepare($sql);
         if (!$s) {
             return false;
         }
-        $s->bind_param('sssiississ', $title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $cd, $phone, $email);
+        $s->bind_param('sssiississi', $title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $cd, $phone, $email, $reqById);
         $res = $s->execute();
         if (!$res) {
             $_SESSION['db_error'] = $s->error;
@@ -545,7 +546,7 @@ class Event
             }
         }
 
-        $sql = "SELECT e.*, COALESCE(NULLIF(u.full_name, ''), u.user, 'System / Walk-in') as requester_name,
+        $sql = "SELECT e.*, COALESCE(NULLIF(u.full_name, ''), u.user, 'Walk-in / Parish Office') as requester_name,
                        COALESCE(NULLIF(u.full_name, ''), u.user, 'System / Automated') as encoded_by_name,
                        IFNULL(c.chapel_name, e.chapel_location) as chapel_location,
                        COALESCE(NULLIF(pu.full_name, ''), pu.user) as pastor_assigned
@@ -722,7 +723,7 @@ class Event
     public function getOverduePendingRequests($chapelId = null)
     {
         $requests = [];
-        $sql = "SELECT e.*, COALESCE(NULLIF(u.full_name, ''), u.user, 'System / Walk-in') as requester_name,
+        $sql = "SELECT e.*, COALESCE(NULLIF(u.full_name, ''), u.user, 'Walk-in / Parish Office') as requester_name,
                        COALESCE(NULLIF(u.full_name, ''), u.user, 'System / Automated') as encoded_by_name,
                        IFNULL(c.chapel_name, e.chapel_location) as chapel_location,
                        COALESCE(NULLIF(pu.full_name, ''), pu.user) as pastor_assigned

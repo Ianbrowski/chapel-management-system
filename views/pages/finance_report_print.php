@@ -106,18 +106,52 @@ $overall_grand_total = ($overall['total_donations_all'] ?? 0) + ($overall['total
     <title>Detailed Financial & Activity Report</title>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'DM Sans', sans-serif; padding: 30px 40px; color: #1e293b; background: white; margin: 0; }
-        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #1e293b; padding-bottom: 16px; }
-        .header h1 { font-family: 'Cinzel', serif; font-size: 24px; color: #b8882a; margin: 0 0 6px; }
+        * { box-sizing: border-box; }
+        body { font-family: 'DM Sans', sans-serif; padding: 0; color: #1e293b; background: #e2e8f0; margin: 0; }
+        .print-studio-layout {
+            display: flex;
+            align-items: flex-start;
+            gap: 24px;
+            min-height: 100vh;
+            padding: 20px 24px;
+            max-width: 1380px;
+            margin: 0 auto;
+        }
+        .paper-workspace {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            justify-content: center;
+        }
+        .paper-sheet {
+            width: 100%;
+            max-width: 820px;
+            min-height: 1056px;
+            background: #ffffff;
+            padding: 38px 44px;
+            border-radius: 6px;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+            outline: none;
+            transition: box-shadow 0.15s ease;
+        }
+        .paper-sheet[contenteditable="true"]:focus {
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18), 0 0 0 2px rgba(201, 168, 76, 0.55);
+        }
+        .paper-sheet[contenteditable="true"] *:hover {
+            outline: 1px dashed rgba(201, 168, 76, 0.45);
+            outline-offset: 2px;
+        }
+        .header { text-align: center; margin-bottom: 26px; border-bottom: 2px solid #1e293b; padding-bottom: 16px; }
+        .header h1 { font-family: 'Cinzel', serif; font-size: 22px; color: #b8882a; margin: 0 0 6px; }
         .header p { font-size: 13px; color: #64748b; margin: 0; }
-        .report-meta { display: flex; justify-content: space-between; margin-bottom: 24px; font-size: 13px; color: #475569; }
-        .section-title { font-family: 'Cinzel', serif; font-size: 17px; margin: 26px 0 12px; border-left: 4px solid #b8882a; padding-left: 10px; page-break-after: avoid; }
+        .report-meta { display: flex; justify-content: space-between; margin-bottom: 22px; font-size: 13px; color: #475569; gap: 12px; flex-wrap: wrap; }
+        .section-title { font-family: 'Cinzel', serif; font-size: 16px; margin: 24px 0 10px; border-left: 4px solid #b8882a; padding-left: 10px; page-break-after: avoid; }
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         .stat-label { font-size: 12px; text-transform: uppercase; color: #64748b; letter-spacing: 0.08em; font-weight: 600; }
         .stat-value { font-size: 22px; font-weight: 700; margin-top: 4px; }
         table { width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 18px; page-break-inside: avoid; }
-        th { text-align: left; background: #f8fafc; padding: 10px 14px; font-size: 12px; font-weight: 700; color: #475569; border-bottom: 1px solid #e2e8f0; text-transform: uppercase; letter-spacing: 0.04em; }
-        td { padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
+        th { text-align: left; background: #f8fafc; padding: 9px 12px; font-size: 11.5px; font-weight: 700; color: #475569; border-bottom: 1px solid #e2e8f0; text-transform: uppercase; letter-spacing: 0.04em; }
+        td { padding: 9px 12px; font-size: 12.5px; border-bottom: 1px solid #f1f5f9; }
         .text-right { text-align: right; }
         .font-bold { font-weight: 600; }
         ul.data-list { list-style: none; padding: 0; margin: 0; }
@@ -128,61 +162,114 @@ $overall_grand_total = ($overall['total_donations_all'] ?? 0) + ($overall['total
         .page-break { page-break-before: always; margin-top: 30px; }
         .text-red-500 { color: #ef4444; }
 
-        /* Report Customization Bar (.no-print) */
+        /* Side-by-Side Report Customization Sidebar (.no-print) */
         .config-toolbar {
+            width: 300px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 20px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
             background: #0f172a;
             color: #f8fafc;
-            padding: 16px 20px;
+            padding: 18px 18px;
             border-radius: 12px;
-            margin-bottom: 24px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.18);
         }
         .config-toolbar h3 {
-            margin: 0 0 10px;
+            margin: 0 0 6px;
             font-size: 14px;
             font-weight: 700;
             color: #c9a84c;
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            gap: 8px;
+        }
+        .config-subtitle {
+            font-size: 11.5px;
+            color: #94a3b8;
+            margin: 0 0 14px;
+            line-height: 1.4;
         }
         .config-options {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-            gap: 8px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
             margin-bottom: 14px;
         }
         .config-options label {
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 12px;
+            font-size: 12.5px;
             color: #cbd5e1;
             cursor: pointer;
             user-select: none;
+            padding: 4px 6px;
+            border-radius: 6px;
+            transition: background 0.15s ease;
+        }
+        .config-options label:hover {
+            background: rgba(255,255,255,0.06);
         }
         .config-options input[type="checkbox"] {
             accent-color: #c9a84c;
             width: 15px;
             height: 15px;
             cursor: pointer;
+            flex-shrink: 0;
+        }
+        .edit-mode-box {
+            background: rgba(201, 168, 76, 0.12);
+            border: 1px solid rgba(201, 168, 76, 0.35);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+        }
+        .edit-mode-box label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #f8fafc;
+            cursor: pointer;
+        }
+        .edit-mode-box input[type="checkbox"] {
+            accent-color: #c9a84c;
+            width: 15px;
+            height: 15px;
+            cursor: pointer;
+        }
+        .edit-mode-hint {
+            font-size: 11px;
+            color: #cbd5e1;
+            margin: 5px 0 0;
+            line-height: 1.35;
         }
         .config-actions {
             display: flex;
-            gap: 10px;
-            align-items: center;
-            justify-content: flex-between;
+            flex-direction: column;
+            gap: 8px;
             border-top: 1px solid rgba(255,255,255,0.1);
             padding-top: 12px;
         }
+        .config-actions-row {
+            display: flex;
+            gap: 8px;
+        }
+        .config-actions-row .btn-tb {
+            flex: 1;
+        }
         .btn-tb {
-            padding: 6px 14px;
+            padding: 8px 12px;
             font-size: 12px;
             font-weight: 600;
             border-radius: 6px;
             border: none;
             cursor: pointer;
             transition: all 0.2s;
+            text-align: center;
         }
         .btn-tb-primary { background: #c9a84c; color: #0f172a; }
         .btn-tb-primary:hover { background: #d4af37; }
@@ -191,9 +278,19 @@ $overall_grand_total = ($overall['total_donations_all'] ?? 0) + ($overall['total
 
         .hidden-section { display: none !important; }
 
+        @media (max-width: 1020px) {
+            .print-studio-layout { flex-direction: column; padding: 14px; }
+            .config-toolbar { width: 100%; position: static; max-height: none; }
+            .paper-sheet { padding: 24px 20px; }
+        }
+
         @media print {
             .no-print { display: none !important; }
-            body { padding: 0; }
+            body { padding: 0; background: #ffffff; }
+            .print-studio-layout { display: block; padding: 0; max-width: none; }
+            .paper-workspace { display: block; }
+            .paper-sheet { max-width: none; min-height: 0; padding: 0; box-shadow: none; border-radius: 0; }
+            .paper-sheet *:hover { outline: none !important; }
             .page-break { margin-top: 0; }
             .hidden-section { display: none !important; }
         }
@@ -201,39 +298,54 @@ $overall_grand_total = ($overall['total_donations_all'] ?? 0) + ($overall['total
 </head>
 <body>
 
-    <!-- ── Interactive Report Customizer Toolbar (Screen Only) ── -->
-    <div class="config-toolbar no-print">
+<div class="print-studio-layout">
+    <!-- ── Interactive Report Customizer Sidebar (Screen Only) ── -->
+    <aside class="config-toolbar no-print">
         <h3>
-            <span><i class="fa-solid fa-sliders"></i> Customize Printable Report Sections</span>
-            <span style="font-size:11px; font-weight:normal; color:#94a3b8;">Uncheck sections to exclude them before printing</span>
+            <i class="fa-solid fa-sliders"></i>
+            <span>Print &amp; Report Studio</span>
         </h3>
+        <p class="config-subtitle">Toggle sections or click directly on the paper to edit text before printing.</p>
+
+        <div class="edit-mode-box">
+            <label>
+                <input type="checkbox" id="toggle-paper-edit" checked onchange="togglePaperEdit(this.checked)">
+                <span>Editable Paper Mode</span>
+            </label>
+            <p class="edit-mode-hint">Click any heading, date, amount, or label on the sheet to customize it.</p>
+        </div>
         
         <div class="config-options">
             <label><input type="checkbox" class="sec-toggle" data-target="sec-revenue" checked> Revenue Summary</label>
-            <label><input type="checkbox" class="sec-toggle" data-target="sec-donations-breakdown" checked> Donations & Top Donors</label>
+            <label><input type="checkbox" class="sec-toggle" data-target="sec-donations-breakdown" checked> Donations &amp; Top Donors</label>
             <label><input type="checkbox" class="sec-toggle" data-target="sec-donations-ledger" checked> Individual Donations Ledger</label>
             <?php if (!$userChapelId): ?>
-            <label><input type="checkbox" class="sec-toggle" data-target="sec-merch" checked> Merchandise Sales & Ledger</label>
+            <label><input type="checkbox" class="sec-toggle" data-target="sec-merch" checked> Merchandise Sales &amp; Ledger</label>
             <?php endif; ?>
-            <label><input type="checkbox" class="sec-toggle" data-target="sec-events" checked> Events & Records Summary</label>
+            <label><input type="checkbox" class="sec-toggle" data-target="sec-events" checked> Events &amp; Records Summary</label>
             <label><input type="checkbox" class="sec-toggle" data-target="sec-records-ledger" checked> Sacramental Records Ledger</label>
             <label><input type="checkbox" class="sec-toggle" data-target="sec-certs-ledger" checked> Certificate Issuances</label>
-            <label><input type="checkbox" class="sec-toggle" data-target="sec-tickets-voids" checked> Tickets & Voided Ledger</label>
+            <label><input type="checkbox" class="sec-toggle" data-target="sec-tickets-voids" checked> Tickets &amp; Voided Ledger</label>
             <label><input type="checkbox" class="sec-toggle" data-target="sec-staff-activity" checked> Staff Activity Logs</label>
             <label><input type="checkbox" class="sec-toggle" data-target="sec-overall" checked> All-Time Overall Stats</label>
         </div>
 
         <div class="config-actions">
-            <div style="display:flex; gap:8px;">
+            <div class="config-actions-row">
                 <button type="button" class="btn-tb btn-tb-ghost" onclick="toggleAllSections(true)">Select All</button>
                 <button type="button" class="btn-tb btn-tb-ghost" onclick="toggleAllSections(false)">Deselect All</button>
             </div>
-            <div style="margin-left: auto; display:flex; gap:8px;">
-                <button type="button" class="btn-tb btn-tb-primary" onclick="window.print()">🖨 Print Selected Report</button>
+            <button type="button" class="btn-tb btn-tb-primary" onclick="window.print()">Print Selected Report</button>
+            <div class="config-actions-row">
+                <button type="button" class="btn-tb btn-tb-ghost" onclick="resetPaperEdits()">Reset Edits</button>
                 <button type="button" class="btn-tb btn-tb-ghost" onclick="try { window.close(); } catch(e){} setTimeout(() => { window.location.href = '../../dashboard.php?section=reports'; }, 100);">Close</button>
             </div>
         </div>
-    </div>
+    </aside>
+
+    <!-- ── Editable Paper Sheet Preview ── -->
+    <main class="paper-workspace">
+        <div class="paper-sheet" id="report-paper" contenteditable="true" spellcheck="false">
 
     <!-- ── Report Header ── -->
     <div class="header">
@@ -622,8 +734,27 @@ $overall_grand_total = ($overall['total_donations_all'] ?? 0) + ($overall['total
     <div class="footer">
         &copy; <?php echo date('Y'); ?> IFI Cathedral Parish. All Rights Reserved.
     </div>
+        </div><!-- /.paper-sheet -->
+    </main><!-- /.paper-workspace -->
+</div><!-- /.print-studio-layout -->
 
     <script>
+    const originalPaperHtml = document.getElementById('report-paper')?.innerHTML || '';
+
+    function togglePaperEdit(enabled) {
+        const paper = document.getElementById('report-paper');
+        if (paper) {
+            paper.setAttribute('contenteditable', enabled ? 'true' : 'false');
+        }
+    }
+
+    function resetPaperEdits() {
+        const paper = document.getElementById('report-paper');
+        if (paper && originalPaperHtml) {
+            paper.innerHTML = originalPaperHtml;
+            document.querySelectorAll('.sec-toggle').forEach(cb => applyToggle(cb));
+        }
+    }
     function toggleAllSections(checkAll) {
         document.querySelectorAll('.sec-toggle').forEach(cb => {
             cb.checked = checkAll;

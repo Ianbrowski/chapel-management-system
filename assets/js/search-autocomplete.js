@@ -347,65 +347,88 @@
         if (!input || input.dataset.acBound === '1') return;
         input.dataset.acBound = '1';
         input.setAttribute('autocomplete', 'off');
+    }
 
-        const mode = input.getAttribute('data-ac-mode');
-
-        input.addEventListener('input', function () {
-            if (mode === 'dom') runDomSearch(input);
-            else if (mode === 'server') runServerSearch(input);
-        });
-
-        input.addEventListener('focus', function () {
-            if (input.value.trim() !== '') {
-                if (mode === 'dom') runDomSearch(input);
-                else if (mode === 'server') runServerSearch(input);
-            }
-        });
-
-        input.addEventListener('keydown', function (e) {
-            if (!activeDropdown || activeDropdown.style.display === 'none' || activeInput !== input) return;
-            const btns = Array.from(activeDropdown.querySelectorAll('.parish-ac-item'));
-            if (!btns.length) {
-                if (e.key === 'Escape') hideDropdown();
-                return;
-            }
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                activeIdx = (activeIdx + 1) % btns.length;
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                activeIdx = (activeIdx <= 0) ? (btns.length - 1) : (activeIdx - 1);
-            } else if (e.key === 'Enter' && activeIdx >= 0 && btns[activeIdx]) {
-                e.preventDefault();
-                btns[activeIdx].click();
-                return;
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                hideDropdown();
-                return;
-            } else {
-                return;
-            }
-
-            btns.forEach(function (el, i) {
-                el.style.background = (i === activeIdx) ? 'var(--bg3, #F4F4F5)' : 'var(--surface, #FFFFFF)';
-            });
-            btns[activeIdx].scrollIntoView({ block: 'nearest' });
-        });
+    function getAcInputFromEvent(e) {
+        const t = e && e.target;
+        if (!t) return null;
+        return t.matches && t.matches('input[data-ac-mode]')
+            ? t
+            : (t.closest ? t.closest('input[data-ac-mode]') : null);
     }
 
     function initSearchAutocomplete() {
         document.querySelectorAll('input[data-ac-mode]').forEach(attachInput);
     }
 
+    document.addEventListener('input', function (e) {
+        const input = getAcInputFromEvent(e);
+        if (!input) return;
+        attachInput(input);
+        const mode = input.getAttribute('data-ac-mode');
+        if (mode === 'dom') runDomSearch(input);
+        else if (mode === 'server') runServerSearch(input);
+    });
+
+    document.addEventListener('focusin', function (e) {
+        const input = getAcInputFromEvent(e);
+        if (!input) return;
+        attachInput(input);
+        if (input.value.trim() !== '') {
+            const mode = input.getAttribute('data-ac-mode');
+            if (mode === 'dom') runDomSearch(input);
+            else if (mode === 'server') runServerSearch(input);
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        const input = getAcInputFromEvent(e);
+        if (!input || !activeDropdown || activeDropdown.style.display === 'none' || activeInput !== input) return;
+        const btns = Array.from(activeDropdown.querySelectorAll('.parish-ac-item'));
+        if (!btns.length) {
+            if (e.key === 'Escape') hideDropdown();
+            return;
+        }
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            activeIdx = (activeIdx + 1) % btns.length;
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            activeIdx = (activeIdx <= 0) ? (btns.length - 1) : (activeIdx - 1);
+        } else if (e.key === 'Enter' && activeIdx >= 0 && btns[activeIdx]) {
+            e.preventDefault();
+            btns[activeIdx].click();
+            return;
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            hideDropdown();
+            return;
+        } else {
+            return;
+        }
+
+        btns.forEach(function (el, i) {
+            el.style.background = (i === activeIdx) ? 'var(--bg3, #F4F4F5)' : 'var(--surface, #FFFFFF)';
+        });
+        btns[activeIdx].scrollIntoView({ block: 'nearest' });
+    });
+
     document.addEventListener('click', function (e) {
         if (!activeDropdown || activeDropdown.style.display === 'none') return;
+        if (activeInput && !document.contains(activeInput)) {
+            hideDropdown();
+            return;
+        }
         if (activeInput && (e.target === activeInput || activeInput.contains(e.target))) return;
         if (activeDropdown.contains(e.target)) return;
         hideDropdown();
     });
 
     window.addEventListener('resize', function () {
+        if (activeInput && !document.contains(activeInput)) {
+            hideDropdown();
+            return;
+        }
         if (activeInput && activeDropdown && activeDropdown.style.display !== 'none') {
             positionDropdown(activeInput);
         }
@@ -418,4 +441,5 @@
     }
 
     window.initSearchAutocomplete = initSearchAutocomplete;
+    window.hideSearchAutocomplete = hideDropdown;
 })();

@@ -247,6 +247,14 @@ function reinitializeSectionComponents(id) {
             window.showWorkspaceInquiryDetails(firstRow);
         }
     }
+
+    // 7. Re-bind / reset live search autocomplete across AJAX-swapped partials
+    if (typeof window.hideSearchAutocomplete === 'function') {
+        window.hideSearchAutocomplete();
+    }
+    if (typeof window.initSearchAutocomplete === 'function') {
+        window.initSearchAutocomplete();
+    }
 }
 
 function showSection(id, el) {

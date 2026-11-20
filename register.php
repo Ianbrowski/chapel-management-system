@@ -73,8 +73,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $errorMessage = "Email address cannot exceed 100 characters.";
         } elseif (!empty($email) && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $errorMessage = "Please enter a valid email address.";
-        } elseif (!empty($phone) && (strlen($phone) > 20 || !preg_match('/^[0-9+ \-()]{7,20}$/', $phone))) {
-            $errorMessage = "Contact number must be between 7 and 20 digits/valid characters.";
+        } elseif (!empty($phone) && !preg_match('/^(09\d{9}|\+639\d{9}|\d{7,11})$/', preg_replace('/[\s\-()]/', '', $phone))) {
+            $errorMessage = "Contact number must be 11 digits (e.g. 09171234567) or +639XXXXXXXXX (7–11 digits for landline).";
         } elseif (strlen($password) < 6) {
             $errorMessage = "Password must be at least 6 characters long.";
         } elseif (strlen($password) > 72) {
@@ -652,9 +652,9 @@ $csrfToken = $base->generateCsrf();
                             class="form-input" 
                             placeholder="e.g. 09171234567" 
                             value="<?php echo htmlspecialchars($submittedData['phone']); ?>"
-                            maxlength="20"
-                            pattern="[0-9+ \-()]{7,20}"
-                            title="7 to 20 digits and valid phone characters (+ - ())"
+                            maxlength="13"
+                            pattern="(09[0-9]{9}|\+639[0-9]{9}|[0-9]{7,11})"
+                            title="Enter an 11-digit mobile number (e.g. 09171234567) or +639XXXXXXXXX"
                         >
                     </div>
                 </div>
@@ -807,7 +807,12 @@ $csrfToken = $base->generateCsrf();
             const phoneInput = document.getElementById('phone');
             if (phoneInput) {
                 phoneInput.addEventListener('input', function () {
-                    this.value = this.value.replace(/[^0-9+\-()\s]/g, '').slice(0, 20);
+                    let v = this.value.replace(/[^0-9+]/g, '');
+                    if (v.indexOf('+') > 0) {
+                        v = v.replace(/\+/g, '');
+                    }
+                    const maxLen = v.startsWith('+') ? 13 : 11;
+                    this.value = v.slice(0, maxLen);
                 });
             }
 

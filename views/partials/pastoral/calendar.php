@@ -1831,7 +1831,7 @@ $isCathedralStaff = ($role === 'Staff' && empty($chapel_id));
                     </select>
 
                     <select name="ev_type" style="height: 32px !important; min-width: 120px; max-width: 180px; font-size: 12px; border-radius: 6px; background: var(--bg2); border: 1px solid var(--border); color: var(--text);" onchange="this.form.submit()">
-                        <?php echo render_event_type_options($ev_filters['event_type'] ?? '', 'All Types'); ?>
+                        <?php echo render_event_type_options($ev_filters['event_type'] ?? '', 'All Event Types', null, 'filter'); ?>
                     </select>
 
                     <!-- Sort Toggle Icon (Up / Down) -->

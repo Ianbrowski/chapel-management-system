@@ -149,9 +149,12 @@ $certificate_types = $viewData['certificate_types'] ?? [];
 
 if (!function_exists('render_event_type_options')) {
     /**
-     * Uniformly renders liturgical and sacramental event type options across modals, forms, and filter dropdowns.
+     * Renders liturgical, sacramental, or parish event type options tailored to context:
+     * - 'service_request': Active Parish Services Catalog only (for service requests/pricing)
+     * - 'event_schedule':  Parish scheduling modals (catalog rites + General Mass, Fiesta, Other)
+     * - 'filter':          Ledger/calendar filters (includes General Mass, Fiesta, Other + visible legacy labels)
      */
-    function render_event_type_options($selected = '', $emptyLabel = 'Select Service / Rite', $catalog = null): string {
+    function render_event_type_options($selected = '', $emptyLabel = 'Select Service / Rite', $catalog = null, string $mode = 'event_schedule'): string {
         global $services_catalog;
         $catList = $catalog ?? ($services_catalog ?? []);
         $html = '';
@@ -172,14 +175,15 @@ if (!function_exists('render_event_type_options')) {
                     $sel = (strcasecmp($selected, $sName) === 0) ? ' selected' : '';
                     $html .= '<option value="' . htmlspecialchars($sName) . '" data-service-id="' . (int)($srv['id'] ?? 0) . '" data-service-code="' . htmlspecialchars($srv['code'] ?? '') . '"' . $sel . '>' . htmlspecialchars($sName) . '</option>';
                 }
-                // Compatibility aliases for legacy records
-                if (stripos($cat['name'], 'sacrament') !== false && !$hasWedding) {
-                    $selWed = (strcasecmp($selected, 'Wedding') === 0) ? ' selected' : '';
-                    $html .= '<option value="Wedding"' . $selWed . ' style="display:none;">Wedding</option>';
-                }
-                if (stripos($cat['name'], 'liturgical') !== false && !$hasFuneral) {
-                    $selFun = (strcasecmp($selected, 'Funeral') === 0) ? ' selected' : '';
-                    $html .= '<option value="Funeral"' . $selFun . ' style="display:none;">Funeral</option>';
+                if ($mode === 'event_schedule') {
+                    if (stripos($cat['name'], 'sacrament') !== false && !$hasWedding) {
+                        $selWed = (strcasecmp($selected, 'Wedding') === 0) ? ' selected' : '';
+                        $html .= '<option value="Wedding"' . $selWed . ' style="display:none;">Wedding</option>';
+                    }
+                    if (stripos($cat['name'], 'liturgical') !== false && !$hasFuneral) {
+                        $selFun = (strcasecmp($selected, 'Funeral') === 0) ? ' selected' : '';
+                        $html .= '<option value="Funeral"' . $selFun . ' style="display:none;">Funeral</option>';
+                    }
                 }
                 $html .= '</optgroup>';
             }
@@ -188,14 +192,12 @@ if (!function_exists('render_event_type_options')) {
             $html .= '<option value="Baptism"' . (strcasecmp($selected, 'Baptism') === 0 ? ' selected' : '') . '>Baptism</option>';
             $html .= '<option value="Confirmation"' . (strcasecmp($selected, 'Confirmation') === 0 ? ' selected' : '') . '>Confirmation</option>';
             $html .= '<option value="Wedding (Holy Matrimony)"' . (strcasecmp($selected, 'Wedding (Holy Matrimony)') === 0 ? ' selected' : '') . '>Wedding (Holy Matrimony)</option>';
-            $html .= '<option value="Wedding"' . (strcasecmp($selected, 'Wedding') === 0 ? ' selected' : '') . ' style="display:none;">Wedding</option>';
             $html .= '</optgroup>';
 
             $html .= '<optgroup label="Liturgical Services">';
             $html .= '<option value="Thanksgiving Mass"' . (strcasecmp($selected, 'Thanksgiving Mass') === 0 ? ' selected' : '') . '>Thanksgiving Mass</option>';
             $html .= '<option value="Burial Mass"' . (strcasecmp($selected, 'Burial Mass') === 0 ? ' selected' : '') . '>Burial Mass</option>';
             $html .= '<option value="Requiem Mass"' . (strcasecmp($selected, 'Requiem Mass') === 0 ? ' selected' : '') . '>Requiem Mass</option>';
-            $html .= '<option value="Funeral"' . (strcasecmp($selected, 'Funeral') === 0 ? ' selected' : '') . ' style="display:none;">Funeral</option>';
             $html .= '</optgroup>';
 
             $html .= '<optgroup label="Blessings">';
@@ -203,12 +205,22 @@ if (!function_exists('render_event_type_options')) {
             $html .= '</optgroup>';
         }
 
-        $html .= '<optgroup label="Other">';
-        $selMass = (strcasecmp($selected, 'Mass') === 0) ? ' selected' : '';
-        $selOther = (strcasecmp($selected, 'Other') === 0) ? ' selected' : '';
-        $html .= '<option value="Mass"' . $selMass . '>General Mass</option>';
-        $html .= '<option value="Other"' . $selOther . '>Other Event</option>';
-        $html .= '</optgroup>';
+        if ($mode !== 'service_request') {
+            $html .= '<optgroup label="Parish &amp; Calendar Events">';
+            $selMass   = (strcasecmp($selected, 'Mass') === 0) ? ' selected' : '';
+            $selFiesta = (strcasecmp($selected, 'Fiesta') === 0) ? ' selected' : '';
+            $selOther  = (strcasecmp($selected, 'Other') === 0) ? ' selected' : '';
+            $html .= '<option value="Mass"' . $selMass . '>General Mass</option>';
+            $html .= '<option value="Fiesta"' . $selFiesta . '>Fiesta</option>';
+            $html .= '<option value="Other"' . $selOther . '>Other Event</option>';
+            if ($mode === 'filter') {
+                $selWed = (strcasecmp($selected, 'Wedding') === 0) ? ' selected' : '';
+                $selFun = (strcasecmp($selected, 'Funeral') === 0) ? ' selected' : '';
+                $html .= '<option value="Wedding"' . $selWed . '>Wedding (Legacy)</option>';
+                $html .= '<option value="Funeral"' . $selFun . '>Funeral (Legacy)</option>';
+            }
+            $html .= '</optgroup>';
+        }
 
         return $html;
     }

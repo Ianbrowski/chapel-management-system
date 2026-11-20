@@ -23,13 +23,14 @@ $venueId = ($venue === '0' || $venue === '' || $venue === null || $venue === 'nu
 // Relaxed: Allow all authenticated roles to view availability timelines 
 // across chapels and the Cathedral to check for scheduling conflicts.
 $date  = $_GET['date'] ?? null;
-$exclude = $_GET['exclude_id'] ?? null;
+$exclude = isset($_GET['exclude_id']) && (int)$_GET['exclude_id'] > 0 ? (int)$_GET['exclude_id'] : null;
 
 if (!$date) {
     echo json_encode([]);
     exit;
 }
 
+$isStaffOrClergy = in_array($sessionRole, ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff', 'Priest'], true);
 $venueId = ($venue === '0' || $venue === '' || $venue === null || $venue === 'null') ? null : (int)$venue;
 
 $eventModel = new Event($conn);
@@ -42,20 +43,30 @@ $sql = "SELECT event_id, title, start_time, event_type, status, custom_duration
           AND is_archived = 0
           AND COALESCE(event_type, '') != 'Ecclesiastical Certificates'
           AND COALESCE(event_type, '') NOT LIKE '%Certificate%'
-          AND (service_id IS NULL OR service_id != 8)";
+          AND COALESCE(event_type, '') NOT LIKE '%Thanksgiving%'
+          AND COALESCE(event_type, '') NOT LIKE '%Requiem%'
+          AND COALESCE(event_type, '') NOT LIKE '%Intention%'
+          AND (service_id IS NULL OR service_id NOT IN (4, 7, 8))";
 
-if ($exclude) {
-    $sql .= " AND event_id != " . (int)$exclude;
+$params = [];
+$types  = '';
+if ($venueId !== null) {
+    $params[] = $venueId;
+    $types   .= 'i';
+}
+$params[] = $date;
+$types   .= 's';
+
+if ($exclude !== null) {
+    $sql .= " AND event_id != ?";
+    $params[] = $exclude;
+    $types   .= 'i';
 }
 
 $sql .= " ORDER BY start_time ASC";
 
 $stmt = $conn->prepare($sql);
-if ($venueId === null) {
-    $stmt->bind_param('s', $date);
-} else {
-    $stmt->bind_param('is', $venueId, $date);
-}
+$stmt->bind_param($types, ...$params);
 $stmt->execute();
 $res = $stmt->get_result();
 
@@ -64,6 +75,9 @@ while ($row = $res->fetch_assoc()) {
     $row['duration'] = $eventModel->getEventDuration($row['event_type'], $row['custom_duration']);
     $hour = (int)date('H', strtotime($row['start_time']));
     $row['slot'] = ($hour < 12) ? 'Morning' : 'Afternoon';
+    if (!$isStaffOrClergy) {
+        $row['title'] = 'Reserved Sanctuary Slot';
+    }
     $events[] = $row;
 }
 

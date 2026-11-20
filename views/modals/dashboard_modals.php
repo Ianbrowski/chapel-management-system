@@ -336,7 +336,7 @@ function openChapelHubModal(chapel) {
                             </label>
                             <select name="event_type" id="field-event-type-modal" required onchange="onFormChange('modal')"
                                     style="height: 34px !important; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2, #FAFAFA); width: 100%;">
-                                <?php echo render_event_type_options('', 'Select Service / Rite'); ?>
+                                <?php echo render_event_type_options('', 'Select Event / Rite', null, 'event_schedule'); ?>
                             </select>
                         </div>
                         
@@ -566,7 +566,7 @@ function openChapelHubModal(chapel) {
                             </label>
                             <select name="event_type" id="field-event-type-edit-modal" onchange="onFormChange('edit-modal'); updateEditSacramentType(this.value);"
                                     style="width: 100%; padding: 9px 12px; font-size: 13px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); color: var(--text); outline: none;">
-                                <?php echo render_event_type_options('', 'Select Service / Rite'); ?>
+                                <?php echo render_event_type_options('', 'Select Event / Rite', null, 'event_schedule'); ?>
                             </select>
                         </div>
 

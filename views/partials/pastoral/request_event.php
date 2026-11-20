@@ -319,7 +319,7 @@ $defaultTab = $_GET['tab'] ?? ($isGuest ? 'catalog' : ($totalReqs > 0 ? 'request
                 <!-- Event Type Filter -->
                 <select name="event_type" onchange="this.form.submit()" 
                         style="height: 34px !important; min-width: 120px; font-size: 12px; border-radius: 8px; padding: 0 10px; cursor: pointer; border: 1px solid var(--border); background: var(--bg2); color: var(--text); outline: none;">
-                    <?php echo render_event_type_options($curType, 'All Types'); ?>
+                    <?php echo render_event_type_options($curType, 'All Services / Rites', null, 'filter'); ?>
                 </select>
 
                 <!-- Sort Toggle Icon (Up / Down) -->
@@ -530,12 +530,12 @@ $defaultTab = $_GET['tab'] ?? ($isGuest ? 'catalog' : ($totalReqs > 0 ? 'request
                     <div style="display: flex; flex-direction: column; gap: 8px;">
                         <div class="form-group" style="margin: 0;">
                             <label class="form-label" style="font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px; display: block;">
-                                Service / Event Type <span style="color:#ef4444;">*</span>
+                                Requested Service / Rite <span style="color:#ef4444;">*</span>
                             </label>
-                            <select name="event_type" id="field-event-type-request" required onchange="handleServiceCatalogChange(this); if (typeof onFormChange === 'function') onFormChange('request');" 
+                            <select name="event_type" id="field-event-type-request" required onchange="handleServiceCatalogChange(this); if (typeof syncRequestSlots === 'function') syncRequestSlots(); if (typeof onFormChange === 'function') onFormChange('request');" 
                                     class="req-compact-control"
                                     style="padding: 0 28px 0 10px !important; height: 34px; min-height: 34px; font-size: 12.5px; box-sizing: border-box; width: 100%; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2); color: var(--text); cursor: pointer;">
-                                <?php echo render_event_type_options('', 'Select Service / Rite'); ?>
+                                <?php echo render_event_type_options('', 'Select a Parish Service', null, 'service_request'); ?>
                             </select>
                         </div>
                         <div class="form-group" style="margin: 0;">
@@ -1510,15 +1510,18 @@ let activeSlotSelection = 'morning';
 async function syncRequestSlots() {
     const dateInput = document.getElementById('field-date-request');
     const venueSelect = document.getElementById('field-venue-request');
+    const typeSelect = document.getElementById('field-event-type-request');
     const dtHidden = document.getElementById('field-datetime-request');
     const syncIndicator = document.getElementById('slot-sync-indicator');
     const fullAlert = document.getElementById('slots-full-alert-request');
-    const submitBtn = document.getElementById('btn-submit-request');
+    const submitBtn = document.getElementById('btn-open-confirm-modal');
     
     if (!dateInput || !dtHidden) return;
     const dateVal = dateInput.value;
     if (!dateVal) return;
-    
+
+    const selType = (typeSelect ? typeSelect.value : '').toLowerCase();
+    const isNonExclusiveIntention = selType.includes('thanksgiving') || selType.includes('requiem') || selType.includes('intention');
     const venueVal = venueSelect ? venueSelect.value : '0';
     
     if (syncIndicator) {
@@ -1534,7 +1537,7 @@ async function syncRequestSlots() {
         let morningTitle = '';
         let afternoonTitle = '';
         
-        if (Array.isArray(events)) {
+        if (!isNonExclusiveIntention && Array.isArray(events)) {
             events.forEach(ev => {
                 const dt = new Date(ev.start_time);
                 const hr = dt.getHours();

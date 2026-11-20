@@ -170,7 +170,7 @@ $tp = (int)($total_pages ?? 1);
 
                 <!-- Type / Sacrament Filter Dropdown -->
                 <select name="event_type" onchange="this.form.submit()" style="padding: 0 10px; font-size: 12px; height: 34px; border-radius: 8px; background: var(--bg2); border: 1px solid var(--border); color: var(--text); cursor: pointer; min-width: 120px; outline: none;">
-                    <?php echo render_event_type_options($curType, 'All Rites'); ?>
+                    <?php echo render_event_type_options($curType, 'All Rites / Events', null, 'filter'); ?>
                 </select>
 
                 <!-- Timeframe / Recently Added Filter Dropdown -->

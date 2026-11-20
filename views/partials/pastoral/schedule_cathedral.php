@@ -170,7 +170,7 @@ $activeStatus = $ev_filters['status'] ?? '';
 
                 <!-- Type Filter Dropdown -->
                 <select name="event_type" onchange="this.form.submit()" style="height: 32px !important; font-size: 12px; font-weight: 500; min-width: 120px; max-width: 165px;" title="Filter by event type">
-                    <?php echo render_event_type_options($curType, 'All Types'); ?>
+                    <?php echo render_event_type_options($curType, 'All Event Types', null, 'filter'); ?>
                 </select>
 
                 <!-- Sort Toggle Icon (Up / Down) -->

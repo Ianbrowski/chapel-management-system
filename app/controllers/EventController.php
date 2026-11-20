@@ -480,6 +480,17 @@ class EventController extends BaseController {
             require_once __DIR__ . '/../models/ServiceModel.php';
             $srvModel = new ServiceModel($this->conn);
             try {
+                // Verify submitted event_type matches the catalog service to prevent conflict-bypass tampering
+                $srvCheckStmt = $this->conn->prepare("SELECT name FROM services WHERE id = ? LIMIT 1");
+                if ($srvCheckStmt) {
+                    $srvCheckStmt->bind_param('i', $serviceId);
+                    $srvCheckStmt->execute();
+                    $srvRow = $srvCheckStmt->get_result()->fetch_assoc();
+                    $srvCheckStmt->close();
+                    if (!$srvRow || (strcasecmp(trim($srvRow['name']), trim($type)) !== 0 && !$isCertSection)) {
+                        throw new InvalidArgumentException("Selected service option does not match the requested rite.");
+                    }
+                }
                 $quantity = max(1, (int)($_POST['certificate_copies'] ?? $_POST['quantity'] ?? 1));
                 $calc = $srvModel->calculateAndVerifyFee($serviceId, $variantId, $selectedAddons, $quantity);
                 $serviceFee = $calc['base_fee'];
@@ -487,6 +498,7 @@ class EventController extends BaseController {
                 $totalFee   = $calc['total_fee'];
                 $verifiedAddons = $calc['addons'];
             } catch (Exception $ex) {
+                $this->conn->rollback();
                 $this->flash('error', $ex->getMessage());
                 $this->redirect($redirectUrl);
             }

@@ -34,14 +34,20 @@ class EventConflictService
 
     private function isNonExclusiveService(string $eventType, ?int $serviceId = null): bool
     {
-        if ($serviceId !== null && in_array($serviceId, [4, 7, 8], true)) {
-            return true;
-        }
-        return $eventType === 'Ecclesiastical Certificates'
+        $isNonExclusiveType = ($eventType === 'Ecclesiastical Certificates'
             || stripos($eventType, 'Certificate') !== false
             || stripos($eventType, 'Thanksgiving') !== false
             || stripos($eventType, 'Requiem') !== false
-            || stripos($eventType, 'Intention') !== false;
+            || stripos($eventType, 'Intention') !== false);
+
+        if ($isNonExclusiveType) {
+            return true;
+        }
+        // Only honor non-exclusive service_id shortcut when event_type wasn't forged to an exclusive rite
+        if ($serviceId !== null && in_array($serviceId, [4, 7, 8], true) && trim($eventType) === '') {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -207,7 +213,7 @@ class EventConflictService
                 WHERE ";
 
         if ($chapelId === null || $chapelId === '' || $chapelId == 0) {
-            $sql .= "chapel_id IS NULL AND event_scope = 'cathedral'";
+            $sql .= "(chapel_id IS NULL OR chapel_id = 0)";
         } else {
             $sql .= "chapel_id = ?";
         }

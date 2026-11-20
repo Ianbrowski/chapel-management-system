@@ -852,7 +852,7 @@ $readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_request
 </div>
 
 <form id="cert-approve-form" method="POST" action="dashboard.php?section=request_certificate" style="display: none;">
-    <input type="hidden" name="form_section" value="event_review">
+    <input type="hidden" name="form_section" value="review_request">
     <input type="hidden" name="redirect_section" value="request_certificate">
     <input type="hidden" name="action" value="approve">
     <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">

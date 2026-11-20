@@ -868,6 +868,9 @@ function openChapelHubModal(chapel) {
                 <button type="button" class="btn btn-danger btn-sm" id="ve-reject-btn" style="display: none; height: 34px; padding: 0 14px; font-weight: 600;">
                     <i class="fa-solid fa-xmark"></i> Reject
                 </button>
+                <button type="button" class="btn btn-gray btn-sm" id="ve-chat-btn" style="display: none; height: 34px; padding: 0 14px; font-weight: 600;">
+                    <i class="fa-solid fa-comments" style="color: var(--accent);"></i> Chat Requester
+                </button>
             </div>
             <div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
                 <button type="button" class="btn btn-primary btn-sm" id="ve-edit-btn" style="height: 34px; padding: 0 14px; font-weight: 600;">

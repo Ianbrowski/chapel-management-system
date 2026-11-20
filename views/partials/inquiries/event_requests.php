@@ -314,18 +314,30 @@ $tp = (int)($total_pages ?? 1);
                         </td>
 
                         <td style="text-align: center;">
-                            <?php if ($status === 'Pending'): ?>
+                            <?php
+                                $reqUid = (int)($req['requested_by'] ?? 0);
+                                $curUid = (int)($_SESSION['user_id'] ?? 0);
+                                $canChatReq = ($reqUid > 0 && $reqUid !== $curUid);
+                                $canEditReq = in_array($role ?? '', ['Admin', 'Cathedral Admin', 'Chapel Admin'], true) || ($status === 'Pending');
+                            ?>
                             <div class="req-action-wrap" style="position: relative; display: inline-block;" onclick="event.stopPropagation();">
                                 <button type="button" class="btn btn-sm btn-action-box" 
                                         onclick="toggleRequestActionBox(this, event)"
                                         aria-haspopup="true"
                                         aria-expanded="false"
-                                        title="Click to review action controls"
+                                        title="Manage reservation, edit, chat, or approve"
                                         style="height: 32px; padding: 4px 12px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: all 0.15s ease;">
                                     <span>Manage</span>
                                     <i class="fa-solid fa-chevron-down" style="font-size: 9px; opacity: 0.7;"></i>
                                 </button>
-                                <div class="req-action-popover" style="display: none; position: absolute; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); z-index: 100; min-width: 170px; padding: 5px; text-align: left;">
+                                <div class="req-action-popover" style="display: none; position: absolute; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); z-index: 100; min-width: 185px; padding: 5px; text-align: left;">
+                                    <button type="button" class="req-popover-item"
+                                            onclick="closeAllReqActionBoxes(); viewRequestDetailsFromRow(this.closest('tr'));"
+                                            style="width: 100%; border: none; background: transparent; padding: 7px 10px; font-size: 12px; font-weight: 600; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 5px; text-align: left; transition: background 0.15s ease;">
+                                        <i class="fa-solid fa-eye" style="font-size: 13px; color: var(--accent);"></i>
+                                        <span>Review Details</span>
+                                    </button>
+                                    <?php if ($status === 'Pending'): ?>
                                     <button type="button" class="req-popover-item"
                                             data-approve="<?php echo htmlspecialchars(json_encode([
                                                 'id' => $req['event_id'],
@@ -337,36 +349,52 @@ $tp = (int)($total_pages ?? 1);
                                                 'custom_duration' => $req['custom_duration']
                                             ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
                                             onclick="closeAllReqActionBoxes(); openApproveModal(this);"
-                                            style="width: 100%; border: none; background: transparent; padding: 8px 10px; font-size: 12px; font-weight: 600; color: #16a34a; cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 5px; text-align: left; transition: background 0.15s ease;">
-                                        <i class="fa-solid fa-circle-check" style="font-size: 14px;"></i>
+                                            style="width: 100%; border: none; background: transparent; padding: 7px 10px; font-size: 12px; font-weight: 600; color: #16a34a; cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 5px; text-align: left; transition: background 0.15s ease;">
+                                        <i class="fa-solid fa-circle-check" style="font-size: 13px;"></i>
                                         <span>Check / Approve</span>
                                     </button>
+                                    <?php endif; ?>
+                                    <?php if ($canEditReq): ?>
+                                    <button type="button" class="req-popover-item"
+                                            onclick="closeAllReqActionBoxes(); openEditEventModal(this.closest('tr'));"
+                                            style="width: 100%; border: none; background: transparent; padding: 7px 10px; font-size: 12px; font-weight: 600; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 5px; text-align: left; transition: background 0.15s ease;">
+                                        <i class="fa-solid fa-pen-to-square" style="font-size: 13px; color: var(--accent);"></i>
+                                        <span>Edit / Assign</span>
+                                    </button>
+                                    <?php endif; ?>
+                                    <?php if ($canChatReq): ?>
+                                    <button type="button" class="req-popover-item"
+                                            onclick="closeAllReqActionBoxes(); openEventRequesterChat(<?php echo $reqUid; ?>);"
+                                            style="width: 100%; border: none; background: transparent; padding: 7px 10px; font-size: 12px; font-weight: 600; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 5px; text-align: left; transition: background 0.15s ease;">
+                                        <i class="fa-solid fa-comments" style="font-size: 13px; color: var(--accent);"></i>
+                                        <span>Chat Requester</span>
+                                    </button>
+                                    <?php endif; ?>
+                                    <?php if ($status === 'Pending' || in_array($role ?? '', ['Admin', 'Cathedral Admin'], true)): ?>
+                                    <div style="height: 1px; background: var(--border); margin: 3px 0;"></div>
+                                    <?php endif; ?>
+                                    <?php if ($status === 'Pending'): ?>
                                     <button type="button" class="req-popover-item"
                                             data-reject="<?php echo htmlspecialchars(json_encode([
                                                 'id' => $req['event_id'],
                                                 'title' => $req['title']
                                             ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
                                             onclick="closeAllReqActionBoxes(); openRejectModal(this);"
-                                            style="width: 100%; border: none; background: transparent; padding: 8px 10px; font-size: 12px; font-weight: 600; color: #dc2626; cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 5px; text-align: left; transition: background 0.15s ease;">
-                                        <i class="fa-solid fa-circle-xmark" style="font-size: 14px;"></i>
+                                            style="width: 100%; border: none; background: transparent; padding: 7px 10px; font-size: 12px; font-weight: 600; color: #dc2626; cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 5px; text-align: left; transition: background 0.15s ease;">
+                                        <i class="fa-solid fa-circle-xmark" style="font-size: 13px;"></i>
                                         <span>Reject Request</span>
                                     </button>
-                                    <div style="height: 1px; background: var(--border); margin: 3px 0;"></div>
+                                    <?php endif; ?>
+                                    <?php if (in_array($role ?? '', ['Admin', 'Cathedral Admin'], true)): ?>
                                     <button type="button" class="req-popover-item"
-                                            onclick="closeAllReqActionBoxes(); viewRequestDetailsFromRow(this.closest('tr'));"
-                                            style="width: 100%; border: none; background: transparent; padding: 7px 10px; font-size: 11.5px; font-weight: 500; color: var(--text2); cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 5px; text-align: left; transition: background 0.15s ease;">
-                                        <i class="fa-solid fa-eye" style="font-size: 12px;"></i>
-                                        <span>Review Details</span>
+                                            onclick="closeAllReqActionBoxes(); deleteEventRequestRow(<?php echo (int)$req['event_id']; ?>, <?php echo htmlspecialchars(json_encode($req['title'] ?? 'this request'), ENT_QUOTES, 'UTF-8'); ?>);"
+                                            style="width: 100%; border: none; background: transparent; padding: 7px 10px; font-size: 12px; font-weight: 600; color: #ef4444; cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 5px; text-align: left; transition: background 0.15s ease;">
+                                        <i class="fa-solid fa-trash" style="font-size: 13px;"></i>
+                                        <span>Delete</span>
                                     </button>
+                                    <?php endif; ?>
                                 </div>
                             </div>
-                            <?php else: ?>
-                            <button type="button" class="btn btn-sm btn-ghost" onclick="viewRequestDetailsFromRow(this.closest('tr'))" 
-                                    style="height: 30px; padding: 4px 10px; font-size: 11.5px; border-radius: 6px; border: 1px solid var(--border); color: var(--text); background: var(--surface); cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
-                                <i class="fa-solid fa-eye" style="font-size: 11px; color: var(--accent);"></i>
-                                <span>Details</span>
-                            </button>
-                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -410,6 +438,14 @@ $tp = (int)($total_pages ?? 1);
     </div>
 </div>
 
+<form id="ev-req-delete-form" method="POST" action="dashboard.php?section=event_requests" style="display: none;">
+    <input type="hidden" name="form_section" value="event_request">
+    <input type="hidden" name="redirect_section" value="event_requests">
+    <input type="hidden" name="action" value="delete_request">
+    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+    <input type="hidden" name="event_id" id="ev-req-delete-id">
+</form>
+
 <script>
 function viewRequestDetailsFromRow(tr) {
     const dataAttr = tr.getAttribute('data-req');
@@ -444,5 +480,21 @@ function closeAllReqActionBoxes() {
     document.querySelectorAll('.btn-action-box').forEach(b => b.setAttribute('aria-expanded', 'false'));
 }
 
+window.CURRENT_USER_ID = <?php echo (int)($_SESSION['user_id'] ?? 0); ?>;
+function openEventRequesterChat(userId) {
+    if (!userId || !window.ParishChat) return;
+    if (typeof window.ParishChat.toggleChat === 'function') window.ParishChat.toggleChat(true);
+    if (typeof window.ParishChat.startDirectChat === 'function') window.ParishChat.startDirectChat(userId);
+}
+function deleteEventRequestRow(id, title) {
+    if (!id) return;
+    if (!confirm('Delete request "' + (title || '#' + id) + '" permanently?')) return;
+    const inp = document.getElementById('ev-req-delete-id');
+    const frm = document.getElementById('ev-req-delete-form');
+    if (inp && frm) {
+        inp.value = id;
+        frm.submit();
+    }
+}
 document.addEventListener('click', closeAllReqActionBoxes);
 </script>

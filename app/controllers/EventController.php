@@ -327,8 +327,15 @@ class EventController extends BaseController {
     }
 
     private function handleEventRequestActions($action) {
-        $isCertSection = ($_POST['form_section'] ?? '') === 'certificate_request' || ($_POST['redirect_section'] ?? '') === 'request_certificate';
-        $redirectUrl   = $isCertSection ? 'dashboard.php?section=request_certificate' : 'dashboard.php?section=request_event';
+        $reqRedirect = $_POST['redirect_section'] ?? '';
+        $isCertSection = ($_POST['form_section'] ?? '') === 'certificate_request' || $reqRedirect === 'request_certificate';
+        if ($reqRedirect === 'event_requests') {
+            $redirectUrl = 'dashboard.php?section=event_requests';
+        } elseif ($isCertSection) {
+            $redirectUrl = 'dashboard.php?section=request_certificate';
+        } else {
+            $redirectUrl = 'dashboard.php?section=request_event';
+        }
 
         if ($this->role === 'Guest' || (int)$this->userId === 0) {
             $this->flash('error', 'Guest accounts cannot submit requests. Please register or sign in as a parishioner member.');

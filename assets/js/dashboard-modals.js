@@ -616,6 +616,22 @@ function viewEventDetails(input, readonly = false, options = {}) {
         if (rejectBtn) rejectBtn.style.display = 'none';
     }
 
+    const chatBtn = document.getElementById('ve-chat-btn');
+    if (chatBtn) {
+        const reqUid = parseInt(ev.requested_by || 0, 10);
+        const curUid = parseInt(window.CURRENT_USER_ID || 0, 10);
+        if (reqUid > 0 && reqUid !== curUid && window.ParishChat) {
+            chatBtn.style.display = 'inline-flex';
+            chatBtn.onclick = () => {
+                closeModal('modal-view-event-details');
+                if (typeof window.ParishChat.toggleChat === 'function') window.ParishChat.toggleChat(true);
+                if (typeof window.ParishChat.startDirectChat === 'function') window.ParishChat.startDirectChat(reqUid);
+            };
+        } else {
+            chatBtn.style.display = 'none';
+        }
+    }
+
     // Setup Edit Button
     const editBtn = document.getElementById('ve-edit-btn');
     if (editBtn) {

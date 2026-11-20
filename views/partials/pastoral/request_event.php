@@ -413,6 +413,11 @@ $defaultTab = $_GET['tab'] ?? ($isGuest ? 'catalog' : ($totalReqs > 0 ? 'request
                                 <button type="button" class="btn-action-icon" onclick="viewRequestDetailsFromRow(this.closest('tr'))" title="View Details">
                                     <i class="fa-solid fa-eye"></i>
                                 </button>
+                                <?php if (!$isGuest): ?>
+                                <button type="button" class="btn-action-icon" onclick="if (window.ParishChat) ParishChat.toggleChat(true);" title="Chat Parish Office">
+                                    <i class="fa-solid fa-comments"></i>
+                                </button>
+                                <?php endif; ?>
                                 <?php if ($st === 'Pending'): ?>
                                 <button type="button" class="btn-action-icon" data-id="<?php echo (int)$req['event_id']; ?>" data-name="<?php echo htmlspecialchars($req['title'], ENT_QUOTES, 'UTF-8'); ?>" onclick="cancelRequest(this)" title="Cancel Request" style="color: #dc2626;">
                                     <i class="fa-solid fa-ban"></i>

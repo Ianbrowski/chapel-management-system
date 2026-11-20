@@ -550,11 +550,13 @@ class EventController extends BaseController {
         if (!$this->permissions['can_approve_events']) return;
         $id = (int)($_POST['id'] ?? 0);
         $note = $_POST['rejection_note'] ?? '';
+        $redirectSection = ($_POST['redirect_section'] ?? '') === 'request_certificate' ? 'request_certificate' : 'event_requests';
+        $redirectUrl = 'dashboard.php?section=' . $redirectSection;
 
         $record = $this->eventModel->getById($id);
         if (!$record || !$this->canManageExistingChapelRecord($record['chapel_id'] ?? null)) {
             $this->flash('error', 'You do not have permission to review requests for other chapels.');
-            $this->redirect('dashboard.php?section=event_requests');
+            $this->redirect($redirectUrl);
         }
 
         $submittedPastor = isset($_POST['pastor_id']) && (int)$_POST['pastor_id'] > 0 ? (int)$_POST['pastor_id'] : null;
@@ -567,13 +569,13 @@ class EventController extends BaseController {
             if ($conflict['conflict']) {
                 $this->conn->rollback();
                 $this->flash('error', "Schedule conflict detected during approval ({$conflict['type']}): {$conflict['details']}.");
-                $this->redirect('dashboard.php?section=event_requests');
+                $this->redirect($redirectUrl);
             }
 
             if (!$this->eventModel->approveRequest($id, $pastor)) {
                 $this->conn->rollback();
                 $this->flash('error', 'Failed to approve request.');
-                $this->redirect('dashboard.php?section=event_requests');
+                $this->redirect($redirectUrl);
             }
             $this->conn->commit();
 
@@ -617,7 +619,7 @@ class EventController extends BaseController {
         } elseif ($action === 'reject') {
             if (!$this->eventModel->rejectRequest($id, $note)) {
                 $this->flash('error', 'Failed to reject request.');
-                $this->redirect('dashboard.php?section=event_requests');
+                $this->redirect($redirectUrl);
             }
 
             $event = $this->eventModel->getById($id);
@@ -650,7 +652,7 @@ class EventController extends BaseController {
             $this->flash('success', 'Request rejected. ' . $this->formatEventNotificationSummary($event, $mailSent, $smsSent));
         }
 
-        $this->redirect('dashboard.php?section=event_requests');
+        $this->redirect($redirectUrl);
     }
 
     private function handlePastorPrefs() {

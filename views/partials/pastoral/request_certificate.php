@@ -343,15 +343,15 @@ $readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_request
                         </div>
                     </div>
                 <?php else: ?>
-                    <table class="data-table" id="cert-requests-table" style="width: 100%; border-collapse: collapse;">
+                    <table class="data-table" id="cert-requests-table" style="width: 100%; table-layout: fixed; border-collapse: collapse;">
                         <thead style="position: sticky; top: 0; background: var(--bg3); z-index: 5; border-bottom: 1px solid var(--border);">
                             <tr>
-                                <th style="padding: 9px 16px; text-align: left; font-size: 11px; text-transform: uppercase;">Certificate / Person</th>
-                                <th style="padding: 9px 14px; text-align: left; font-size: 11px; text-transform: uppercase; width: 180px;">Sacrament Details</th>
-                                <th style="padding: 9px 14px; text-align: left; font-size: 11px; text-transform: uppercase; width: 140px;">Target Pickup</th>
-                                <th style="padding: 9px 14px; text-align: right; font-size: 11px; text-transform: uppercase; width: 110px;">Document Fee</th>
+                                <th style="padding: 9px 16px; text-align: left; font-size: 11px; text-transform: uppercase; width: auto;">Certificate / Person</th>
+                                <th style="padding: 9px 14px; text-align: left; font-size: 11px; text-transform: uppercase; width: 175px;">Sacrament Details</th>
+                                <th style="padding: 9px 14px; text-align: left; font-size: 11px; text-transform: uppercase; width: 135px;">Target Pickup</th>
+                                <th style="padding: 9px 14px; text-align: right; font-size: 11px; text-transform: uppercase; width: 115px;">Document Fee</th>
                                 <th style="padding: 9px 14px; text-align: center; font-size: 11px; text-transform: uppercase; width: 110px;">Status</th>
-                                <th style="padding: 9px 16px; text-align: center; font-size: 11px; text-transform: uppercase; width: 90px;">Actions</th>
+                                <th style="padding: 9px 16px; text-align: center; font-size: 11px; text-transform: uppercase; width: 80px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -374,16 +374,16 @@ $readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_request
                                 data-req="<?php echo htmlspecialchars(json_encode($req), ENT_QUOTES, 'UTF-8'); ?>"
                                 style="cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s ease;">
                                 
-                                <td style="padding: 10px 16px;">
-                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                <td style="padding: 10px 16px; min-width: 0;">
+                                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
                                         <div style="width: 32px; height: 32px; border-radius: 6px; background: rgba(201,168,76,0.12); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0;">
                                             <i class="fa-solid fa-certificate"></i>
                                         </div>
-                                        <div style="min-width: 0;">
-                                            <div style="font-weight: 700; color: var(--text); font-size: 12.5px; line-height: 1.3;">
+                                        <div style="min-width: 0; flex: 1;">
+                                            <div title="<?php echo htmlspecialchars($pTitle, ENT_QUOTES, 'UTF-8'); ?>" style="font-weight: 700; color: var(--text); font-size: 12.5px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                                 <?php echo htmlspecialchars($pTitle); ?>
                                             </div>
-                                            <div style="font-size: 10.5px; color: var(--text2); font-family: var(--font-mono, monospace); margin-top: 2px;">
+                                            <div style="font-size: 10.5px; color: var(--text2); font-family: var(--font-mono, monospace); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                                 #REQ-<?php echo str_pad((string)$req['event_id'], 4, '0', STR_PAD_LEFT); ?> &bull; Parish Archives
                                             </div>
                                         </div>
@@ -427,17 +427,33 @@ $readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_request
                                 <td style="padding: 10px 16px; text-align: center;" onclick="event.stopPropagation();">
                                     <?php
                                         $currentUid = (int)($_SESSION['user_id'] ?? 0);
-                                        $isRowOwner = ($currentUid > 0 && (int)($req['requested_by'] ?? 0) === $currentUid);
+                                        $reqOwnerUid = (int)($req['requested_by'] ?? 0);
+                                        $isRowOwner = ($currentUid > 0 && $reqOwnerUid === $currentUid);
                                         $canDeleteRow = $isAdmin || $isRowOwner || in_array($st, ['Cancelled', 'Rejected']);
+                                        $canChatApplicant = ($isAdmin && $reqOwnerUid > 0 && $reqOwnerUid !== $currentUid);
                                     ?>
                                     <div class="portal-dropdown-wrapper" style="position: relative; display: inline-block;">
                                         <button class="btn-icon" onclick="togglePortalDropdown(this)" title="Actions" style="width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: #FFFFFF; color: var(--text); cursor: pointer;">
                                             <i class="fa-solid fa-ellipsis-vertical" style="font-size: 11px;"></i>
                                         </button>
-                                        <div class="dropdown-menu" style="display: none; position: absolute; top: calc(100% + 4px); right: 0; left: auto; background: #FFFFFF; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 50; min-width: 155px; padding: 4px; text-align: left;">
+                                        <div class="dropdown-menu" style="display: none; position: absolute; top: calc(100% + 4px); right: 0; left: auto; background: #FFFFFF; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 50; min-width: 175px; padding: 4px; text-align: left;">
                                             <a class="dropdown-item" href="javascript:void(0)" onclick="viewCertDetailsFromRow(this.closest('tr'))" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); border-radius: 4px;">
                                                 <i class="fa-solid fa-eye" style="color: var(--accent);"></i> View Details
                                             </a>
+                                            <?php if ($isAdmin && $st === 'Pending'): ?>
+                                            <a class="dropdown-item" href="javascript:void(0)" data-id="<?php echo (int)$req['event_id']; ?>" onclick="approveCertRequest(this)" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: #16a34a; border-radius: 4px;">
+                                                <i class="fa-solid fa-circle-check"></i> Mark as Ready
+                                            </a>
+                                            <?php endif; ?>
+                                            <?php if ($canChatApplicant): ?>
+                                            <a class="dropdown-item" href="javascript:void(0)" onclick="openCertApplicantChat(<?php echo $reqOwnerUid; ?>)" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); border-radius: 4px;">
+                                                <i class="fa-solid fa-comments" style="color: var(--accent);"></i> Chat Applicant
+                                            </a>
+                                            <?php elseif (!$isAdmin && !$isGuest): ?>
+                                            <a class="dropdown-item" href="javascript:void(0)" onclick="if (window.ParishChat) ParishChat.toggleChat(true);" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); border-radius: 4px;">
+                                                <i class="fa-solid fa-comments" style="color: var(--accent);"></i> Chat Parish Office
+                                            </a>
+                                            <?php endif; ?>
                                             <?php if ($st === 'Pending'): ?>
                                             <a class="dropdown-item" href="javascript:void(0)" data-id="<?php echo (int)$req['event_id']; ?>" data-title="<?php echo htmlspecialchars($req['title'], ENT_QUOTES, 'UTF-8'); ?>" onclick="cancelCertRequest(this)" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: #dc2626; border-radius: 4px;">
                                                 <i class="fa-solid fa-ban"></i> Cancel Request
@@ -835,6 +851,14 @@ $readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_request
     </div>
 </div>
 
+<form id="cert-approve-form" method="POST" action="dashboard.php?section=request_certificate" style="display: none;">
+    <input type="hidden" name="form_section" value="event_review">
+    <input type="hidden" name="redirect_section" value="request_certificate">
+    <input type="hidden" name="action" value="approve">
+    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+    <input type="hidden" name="id" id="cert-approve-id-input">
+</form>
+
 <script>
 let certSelectedPrice = <?php echo (float)($certVariants[0]['price'] ?? 200.00); ?>;
 let certSelectedName = '<?php echo addslashes($certVariants[0]['name'] ?? 'Baptismal Certificate'); ?>';
@@ -1103,6 +1127,29 @@ function deleteCertRequest(idOrEl, title) {
     }
 }
 
+function approveCertRequest(el) {
+    const id = el ? el.getAttribute('data-id') : '';
+    if (!id) return;
+    const input = document.getElementById('cert-approve-id-input');
+    const form = document.getElementById('cert-approve-form');
+    if (input && form) {
+        input.value = id;
+        form.submit();
+    }
+}
+
+function openCertApplicantChat(userId) {
+    if (!userId || !window.ParishChat) return;
+    if (typeof window.ParishChat.toggleChat === 'function') {
+        window.ParishChat.toggleChat(true);
+    }
+    if (typeof window.ParishChat.startDirectChat === 'function') {
+        window.ParishChat.startDirectChat(userId);
+    }
+}
+
+window.approveCertRequest = approveCertRequest;
+window.openCertApplicantChat = openCertApplicantChat;
 window.cancelCertRequest = cancelCertRequest;
 window.closeCertCancelModal = closeCertCancelModal;
 window.deleteCertRequest = deleteCertRequest;

@@ -104,7 +104,23 @@ $voidedCount = count($voided_donations ?? []);
 }
 #sec-donations .don-filter-bar select {
     width: auto !important;
-    flex: 0 0 auto;
+    max-width: 195px;
+    flex: 0 1 auto;
+}
+#donations-table-scroll {
+    width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    min-height: 0;
+}
+@media (max-width: 820px) {
+    #donations-table-scroll {
+        overflow-x: auto;
+    }
+    #donations-data-table {
+        min-width: 720px;
+    }
 }
 #donations-data-table {
     width: 100%;
@@ -113,9 +129,17 @@ $voidedCount = count($voided_donations ?? []);
 }
 #donations-data-table th,
 #donations-data-table td {
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+}
+#donations-data-table th {
+    padding: 11px 14px;
     white-space: nowrap;
+    text-overflow: ellipsis;
+}
+#donations-data-table td {
+    padding: 13px 14px;
+    vertical-align: middle;
 }
 </style>
 
@@ -202,12 +226,29 @@ $voidedCount = count($voided_donations ?? []);
         <div class="panel" style="border-radius: 10px; overflow: hidden; background: #FFFFFF; border: 1px solid var(--border); display: flex; flex-direction: column; flex: 1; min-height: 0;">
             
             <!-- Quick Filter Toolbar -->
-            <div class="don-filter-bar" style="padding: 10px 14px; border-bottom: 1px solid var(--border); background: #FFFFFF; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0;">
+            <div class="don-filter-bar" style="padding: 12px 16px; border-bottom: 1px solid var(--border); background: #FFFFFF; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;">
+                <!-- Search & Sort Row -->
+                <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                    <button type="button" class="btn-sort-toggle" onclick="toggleDonationsSort(this)"
+                            title="Sorted: Newest First (Click to sort Oldest first)"
+                            style="height: 34px; width: 34px; min-width: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2, #FAFAFA); color: var(--text); cursor: pointer; transition: all 0.15s ease; flex-shrink: 0;" aria-label="Toggle sort order">
+                        <i class="fa-solid fa-arrow-down-wide-short" style="font-size: 13px;"></i>
+                    </button>
+
+                    <div style="position: relative; flex: 1; min-width: 180px;">
+                        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text2, #71717A); font-size: 11.5px; pointer-events: none; z-index: 2;"></i>
+                        <input type="text" id="donations-search-input" placeholder="Search donor name, reference ID, or purpose..." oninput="filterDonationsLedger()" 
+                               style="width: 100%; height: 34px; padding-left: 34px !important; padding-right: 26px !important; font-size: 12.5px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; outline: none; background: var(--bg2, #FFFFFF); color: var(--text);">
+                        <span id="donations-clear-search" onclick="clearDonationsSearch()" title="Clear search" style="display: none; position: absolute; right: 9px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text2); font-size: 14px; line-height: 1;">&times;</span>
+                    </div>
+                </div>
+
+                <!-- Filters Row -->
                 <form method="GET" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0;">
                     <input type="hidden" name="section" value="donations">
                     <input type="hidden" name="tab" value="ledger">
                     
-                    <div style="display: flex; align-items: center; gap: 4px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
                         <input type="date" name="don_from" value="<?php echo htmlspecialchars($_GET['don_from'] ?? ''); ?>" 
                                style="height: 32px; padding: 0 8px; font-size: 11.5px; border-radius: 6px; border: 1px solid var(--border); background: #FAFAFA; color: var(--text);" title="From date">
                         <span style="font-size: 11px; color: var(--text2);">to</span>
@@ -216,14 +257,14 @@ $voidedCount = count($voided_donations ?? []);
                     </div>
 
                     <select name="don_timeframe" onchange="this.form.submit()" 
-                            style="height: 32px !important; min-width: 140px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); color: var(--text);">
+                            style="height: 32px !important; min-width: 130px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); color: var(--text);">
                         <option value="">All Timeframes</option>
                         <option value="recently_added" <?php echo (($_GET['don_timeframe'] ?? '') === 'recently_added') ? 'selected' : ''; ?>>Recently Added (30 Days)</option>
                         <option value="recently_added_7" <?php echo (($_GET['don_timeframe'] ?? '') === 'recently_added_7') ? 'selected' : ''; ?>>Recently Added (7 Days)</option>
                     </select>
 
                     <select name="don_method" onchange="this.form.submit()" 
-                            style="height: 32px !important; min-width: 140px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); color: var(--text);">
+                            style="height: 32px !important; min-width: 135px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); color: var(--text);">
                         <option value="">All Payment Methods</option>
                         <option value="Cash" <?php echo (($_GET['don_method']??'')==='Cash')?'selected':''; ?>>Cash</option>
                         <option value="GCash" <?php echo (($_GET['don_method']??'')==='GCash')?'selected':''; ?>>GCash</option>
@@ -234,7 +275,7 @@ $voidedCount = count($voided_donations ?? []);
 
                     <?php if ($can_donations_admin): ?>
                     <select name="don_chapel" onchange="this.form.submit()" 
-                            style="height: 32px !important; min-width: 140px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); color: var(--text);">
+                            style="height: 32px !important; min-width: 145px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); color: var(--text);">
                         <option value="">All Branches / Chapels</option>
                         <option value="0" <?php echo (($_GET['don_chapel']??'')==='0')?'selected':''; ?>>General / Cathedral</option>
                         <?php foreach($chapels as $ch): ?>
@@ -243,53 +284,34 @@ $voidedCount = count($voided_donations ?? []);
                     </select>
                     <?php endif; ?>
 
-                    <button type="submit" class="btn btn-primary btn-sm" style="height: 32px; padding: 0 12px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px; border-radius: 6px;">
+                    <button type="submit" class="btn btn-primary btn-sm" style="height: 32px; padding: 0 12px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 5px; border-radius: 6px;">
                         <i class="fa-solid fa-filter"></i> Apply
                     </button>
                     
                     <?php if (!empty($_GET['don_from']) || !empty($_GET['don_to']) || !empty($_GET['don_method']) || !empty($_GET['don_chapel']) || !empty($_GET['don_timeframe'])): ?>
-                    <a href="dashboard.php?section=donations&tab=ledger" class="btn btn-ghost btn-sm" style="height: 32px; padding: 0 8px; font-size: 11px; color: var(--text2); display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; border: 1px solid var(--border);">
+                    <a href="dashboard.php?section=donations&tab=ledger" class="btn btn-ghost btn-sm" style="height: 32px; padding: 0 10px; font-size: 11.5px; color: var(--text2); display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; border: 1px solid var(--border); text-decoration: none;">
                         <i class="fa-solid fa-xmark"></i> Clear Filters
                     </a>
                     <?php endif; ?>
                 </form>
-
-                <div style="display: flex; align-items: center; gap: 8px; flex: 1; max-width: 360px; min-width: 240px;">
-                    <!-- Universal Sort Toggle Button -->
-                    <button type="button" class="btn-sort-toggle" onclick="toggleDonationsSort(this)"
-                            title="Sorted: Newest First (Click to sort Oldest first)"
-                            style="height: 32px; width: 34px; min-width: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2, #FAFAFA); color: var(--text); cursor: pointer; transition: all 0.15s ease; flex-shrink: 0;" aria-label="Toggle sort order">
-                        <i class="fa-solid fa-arrow-down-wide-short" style="font-size: 13px;"></i>
-                    </button>
-
-                    <!-- Client-side Quick Search with Clear Button -->
-                    <div style="position: relative; flex: 1;">
-                        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text2, #71717A); font-size: 11px; pointer-events: none; z-index: 2;"></i>
-                        <input type="text" id="donations-search-input" placeholder="Search donor, ref ID, purpose..." oninput="filterDonationsLedger()" 
-                               style="width: 100%; height: 32px; padding-left: 32px !important; padding-right: 24px !important; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; outline: none; background: var(--bg2, #FFFFFF); color: var(--text);">
-                        <span id="donations-clear-search" onclick="clearDonationsSearch()" title="Clear search" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text2); font-size: 14px; line-height: 1;">&times;</span>
-                    </div>
-                </div>
             </div>
 
             <!-- Table Body -->
-            <div style="padding: 0; overflow-y: auto; overflow-x: auto; flex: 1; min-height: 0; width: 100%;">
+            <div id="donations-table-scroll">
                 <table class="data-table" id="donations-data-table" style="font-size: 12.5px; width: 100%; table-layout: fixed; border-collapse: collapse;">
                     <thead>
                         <tr>
-                            <th style="padding: 9px 12px; width: 100px; text-align: left;">Date Received</th>
-                            <th style="padding: 9px 12px; width: 150px; text-align: left;">Donor Name</th>
-                            <th style="padding: 9px 12px; width: 125px; text-align: left;">Reference ID</th>
-                            <th style="padding: 9px 12px; width: auto; text-align: left;">Purpose / Intention</th>
-                            <th style="padding: 9px 10px; width: 95px; text-align: center;">Method</th>
-                            <th style="padding: 9px 12px; width: 150px; text-align: left;">Jurisdiction</th>
-                            <th style="padding: 9px 12px; width: 100px; text-align: right;">Amount</th>
-                            <th style="padding: 9px 12px; width: 118px; text-align: center;">Actions</th>
+                            <th style="width: 12%; text-align: left;">Date</th>
+                            <th style="width: 23%; text-align: left;">Donor &amp; Reference</th>
+                            <th style="width: 30%; text-align: left;">Purpose &amp; Parish</th>
+                            <th style="width: 10%; text-align: center;">Method</th>
+                            <th style="width: 12%; text-align: right;">Amount</th>
+                            <th style="width: 13%; text-align: right;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($donations)): ?>
-                            <tr><td colspan="8" style="padding: 40px; text-align: center; color: var(--text2); font-size: 13px;">No donations recorded yet. Click <strong>Log Donation</strong> above to register a donation.</td></tr>
+                            <tr><td colspan="6" style="padding: 40px; text-align: center; color: var(--text2); font-size: 13px;">No donations recorded yet. Click <strong>Record Offering</strong> above to register a donation.</td></tr>
                         <?php else: ?>
                             <?php foreach ($donations as $don): ?>
                             <tr class="donation-row" 
@@ -302,45 +324,51 @@ $voidedCount = count($voided_donations ?? []);
                                 style="cursor: pointer; transition: background 0.15s;" 
                                 onclick="viewDonationDetails(this)">
                                 
-                                <td style="padding: 9px 12px; white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--text);">
+                                <td style="white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--text);">
                                     <?php echo date('M d, Y', strtotime($don['date_received'])); ?>
                                 </td>
-                                <td style="padding: 9px 12px;" title="<?php echo htmlspecialchars($don['donor_name'] ?: 'Anonymous Donor', ENT_QUOTES, 'UTF-8'); ?>">
-                                    <div style="font-weight: 700; font-size: 12.5px; color: var(--text); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <td title="<?php echo htmlspecialchars(($don['donor_name'] ?: 'Anonymous Donor') . ' ' . ($don['reference_id'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+                                    <div style="font-weight: 700; font-size: 13px; color: var(--text); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                         <?php echo htmlspecialchars($don['donor_name'] ?: 'Anonymous Donor'); ?>
                                     </div>
+                                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px; font-size: 11px; line-height: 1.3;">
+                                        <span style="font-family: var(--font-mono, monospace); color: var(--text2); font-weight: 600;">
+                                            <?php echo htmlspecialchars($don['reference_id'] ?: '—'); ?>
+                                        </span>
+                                        <?php if (!empty($don['donor_ref_id'])): ?>
+                                            <span style="color: var(--accent); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;" title="<?php echo htmlspecialchars($don['donor_ref_id'], ENT_QUOTES, 'UTF-8'); ?>">
+                                                &middot; <?php echo htmlspecialchars($don['donor_ref_id']); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
                                 </td>
-                                <td style="padding: 9px 12px;">
-                                    <span style="font-size: 11px; font-family: var(--font-mono, monospace); color: var(--text2); font-weight: 600;">
-                                        <?php echo htmlspecialchars($don['reference_id'] ?: '—'); ?>
-                                    </span>
-                                    <?php if (!empty($don['donor_ref_id'])): ?>
-                                        <div style="color: var(--accent); font-size: 10px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="<?php echo htmlspecialchars($don['donor_ref_id'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($don['donor_ref_id']); ?></div>
-                                    <?php endif; ?>
+                                <td title="<?php echo htmlspecialchars(($don['purpose'] ?: 'General Offering') . ' — ' . ($don['chapel_name'] ?? 'Cathedral'), ENT_QUOTES, 'UTF-8'); ?>">
+                                    <div style="color: var(--text); font-size: 12.5px; font-weight: 500; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;">
+                                        <?php echo htmlspecialchars($don['purpose'] ?: 'General Offering'); ?>
+                                    </div>
+                                    <div style="font-size: 11px; color: var(--text2); margin-top: 3px; display: flex; align-items: center; gap: 5px; overflow: hidden; white-space: nowrap;">
+                                        <i class="fa-solid fa-place-of-worship" style="color: var(--accent); font-size: 10px; flex-shrink: 0;"></i>
+                                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                            <?php echo htmlspecialchars($don['chapel_name'] ?? 'Cathedral'); ?>
+                                        </span>
+                                    </div>
                                 </td>
-                                <td style="padding: 9px 12px; color: var(--text2); font-size: 12px; line-height: 1.3;" title="<?php echo htmlspecialchars($don['purpose'] ?: 'General Offering', ENT_QUOTES, 'UTF-8'); ?>">
-                                    <?php echo htmlspecialchars($don['purpose'] ?: 'General Offering'); ?>
-                                </td>
-                                <td style="padding: 9px 10px; text-align: center;">
-                                    <span class="badge" style="background: #F4F4F5; color: #111111; border: 1px solid var(--border); font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 600;">
+                                <td style="text-align: center;">
+                                    <span class="badge" style="background: #F4F4F5; color: #111111; border: 1px solid var(--border); font-size: 10.5px; padding: 3px 8px; border-radius: 6px; font-weight: 600; white-space: nowrap; display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis;">
                                         <?php echo htmlspecialchars($don['payment_method'] ?? 'Cash'); ?>
                                     </span>
                                 </td>
-                                <td style="padding: 9px 12px; font-size: 12px; color: var(--text);" title="<?php echo htmlspecialchars($don['chapel_name'] ?? 'Cathedral', ENT_QUOTES, 'UTF-8'); ?>">
-                                    <i class="fa-solid fa-place-of-worship" style="color: var(--accent); font-size: 11px; margin-right: 4px;"></i>
-                                    <?php echo htmlspecialchars($don['chapel_name'] ?? 'Cathedral'); ?>
-                                </td>
-                                <td style="padding: 9px 12px; font-weight: 800; color: #111111; font-size: 13px; text-align: right; white-space: nowrap;">
+                                <td style="font-weight: 800; color: #111111; font-size: 13.5px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums;">
                                     ₱<?php echo number_format($don['amount'], 2); ?>
                                 </td>
-                                <td style="padding: 9px 12px; text-align: center; overflow: visible;" onclick="event.stopPropagation()">
-                                    <div style="display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex-wrap: nowrap;">
+                                <td style="text-align: right;" onclick="event.stopPropagation()">
+                                    <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: nowrap;">
                                         <a href="views/pages/donation_receipt.php?id=<?php echo $don['donation_id']; ?>" target="_blank"
                                            class="btn-sm btn-ghost" style="color: var(--accent); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; text-decoration: none; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;" title="Print Receipt">
                                             <i class="fa-solid fa-print"></i> Receipt
                                         </a>
                                         <?php if (in_array($role, ['Admin', 'Cathedral Admin'], true)): ?>
-                                        <button type="button" class="btn-sm btn-ghost" style="color: #ef4444; border: 1px solid rgba(239,68,68,0.25); border-radius: 6px; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;"
+                                        <button type="button" class="btn-sm btn-ghost" style="color: #ef4444; border: 1px solid rgba(239,68,68,0.25); border-radius: 6px; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;"
                                                 title="Void this financial record"
                                                 data-id="<?php echo (int)$don['donation_id']; ?>"
                                                 data-ref="<?php echo htmlspecialchars($don['reference_id'], ENT_QUOTES, 'UTF-8'); ?>"
@@ -353,19 +381,21 @@ $voidedCount = count($voided_donations ?? []);
                                 </td>
                             </tr>
                             <?php endforeach; ?>
-                            
-                            <!-- Current Page Summary Row -->
-                            <tr style="border-top: 2px solid var(--border); background: #FAFAFA;">
-                                <td colspan="6" style="text-align: right; font-weight: 700; font-size: 12px; color: var(--text2); padding: 10px 14px;">
-                                    Page Total:
-                                </td>
-                                <td style="text-align: right; font-weight: 800; font-size: 14px; color: #111111; padding: 10px 14px;">
-                                    ₱<?php echo number_format(array_sum(array_column($donations, 'amount')), 2); ?>
-                                </td>
-                                <td></td>
-                            </tr>
                         <?php endif; ?>
                     </tbody>
+                    <?php if (!empty($donations)): ?>
+                    <tfoot>
+                        <tr style="border-top: 2px solid var(--border); background: #FAFAFA;">
+                            <td colspan="4" style="text-align: right; font-weight: 700; font-size: 12px; color: var(--text2); padding: 11px 14px;">
+                                Page Total:
+                            </td>
+                            <td style="text-align: right; font-weight: 800; font-size: 14px; color: #111111; padding: 11px 14px; white-space: nowrap; font-variant-numeric: tabular-nums;">
+                                ₱<?php echo number_format(array_sum(array_column($donations, 'amount')), 2); ?>
+                            </td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                    <?php endif; ?>
                 </table>
             </div>
 

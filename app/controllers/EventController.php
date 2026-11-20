@@ -664,6 +664,30 @@ class EventController extends BaseController {
 
             AuditLogger::logFromSession($this->conn, 'rejected', 'Event Requests', "Rejected request ID: {$id}");
             $this->flash('success', 'Request rejected. ' . $this->formatEventNotificationSummary($event, $mailSent, $smsSent));
+        } elseif ($action === 'complete') {
+            if (!$this->eventModel->completeRequest($id)) {
+                $this->flash('error', 'Only Ready / Confirmed requests can be marked as completed or released.');
+                $this->redirect($redirectUrl);
+            }
+
+            $event = $this->eventModel->getById($id);
+            $isCertRecord = ((int)($event['service_id'] ?? 0) === 8) || stripos((string)($event['title'] ?? ''), 'Certificate') !== false;
+            if ($event) {
+                $reqUserId = (int)($event['requested_by'] ?? 0);
+                if ($reqUserId > 0) {
+                    require_once __DIR__ . '/../models/SystemNotification.php';
+                    $sysNotif = new SystemNotification($this->conn);
+                    $evTitle = $event['title'] ?: ($event['event_type'] ?: 'Request');
+                    $notifTitle = $isCertRecord ? "Certificate Released" : "Event Completed";
+                    $notifBody = $isCertRecord
+                        ? "Your certificate request \"{$evTitle}\" has been marked as released."
+                        : "Your scheduled event \"{$evTitle}\" has been marked as completed.";
+                    $sysNotif->create($reqUserId, $notifTitle, $notifBody, 'event_completed', (int)$id);
+                }
+            }
+
+            AuditLogger::logFromSession($this->conn, 'completed', $isCertRecord ? 'Certificates' : 'Event Requests', "Marked ID {$id} as Completed/Released");
+            $this->flash('success', $isCertRecord ? 'Certificate marked as released.' : 'Event marked as completed.');
         }
 
         $this->redirect($redirectUrl);

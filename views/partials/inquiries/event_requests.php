@@ -298,6 +298,10 @@ $tp = (int)($total_pages ?? 1);
                                 <span class="badge" style="background: rgba(22,163,74,0.1); color: #16a34a; border: 1px solid rgba(22,163,74,0.3); font-size: 11.5px; padding: 3px 8px; border-radius: 4px; font-weight: 600;">
                                     <i class="fa-solid fa-circle-check"></i> Approved
                                 </span>
+                            <?php elseif ($status === 'Completed'): ?>
+                                <span class="badge" style="background: rgba(59,130,246,0.1); color: #2563eb; border: 1px solid rgba(59,130,246,0.3); font-size: 11.5px; padding: 3px 8px; border-radius: 4px; font-weight: 600;">
+                                    <i class="fa-solid fa-flag-checkered"></i> Completed
+                                </span>
                             <?php elseif ($status === 'Rejected' || $status === 'Cancelled'): ?>
                                 <span class="badge" style="background: rgba(220,38,38,0.1); color: #dc2626; border: 1px solid rgba(220,38,38,0.3); font-size: 11.5px; padding: 3px 8px; border-radius: 4px; font-weight: 600;">
                                     <i class="fa-solid fa-circle-xmark"></i> <?php echo htmlspecialchars($status); ?>
@@ -352,6 +356,14 @@ $tp = (int)($total_pages ?? 1);
                                             style="width: 100%; border: none; background: transparent; padding: 7px 10px; font-size: 12px; font-weight: 600; color: #16a34a; cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 5px; text-align: left; transition: background 0.15s ease;">
                                         <i class="fa-solid fa-circle-check" style="font-size: 13px;"></i>
                                         <span>Check / Approve</span>
+                                    </button>
+                                    <?php endif; ?>
+                                    <?php if ($status === 'Confirmed'): ?>
+                                    <button type="button" class="req-popover-item"
+                                            onclick="closeAllReqActionBoxes(); completeEventRequestRow(<?php echo (int)$req['event_id']; ?>, <?php echo htmlspecialchars(json_encode($req['title'] ?? 'this event'), ENT_QUOTES, 'UTF-8'); ?>);"
+                                            style="width: 100%; border: none; background: transparent; padding: 7px 10px; font-size: 12px; font-weight: 600; color: #2563eb; cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 5px; text-align: left; transition: background 0.15s ease;">
+                                        <i class="fa-solid fa-flag-checkered" style="font-size: 13px;"></i>
+                                        <span>Mark Completed</span>
                                     </button>
                                     <?php endif; ?>
                                     <?php if ($canEditReq): ?>
@@ -446,6 +458,14 @@ $tp = (int)($total_pages ?? 1);
     <input type="hidden" name="event_id" id="ev-req-delete-id">
 </form>
 
+<form id="ev-req-complete-form" method="POST" action="dashboard.php?section=event_requests" style="display: none;">
+    <input type="hidden" name="form_section" value="review_request">
+    <input type="hidden" name="redirect_section" value="event_requests">
+    <input type="hidden" name="action" value="complete">
+    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+    <input type="hidden" name="id" id="ev-req-complete-id">
+</form>
+
 <script>
 function viewRequestDetailsFromRow(tr) {
     const dataAttr = tr.getAttribute('data-req');
@@ -491,6 +511,16 @@ function deleteEventRequestRow(id, title) {
     if (!confirm('Delete request "' + (title || '#' + id) + '" permanently?')) return;
     const inp = document.getElementById('ev-req-delete-id');
     const frm = document.getElementById('ev-req-delete-form');
+    if (inp && frm) {
+        inp.value = id;
+        frm.submit();
+    }
+}
+function completeEventRequestRow(id, title) {
+    if (!id) return;
+    if (!confirm('Mark "' + (title || '#' + id) + '" as completed?')) return;
+    const inp = document.getElementById('ev-req-complete-id');
+    const frm = document.getElementById('ev-req-complete-form');
     if (inp && frm) {
         inp.value = id;
         frm.submit();

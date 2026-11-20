@@ -61,8 +61,9 @@ if ($isGuest && $initialCertTab === 'apply') {
 }
 $certCounts       = $cert_counts ?? [];
 $totalCertCount   = $certCounts['total'] ?? count($cert_requests);
-$pendingCertCount = $certCounts['pending'] ?? count(array_filter($cert_requests, fn($r) => ($r['status'] ?? '') === 'Pending'));
-$readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_requests, fn($r) => ($r['status'] ?? '') === 'Confirmed'));
+$pendingCertCount  = $certCounts['pending'] ?? count(array_filter($cert_requests, fn($r) => ($r['status'] ?? '') === 'Pending'));
+$readyCertCount    = $certCounts['confirmed'] ?? count(array_filter($cert_requests, fn($r) => ($r['status'] ?? '') === 'Confirmed'));
+$releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] ?? '') === 'Completed'));
 ?>
 
 <link rel="stylesheet" href="assets/css/workspace.css?v=2.5">
@@ -289,6 +290,9 @@ $readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_request
                         <button type="button" class="cert-status-filter" onclick="filterCertStatus('recent', this)" style="border: 1px solid transparent; background: transparent; color: var(--text2); font-size: 11.5px; font-weight: 600; padding: 4px 12px; border-radius: 999px; cursor: pointer; transition: all 0.15s ease;" title="Applications submitted in the last 30 days">Recently Added</button>
                         <button type="button" class="cert-status-filter" onclick="filterCertStatus('pending', this)" style="border: 1px solid transparent; background: transparent; color: var(--text2); font-size: 11.5px; font-weight: 600; padding: 4px 12px; border-radius: 999px; cursor: pointer; transition: all 0.15s ease;">Pending (<?php echo $pendingCertCount; ?>)</button>
                         <button type="button" class="cert-status-filter" onclick="filterCertStatus('ready', this)" style="border: 1px solid transparent; background: transparent; color: var(--text2); font-size: 11.5px; font-weight: 600; padding: 4px 12px; border-radius: 999px; cursor: pointer; transition: all 0.15s ease;">Ready (<?php echo $readyCertCount; ?>)</button>
+                        <?php if ($releasedCertCount > 0): ?>
+                        <button type="button" class="cert-status-filter" onclick="filterCertStatus('completed', this)" style="border: 1px solid transparent; background: transparent; color: var(--text2); font-size: 11.5px; font-weight: 600; padding: 4px 12px; border-radius: 999px; cursor: pointer; transition: all 0.15s ease;">Released (<?php echo $releasedCertCount; ?>)</button>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Universal Sort Toggle Button -->
@@ -358,6 +362,7 @@ $readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_request
                             <?php foreach ($cert_requests as $req):
                                 $st = $req['status'];
                                 $isConfirmed = ($st === 'Confirmed');
+                                $isCompleted = ($st === 'Completed');
                                 $isCancelled = in_array($st, ['Cancelled', 'Rejected']);
                                 $fee = (float)($req['total_fee'] ?? 200.00);
                                 $pickupTime = !empty($req['start_time']) ? date('M d, Y', strtotime($req['start_time'])) : 'Pending';
@@ -409,7 +414,11 @@ $readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_request
                                 </td>
 
                                 <td style="padding: 10px 12px; text-align: center; white-space: nowrap;">
-                                    <?php if ($isConfirmed): ?>
+                                    <?php if ($isCompleted): ?>
+                                        <span class="badge" style="background: rgba(59,130,246,0.12); color: #2563eb; border: 1px solid rgba(59,130,246,0.3); font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px;">
+                                            Released
+                                        </span>
+                                    <?php elseif ($isConfirmed): ?>
                                         <span class="badge" style="background: rgba(46,158,91,0.12); color: #2E9E5B; border: 1px solid rgba(46,158,91,0.3); font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px;">
                                             Ready
                                         </span>
@@ -443,6 +452,20 @@ $readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_request
                                             <?php if ($isAdmin && $st === 'Pending'): ?>
                                             <a class="dropdown-item" href="javascript:void(0)" data-id="<?php echo (int)$req['event_id']; ?>" onclick="approveCertRequest(this)" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: #16a34a; border-radius: 4px;">
                                                 <i class="fa-solid fa-circle-check"></i> Mark as Ready
+                                            </a>
+                                            <?php endif; ?>
+                                            <?php if ($isAdmin && $st === 'Confirmed'): ?>
+                                            <a class="dropdown-item" href="javascript:void(0)" data-id="<?php echo (int)$req['event_id']; ?>" onclick="completeCertRequest(this)" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: #2563eb; border-radius: 4px;">
+                                                <i class="fa-solid fa-box-open"></i> Mark as Released
+                                            </a>
+                                            <?php endif; ?>
+                                            <?php if ($isAdmin):
+                                                $searchPerson = preg_replace('/^[^:]+:\s*/', '', (string)$pTitle);
+                                                $searchPerson = trim(preg_replace('/\s*-\s*.*$/', '', $searchPerson));
+                                                $searchPerson = trim(preg_replace('/\s*\(\d{4}\)$/', '', $searchPerson));
+                                            ?>
+                                            <a class="dropdown-item" href="dashboard.php?section=records_cathedral&amp;search=<?php echo urlencode($searchPerson); ?>" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); border-radius: 4px;">
+                                                <i class="fa-solid fa-folder-open" style="color: var(--accent);"></i> Find in Records
                                             </a>
                                             <?php endif; ?>
                                             <?php if ($canChatApplicant): ?>
@@ -859,6 +882,14 @@ $readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_request
     <input type="hidden" name="id" id="cert-approve-id-input">
 </form>
 
+<form id="cert-complete-form" method="POST" action="dashboard.php?section=request_certificate" style="display: none;">
+    <input type="hidden" name="form_section" value="review_request">
+    <input type="hidden" name="redirect_section" value="request_certificate">
+    <input type="hidden" name="action" value="complete">
+    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+    <input type="hidden" name="id" id="cert-complete-id-input">
+</form>
+
 <script>
 let certSelectedPrice = <?php echo (float)($certVariants[0]['price'] ?? 200.00); ?>;
 let certSelectedName = '<?php echo addslashes($certVariants[0]['name'] ?? 'Baptismal Certificate'); ?>';
@@ -1148,7 +1179,19 @@ function openCertApplicantChat(userId) {
     }
 }
 
+function completeCertRequest(el) {
+    const id = el ? el.getAttribute('data-id') : '';
+    if (!id) return;
+    const input = document.getElementById('cert-complete-id-input');
+    const form = document.getElementById('cert-complete-form');
+    if (input && form) {
+        input.value = id;
+        form.submit();
+    }
+}
+
 window.approveCertRequest = approveCertRequest;
+window.completeCertRequest = completeCertRequest;
 window.openCertApplicantChat = openCertApplicantChat;
 window.cancelCertRequest = cancelCertRequest;
 window.closeCertCancelModal = closeCertCancelModal;
@@ -1294,6 +1337,7 @@ function filterCertLedger() {
         const matchesStatus = (_certCurrentStatusFilter === 'all') || 
                               (_certCurrentStatusFilter === 'pending' && status === 'pending') ||
                               (_certCurrentStatusFilter === 'ready' && status === 'confirmed') ||
+                              (_certCurrentStatusFilter === 'completed' && status === 'completed') ||
                               (_certCurrentStatusFilter === 'recent' && (created >= thirtyDaysAgo || created === 0));
 
         row.style.display = (matchesTerm && matchesStatus) ? '' : 'none';

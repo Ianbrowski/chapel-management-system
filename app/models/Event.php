@@ -75,8 +75,31 @@ class Event
     // CORE CRUD
     // ──────────────────────────────────────────────────────────────────────────
 
+    private function normalizeEventTypeEnum(string $eventType): string
+    {
+        $lower = strtolower(trim($eventType));
+        if (strpos($lower, 'wedding') !== false || strpos($lower, 'matrimony') !== false) {
+            return 'Wedding';
+        }
+        if (strpos($lower, 'baptis') !== false || strpos($lower, 'christening') !== false) {
+            return 'Baptism';
+        }
+        if (strpos($lower, 'funeral') !== false || strpos($lower, 'burial') !== false) {
+            return 'Funeral';
+        }
+        if (strpos($lower, 'mass') !== false || strpos($lower, 'requiem') !== false || strpos($lower, 'thanksgiving') !== false) {
+            return 'Mass';
+        }
+        return 'Other';
+    }
+
     public function create($title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $customDuration = null, $phone = null, $email = null, $requestedBy = null)
     {
+        $title = mb_substr(trim((string)$title), 0, 100);
+        $eventType = $this->normalizeEventTypeEnum((string)$eventType);
+        $scope = mb_substr(trim((string)$scope), 0, 20);
+        $phone = $phone !== null ? mb_substr(trim((string)$phone), 0, 30) : null;
+        $email = $email !== null ? mb_substr(trim((string)$email), 0, 150) : null;
         $cd = ($customDuration !== null && (int)$customDuration > 0) ? (int)$customDuration : null;
         $chapelId = ($chapelId && (int)$chapelId > 0) ? (int)$chapelId : null;
         $pastorId = ($pastorId !== null && (int)$pastorId > 0) ? (int)$pastorId : null;
@@ -121,6 +144,11 @@ class Event
             $approved_sql = ", approved_at=NOW()";
         }
 
+        $title = mb_substr(trim((string)$title), 0, 100);
+        $eventType = $this->normalizeEventTypeEnum((string)$eventType);
+        $scope = mb_substr(trim((string)$scope), 0, 20);
+        $phone = $phone !== null ? mb_substr(trim((string)$phone), 0, 30) : null;
+        $email = $email !== null ? mb_substr(trim((string)$email), 0, 150) : null;
         $cd = ($customDuration !== null && (int)$customDuration > 0) ? (int)$customDuration : null;
         $chapelId = ($chapelId && (int)$chapelId > 0) ? (int)$chapelId : null;
         $pastorId = ($pastorId !== null && (int)$pastorId > 0) ? (int)$pastorId : null;
@@ -199,6 +227,11 @@ class Event
 
     public function requestEvent($title, $eventType, $startTime, $chapelId, $scope, $reqBy, $requesterEmail = null, $status = 'Pending', $pastorId = null, $customDuration = null, $requesterPhone = null, $serviceId = null, $variantId = null, $serviceFee = 0.00, $addonsFee = 0.00, $totalFee = 0.00, $locationType = 'Church')
     {
+        $title = mb_substr(trim((string)$title), 0, 100);
+        $eventType = $this->normalizeEventTypeEnum((string)$eventType);
+        $scope = mb_substr(trim((string)$scope), 0, 20);
+        $requesterPhone = $requesterPhone !== null ? mb_substr(trim((string)$requesterPhone), 0, 30) : null;
+        $requesterEmail = $requesterEmail !== null ? mb_substr(trim((string)$requesterEmail), 0, 150) : null;
         $cd = ($customDuration !== null && (int)$customDuration > 0) ? (int)$customDuration : null;
         $chapelId = ($chapelId && (int)$chapelId > 0) ? (int)$chapelId : null;
         $pastorId = ($pastorId !== null && (int)$pastorId > 0) ? (int)$pastorId : null;
@@ -274,6 +307,7 @@ class Event
 
     public function rejectRequest($id, $note)
     {
+        $note = mb_substr(trim((string)$note), 0, 255);
         $s = $this->conn->prepare("UPDATE events SET status='Cancelled', rejection_note=?, approved_at=NOW() WHERE event_id=? AND status='Pending'");
         if (!$s) {
             return false;
@@ -282,6 +316,19 @@ class Event
         $res = $s->execute();
         $s->close();
         return $res;
+    }
+
+    public function completeRequest(int $id): bool
+    {
+        $s = $this->conn->prepare("UPDATE events SET status='Completed' WHERE event_id=? AND status='Confirmed'");
+        if (!$s) {
+            return false;
+        }
+        $s->bind_param('i', $id);
+        $res = $s->execute();
+        $affected = $s->affected_rows;
+        $s->close();
+        return ($res && $affected > 0);
     }
 
     // ──────────────────────────────────────────────────────────────────────────

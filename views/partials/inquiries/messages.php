@@ -165,8 +165,8 @@
                                 <tr>
                                     <th style="width: 40px; text-align: center;">#</th>
                                     <th style="width: auto;">Parishioner &amp; Request</th>
-                                    <th style="width: 120px;">Target Date</th>
-                                    <th style="width: 100px; text-align: center;">Status</th>
+                                    <th style="width: 110px;">Target Date</th>
+                                    <th style="width: 118px; text-align: center;">Status</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -316,6 +316,7 @@
     min-height: 0;
 }
 .inbox-split-panel .panel {
+    padding: 0 !important;
     margin-bottom: 0 !important;
 }
 .inbox-search-panel .panel-body {

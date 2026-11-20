@@ -564,12 +564,16 @@ class EventController extends BaseController {
 
         if ($action === 'approve') {
             $this->conn->begin_transaction();
-            // Optional: Re-check conflict before final approval to be absolutely safe
-            $conflict = $this->eventModel->checkConflict($record['start_time'], $pastor, $record['chapel_id'], $record['event_type'], $id, $record['custom_duration']);
-            if ($conflict['conflict']) {
-                $this->conn->rollback();
-                $this->flash('error', "Schedule conflict detected during approval ({$conflict['type']}): {$conflict['details']}.");
-                $this->redirect($redirectUrl);
+            // Optional: Re-check conflict before final approval (skip for office-only Certificates)
+            $recType = (string)($record['event_type'] ?? '');
+            $isCertRecord = ($recType === 'Ecclesiastical Certificates' || stripos($recType, 'Certificate') !== false);
+            if (!$isCertRecord) {
+                $conflict = $this->eventModel->checkConflict($record['start_time'], $pastor, $record['chapel_id'], $recType, $id, $record['custom_duration']);
+                if ($conflict['conflict']) {
+                    $this->conn->rollback();
+                    $this->flash('error', "Schedule conflict detected during approval ({$conflict['type']}): {$conflict['details']}.");
+                    $this->redirect($redirectUrl);
+                }
             }
 
             if (!$this->eventModel->approveRequest($id, $pastor)) {

@@ -23,15 +23,65 @@ $certTypes = $certificate_types ?? [];
                 <p class="page-subtitle" style="font-size: var(--font-page-subtitle, 14px); color: var(--text2); margin: 3px 0 0 0;">Parish liturgical rites, sacrament tiers, and service requirements</p>
             </div>
         </div>
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <a href="dashboard.php?section=event_requests" class="btn btn-ghost btn-sm" style="font-size: 11.5px; background: var(--surface); border: 1px solid var(--line); color: var(--ink); border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-calendar-check text-gold"></i> Event Requests
+            </a>
+            <a href="dashboard.php?section=request_certificate" class="btn btn-ghost btn-sm" style="font-size: 11.5px; background: var(--surface); border: 1px solid var(--line); color: var(--ink); border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-certificate text-gold"></i> Certificate Requests
+            </a>
             <button class="btn btn-ghost btn-sm" onclick="window.location.reload();" title="Refresh Catalog" style="font-size: 11.5px; background: var(--surface); border: 1px solid var(--line); color: var(--ink); border-radius: 8px;">
                 <i class="fa-solid fa-arrows-rotate"></i> Refresh
             </button>
         </div>
     </div>
 
+    <!-- ─── TOP SERVICE CATEGORY ICON TABS ─── -->
+    <?php
+        $totalServiceCount = count($certTypes);
+        foreach ($catalog as $c) {
+            if (($c['code'] ?? '') === 'certificates') continue;
+            $totalServiceCount += count($c['services'] ?? []);
+        }
+        $catIcons = [
+            'sacraments'   => 'fa-dove',
+            'liturgical'   => 'fa-church',
+            'blessings'    => 'fa-hands-praying',
+            'certificates' => 'fa-file-shield',
+        ];
+    ?>
+    <div id="admin-service-top-tabs" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <button type="button" class="srv-top-tab active" data-cat="all" onclick="filterAdminServiceCategory('all', this)"
+                style="display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 999px; border: 1px solid #111111; background: #111111; color: #FFFFFF; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
+            <i class="fa-solid fa-layer-group"></i>
+            <span>All Services</span>
+            <span style="font-size: 10.5px; opacity: 0.85; background: rgba(255,255,255,0.18); padding: 1px 7px; border-radius: 999px;"><?= (int)$totalServiceCount ?></span>
+        </button>
+
+        <?php foreach ($catalog as $cat):
+            $code = (string)($cat['code'] ?? '');
+            if ($code === 'certificates') continue;
+            $icon = $catIcons[strtolower($code)] ?? 'fa-church';
+            $cnt = count($cat['services'] ?? []);
+        ?>
+        <button type="button" class="srv-top-tab" data-cat="<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>" onclick="filterAdminServiceCategory('<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>', this)"
+                style="display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
+            <i class="fa-solid <?= $icon ?>" style="color: var(--accent);"></i>
+            <span><?= htmlspecialchars($cat['name']) ?></span>
+            <span style="font-size: 10.5px; color: var(--text2); background: var(--bg3, #F4F4F5); padding: 1px 7px; border-radius: 999px;"><?= (int)$cnt ?></span>
+        </button>
+        <?php endforeach; ?>
+
+        <button type="button" class="srv-top-tab" data-cat="certificates" onclick="filterAdminServiceCategory('certificates', this)"
+                style="display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
+            <i class="fa-solid fa-stamp" style="color: var(--accent);"></i>
+            <span>Certificates</span>
+            <span style="font-size: 10.5px; color: var(--text2); background: var(--bg3, #F4F4F5); padding: 1px 7px; border-radius: 999px;"><?= count($certTypes) ?></span>
+        </button>
+    </div>
+
     <!-- ─── CERTIFICATES MANAGEMENT STRIP ─── -->
-    <div class="ent-card" style="border: 1px solid var(--border); border-radius: 12px; background: var(--panel-bg); overflow: hidden; flex-shrink: 0; box-shadow: none;">
+    <div class="ent-card srv-category-section" data-cat="certificates" style="border: 1px solid var(--border); border-radius: 12px; background: var(--panel-bg); overflow: hidden; flex-shrink: 0; box-shadow: none;">
         <div class="ent-card-header" style="padding: 12px 16px; background: var(--panel-header-bg); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
             <div style="font-family: var(--font-family, 'Inter', sans-serif); font-size: 0.95rem; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px;">
                 <i class="fa-solid fa-stamp" style="color: var(--accent);"></i> Ecclesiastical Certificate Rates
@@ -63,7 +113,7 @@ $certTypes = $certificate_types ?? [];
     <!-- ─── CATEGORY & SERVICE ACCORDIONS ─── -->
     <?php foreach ($catalog as $cat): ?>
         <?php if ($cat['code'] === 'certificates') continue; ?>
-        <div style="margin-top: 8px;">
+        <div class="srv-category-section" data-cat="<?= htmlspecialchars((string)$cat['code'], ENT_QUOTES, 'UTF-8') ?>" style="margin-top: 8px;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <div style="font-family: var(--font-family, 'Inter', sans-serif); font-size: 1rem; font-weight: 600; color: var(--text);">
                     <?= htmlspecialchars($cat['name']) ?>
@@ -621,6 +671,22 @@ function openServiceMetaModal(idOrEl, name, desc, ref, eff, isRef) {
     openModal('modal-service-meta');
 }
 
+function filterAdminServiceCategory(cat, btn) {
+    document.querySelectorAll('#admin-service-top-tabs .srv-top-tab').forEach(t => {
+        const isTarget = (t === btn);
+        t.classList.toggle('active', isTarget);
+        t.style.background = isTarget ? '#111111' : 'var(--surface)';
+        t.style.color = isTarget ? '#FFFFFF' : 'var(--text)';
+        t.style.borderColor = isTarget ? '#111111' : 'var(--border)';
+        const icon = t.querySelector('i');
+        if (icon) icon.style.color = isTarget ? '#FFFFFF' : (t.dataset.cat === 'all' ? '#FFFFFF' : 'var(--accent)');
+    });
+    document.querySelectorAll('.srv-category-section').forEach(sec => {
+        const secCat = sec.getAttribute('data-cat') || '';
+        sec.style.display = (cat === 'all' || secCat === cat) ? '' : 'none';
+    });
+}
+window.filterAdminServiceCategory = filterAdminServiceCategory;
 window.openEditPriceModal = openEditPriceModal;
 window.openCertRateModal = openCertRateModal;
 window.openAddVariantModal = openAddVariantModal;

@@ -288,6 +288,7 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
                     <div class="cert-status-group" style="display: inline-flex; align-items: center; background: var(--bg3, #F4F4F5); padding: 3px; border-radius: 999px; border: 1px solid var(--border); gap: 2px;">
                         <button type="button" class="cert-status-filter active" onclick="filterCertStatus('all', this)" style="border: 1px solid transparent; background: #111111; color: #FFFFFF; font-size: 11.5px; font-weight: 600; padding: 4px 12px; border-radius: 999px; cursor: pointer; transition: all 0.15s ease;">All (<?php echo $totalCertCount; ?>)</button>
                         <button type="button" class="cert-status-filter" onclick="filterCertStatus('recent', this)" style="border: 1px solid transparent; background: transparent; color: var(--text2); font-size: 11.5px; font-weight: 600; padding: 4px 12px; border-radius: 999px; cursor: pointer; transition: all 0.15s ease;" title="Applications submitted in the last 30 days">Recently Added</button>
+                        <button type="button" class="cert-status-filter" onclick="filterCertStatus('modified', this)" style="border: 1px solid transparent; background: transparent; color: var(--text2); font-size: 11.5px; font-weight: 600; padding: 4px 12px; border-radius: 999px; cursor: pointer; transition: all 0.15s ease;" title="Applications updated in the last 30 days">Recently Modified</button>
                         <button type="button" class="cert-status-filter" onclick="filterCertStatus('pending', this)" style="border: 1px solid transparent; background: transparent; color: var(--text2); font-size: 11.5px; font-weight: 600; padding: 4px 12px; border-radius: 999px; cursor: pointer; transition: all 0.15s ease;">Pending (<?php echo $pendingCertCount; ?>)</button>
                         <button type="button" class="cert-status-filter" onclick="filterCertStatus('ready', this)" style="border: 1px solid transparent; background: transparent; color: var(--text2); font-size: 11.5px; font-weight: 600; padding: 4px 12px; border-radius: 999px; cursor: pointer; transition: all 0.15s ease;">Ready (<?php echo $readyCertCount; ?>)</button>
                         <?php if ($releasedCertCount > 0): ?>
@@ -375,6 +376,7 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
                                 data-title="<?php echo strtolower(htmlspecialchars($pTitle)); ?>"
                                 data-id="<?php echo $req['event_id']; ?>"
                                 data-created="<?php echo !empty($req['created_at']) ? strtotime($req['created_at']) : 0; ?>"
+                                data-updated="<?php echo !empty($req['updated_at']) ? strtotime($req['updated_at']) : (!empty($req['created_at']) ? strtotime($req['created_at']) : 0); ?>"
                                 onclick="viewCertDetailsFromRow(this)" 
                                 data-req="<?php echo htmlspecialchars(json_encode($req), ENT_QUOTES, 'UTF-8'); ?>"
                                 style="cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s ease;">
@@ -1430,24 +1432,27 @@ function filterCertLedger() {
         const status = row.dataset.status || '';
         const id = row.dataset.id || '';
         const created = parseInt(row.dataset.created || '0', 10);
+        const updated = parseInt(row.dataset.updated || '0', 10);
 
         const matchesTerm = !term || title.includes(term) || id.includes(term);
         const matchesStatus = (_certCurrentStatusFilter === 'all') || 
                               (_certCurrentStatusFilter === 'pending' && status === 'pending') ||
                               (_certCurrentStatusFilter === 'ready' && status === 'confirmed') ||
                               (_certCurrentStatusFilter === 'completed' && status === 'completed') ||
-                              (_certCurrentStatusFilter === 'recent' && (created >= thirtyDaysAgo || created === 0));
+                              (_certCurrentStatusFilter === 'recent' && (created >= thirtyDaysAgo || created === 0)) ||
+                              (_certCurrentStatusFilter === 'modified' && (updated >= thirtyDaysAgo || updated === 0));
 
         row.style.display = (matchesTerm && matchesStatus) ? '' : 'none';
     });
 
-    if (_certCurrentStatusFilter === 'recent') {
+    if (_certCurrentStatusFilter === 'recent' || _certCurrentStatusFilter === 'modified') {
         const tbody = document.querySelector('#cert-requests-table tbody');
         if (tbody) {
             const rowArr = Array.from(tbody.querySelectorAll('.cert-table-row'));
+            const key = (_certCurrentStatusFilter === 'modified') ? 'updated' : 'created';
             rowArr.sort((a, b) => {
-                const cA = parseInt(a.dataset.created || a.dataset.id || '0', 10);
-                const cB = parseInt(b.dataset.created || b.dataset.id || '0', 10);
+                const cA = parseInt(a.dataset[key] || a.dataset.id || '0', 10);
+                const cB = parseInt(b.dataset[key] || b.dataset.id || '0', 10);
                 return cB - cA; // Newest first
             });
             rowArr.forEach(r => tbody.appendChild(r));

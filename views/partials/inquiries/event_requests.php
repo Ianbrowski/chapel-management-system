@@ -178,6 +178,7 @@ $tp = (int)($total_pages ?? 1);
                     <option value="">All Request Dates</option>
                     <option value="recently_added" <?php echo ($curTimeframe === 'recently_added') ? 'selected' : ''; ?>>Recently Added (30 Days)</option>
                     <option value="recently_added_7" <?php echo ($curTimeframe === 'recently_added_7') ? 'selected' : ''; ?>>Recently Added (7 Days)</option>
+                    <option value="recently_modified" <?php echo ($curTimeframe === 'recently_modified') ? 'selected' : ''; ?>>Recently Modified (30 Days)</option>
                 </select>
 
                 <!-- Sort Dropdown (Event Date & Recently Submitted) -->
@@ -185,6 +186,7 @@ $tp = (int)($total_pages ?? 1);
                     <option value="date_asc" <?php echo ($curSort === 'date_asc') ? 'selected' : ''; ?>>Event Date (Soonest)</option>
                     <option value="date_desc" <?php echo ($curSort === 'date_desc') ? 'selected' : ''; ?>>Event Date (Latest)</option>
                     <option value="recently_added" <?php echo ($curSort === 'recently_added' || $curSort === 'created_desc') ? 'selected' : ''; ?>>Recently Submitted</option>
+                    <option value="modified_desc" <?php echo ($curSort === 'modified_desc') ? 'selected' : ''; ?>>Recently Modified</option>
                 </select>
 
                 <!-- Search Input with Clear '×' Button -->

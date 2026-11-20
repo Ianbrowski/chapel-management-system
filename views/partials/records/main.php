@@ -340,6 +340,7 @@ $isAllActive = empty($curType);
                             <option value="">All Dates</option>
                             <option value="recently_added" <?php echo ($curTimeframe === 'recently_added') ? 'selected' : ''; ?>>Recently Added (30 Days)</option>
                             <option value="recently_added_7" <?php echo ($curTimeframe === 'recently_added_7') ? 'selected' : ''; ?>>Recently Added (7 Days)</option>
+                            <option value="recently_modified" <?php echo ($curTimeframe === 'recently_modified') ? 'selected' : ''; ?>>Recently Modified (30 Days)</option>
                             <option value="this_week" <?php echo ($curTimeframe === 'this_week') ? 'selected' : ''; ?>>This Week</option>
                             <option value="next_week" <?php echo ($curTimeframe === 'next_week') ? 'selected' : ''; ?>>Next Week</option>
                             <option value="this_month" <?php echo ($curTimeframe === 'this_month') ? 'selected' : ''; ?>>This Month</option>

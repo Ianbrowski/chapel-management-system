@@ -100,6 +100,12 @@ class SacramentalRecord
                 case 'recently_added_7':
                     $where[] = 'sr.date_added >= DATE_SUB(NOW(), INTERVAL 7 DAY)';
                     break;
+                case 'recently_modified':
+                    $where[] = 'sr.updated_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+                    break;
+                case 'recently_modified_7':
+                    $where[] = 'sr.updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)';
+                    break;
                 case 'this_week':
                     $where[] = 'sr.event_date >= ? AND sr.event_date <= ?';
                     $params[] = date('Y-m-d', strtotime('monday this week'));

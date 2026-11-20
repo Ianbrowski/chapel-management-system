@@ -602,12 +602,16 @@ class Event
             $types .= "sssss";
         }
 
-        // Timeframe filter (Recently added / submitted)
+        // Timeframe filter (Recently added / modified)
         if (!empty($filters['timeframe'])) {
             if ($filters['timeframe'] === 'recently_added' || $filters['timeframe'] === 'recently_added_30') {
                 $where .= " AND e.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
             } elseif ($filters['timeframe'] === 'recently_added_7') {
                 $where .= " AND e.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+            } elseif ($filters['timeframe'] === 'recently_modified' || $filters['timeframe'] === 'recently_modified_30') {
+                $where .= " AND e.updated_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+            } elseif ($filters['timeframe'] === 'recently_modified_7') {
+                $where .= " AND e.updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
             }
         }
 
@@ -633,6 +637,8 @@ class Event
         if (!empty($filters['sort'])) {
             if ($filters['sort'] === 'date_desc') {
                 $sortOrder = "e.start_time DESC";
+            } elseif ($filters['sort'] === 'modified_desc' || $filters['sort'] === 'recently_modified') {
+                $sortOrder = "e.updated_at DESC";
             } elseif ($filters['sort'] === 'recently_added' || $filters['sort'] === 'created_desc') {
                 $sortOrder = "e.created_at DESC";
             }
@@ -1322,6 +1328,12 @@ class Event
                     break;
                 case 'recently_added_7':
                     $where[] = 'e.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)';
+                    break;
+                case 'recently_modified':
+                    $where[] = 'e.updated_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+                    break;
+                case 'recently_modified_7':
+                    $where[] = 'e.updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)';
                     break;
                 case 'this_week':
                     $where[] = 'e.start_time >= ? AND e.start_time <= ?';

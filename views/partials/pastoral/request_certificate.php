@@ -303,12 +303,16 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
                         <i class="fa-solid fa-arrow-down-wide-short" style="font-size: 12px;"></i>
                     </button>
 
-                    <div style="position: relative; width: 230px;">
-                        <input type="text" id="cert-search-input" maxlength="60" placeholder="Search applicant, ref, purpose..." 
-                               onkeyup="filterCertLedger()"
+                    <div id="cert-search-wrap" style="position: relative; width: 250px;">
+                        <input type="text" id="cert-search-input" maxlength="60" autocomplete="off"
+                               placeholder="Search applicant, ref, purpose..." 
+                               oninput="handleCertSearchInput()"
+                               onfocus="showCertSearchSuggestions()"
+                               onkeydown="handleCertSuggestionKeydown(event, 'cert-search-suggestions')"
                                style="padding-left: 32px !important; padding-right: 24px !important; font-size: 12.5px; width: 100%; height: 34px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg2); color: var(--text); box-sizing: border-box; outline: none; transition: border-color 0.15s ease;">
                         <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 11.5px; color: var(--text2); pointer-events: none; z-index: 2;"></i>
-                        <span id="cert-clear-search" onclick="clearCertSearch()" title="Clear search" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text2); font-size: 14px; line-height: 1;">&times;</span>
+                        <span id="cert-clear-search" onclick="clearCertSearch()" title="Clear search" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text2); font-size: 14px; line-height: 1; z-index: 2;">&times;</span>
+                        <div id="cert-search-suggestions" role="listbox" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; width: 320px; max-width: 85vw; max-height: 290px; overflow-y: auto; background: #FFFFFF; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); z-index: 60;"></div>
                     </div>
                 </div>
             </div>
@@ -683,12 +687,24 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
                         </div>
 
                         <div style="display: grid; grid-template-columns: 2.5fr 1fr; gap: 14px; margin-bottom: 14px;">
-                            <div>
+                            <div id="cert-record-search-wrap" style="position: relative;">
                                 <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text2); display: block; margin-bottom: 4px;">
                                     Person's Name on Record <span style="color:#ef4444;">*</span>
+                                    <?php if ($isAdmin): ?>
+                                    <span style="font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--text2); margin-left: 4px;">(Type to match archives)</span>
+                                    <?php endif; ?>
                                 </label>
-                                <input type="text" id="cert-person-name" name="cert_person_name" required maxlength="80" placeholder="e.g. Juan dela Cruz (Full name as recorded in archives)" oninput="this.value = this.value.replace(/[^a-zA-ZñÑ\s\.\-']/g, ''); syncCertDynamicTitle()" 
+                                <input type="text" id="cert-person-name" name="cert_person_name" required maxlength="80" autocomplete="off"
+                                       placeholder="e.g. Juan dela Cruz (Full name as recorded in archives)" 
+                                       oninput="this.value = this.value.replace(/[^a-zA-ZñÑ\s\.\-']/g, ''); syncCertDynamicTitle();<?php echo $isAdmin ? ' handleCertRecordNameInput();' : ''; ?>"
+                                       <?php if ($isAdmin): ?>
+                                       onfocus="if (this.value.trim().length > 0) handleCertRecordNameInput();"
+                                       onkeydown="handleCertSuggestionKeydown(event, 'cert-record-suggestions')"
+                                       <?php endif; ?>
                                        style="padding: 6px 12px; height: 36px; font-size: 12.5px; box-sizing: border-box; width: 100%; border-radius: 6px; background: #FFFFFF; color: var(--text); border: 1px solid var(--border);">
+                                <?php if ($isAdmin): ?>
+                                <div id="cert-record-suggestions" role="listbox" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; max-height: 250px; overflow-y: auto; background: #FFFFFF; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); z-index: 60;"></div>
+                                <?php endif; ?>
                             </div>
 
                             <div>
@@ -1409,12 +1425,315 @@ function filterCertStatus(status, btn) {
 
 function clearCertSearch() {
     const input = document.getElementById('cert-search-input');
+    hideCertSuggestions('cert-search-suggestions');
     if (input) {
         input.value = '';
         filterCertLedger();
         input.focus();
     }
 }
+
+function escapeCertHtml(str) {
+    return String(str || '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
+
+function highlightCertMatch(text, query) {
+    const safeText = escapeCertHtml(text);
+    const q = (query || '').trim();
+    if (!q) return safeText;
+    const escapedRe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    try {
+        return safeText.replace(new RegExp('(' + escapedRe + ')', 'ig'),
+            '<mark style="background: rgba(201,168,76,0.28); color: #111111; padding: 0 2px; border-radius: 3px; font-weight: 700;">$1</mark>');
+    } catch (e) {
+        return safeText;
+    }
+}
+
+function hideCertSuggestions(containerId) {
+    const box = document.getElementById(containerId);
+    if (box) {
+        box.style.display = 'none';
+        box.dataset.activeIdx = '-1';
+    }
+}
+
+function handleCertSuggestionKeydown(e, containerId) {
+    const box = document.getElementById(containerId);
+    if (!box || box.style.display === 'none') return;
+    const items = Array.from(box.querySelectorAll('.cert-suggestion-item'));
+    if (!items.length) {
+        if (e.key === 'Escape') hideCertSuggestions(containerId);
+        return;
+    }
+
+    let idx = parseInt(box.dataset.activeIdx || '-1', 10);
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        idx = (idx + 1) % items.length;
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        idx = (idx <= 0) ? (items.length - 1) : (idx - 1);
+    } else if (e.key === 'Enter' && idx >= 0 && items[idx]) {
+        e.preventDefault();
+        items[idx].click();
+        return;
+    } else if (e.key === 'Escape') {
+        e.preventDefault();
+        hideCertSuggestions(containerId);
+        return;
+    } else {
+        return;
+    }
+
+    box.dataset.activeIdx = String(idx);
+    items.forEach((el, i) => {
+        el.style.background = (i === idx) ? '#F4F4F5' : '#FFFFFF';
+    });
+    items[idx].scrollIntoView({ block: 'nearest' });
+}
+
+function handleCertSearchInput() {
+    filterCertLedger();
+    showCertSearchSuggestions();
+}
+
+function extractCertPersonLabel(title) {
+    const raw = String(title || '');
+    const colonIdx = raw.indexOf(':');
+    let body = colonIdx >= 0 ? raw.slice(colonIdx + 1).trim() : raw.trim();
+    const parenIdx = body.indexOf('(');
+    if (parenIdx > 0) body = body.slice(0, parenIdx).trim();
+    const pipeIdx = body.indexOf('|');
+    if (pipeIdx > 0) body = body.slice(0, pipeIdx).trim();
+    return body || raw.trim();
+}
+
+function showCertSearchSuggestions() {
+    const input = document.getElementById('cert-search-input');
+    const box = document.getElementById('cert-search-suggestions');
+    if (!input || !box) return;
+
+    const term = input.value.trim();
+    if (!term) {
+        hideCertSuggestions('cert-search-suggestions');
+        return;
+    }
+
+    const qLower = term.toLowerCase();
+    const rows = Array.from(document.querySelectorAll('#cert-requests-table .cert-table-row'));
+    const scored = [];
+    const seen = new Set();
+
+    rows.forEach(row => {
+        let req = null;
+        try { req = JSON.parse(row.getAttribute('data-req') || 'null'); } catch (e) {}
+        const title = (req && req.title) ? String(req.title) : (row.dataset.title || '');
+        const idStr = String((req && req.id) || row.dataset.id || '');
+        const applicant = (req && req.user_name) ? String(req.user_name) : '';
+        const status = String((req && req.status) || row.dataset.status || '').toLowerCase();
+        const personLabel = extractCertPersonLabel(title);
+        const refLabel = idStr ? ('REQ-' + idStr.padStart(4, '0')) : '';
+
+        const haystack = [personLabel, applicant, title, refLabel, idStr].join(' ').toLowerCase();
+        if (!haystack.includes(qLower)) return;
+
+        const dedupeKey = personLabel.toLowerCase() + '|' + refLabel;
+        if (seen.has(dedupeKey)) return;
+        seen.add(dedupeKey);
+
+        const isPrefix = personLabel.toLowerCase().startsWith(qLower)
+            || applicant.toLowerCase().startsWith(qLower)
+            || refLabel.toLowerCase().startsWith(qLower)
+            || idStr.startsWith(qLower);
+
+        scored.push({
+            score: isPrefix ? 0 : 1,
+            id: parseInt(idStr || '0', 10),
+            personLabel,
+            applicant,
+            title,
+            refLabel,
+            status
+        });
+    });
+
+    scored.sort((a, b) => (a.score - b.score) || (b.id - a.id));
+    const top = scored.slice(0, 8);
+
+    const statusMap = {
+        pending:   { label: 'Pending',   color: '#b45309', bg: '#fef3c7' },
+        confirmed: { label: 'Ready',     color: '#047857', bg: '#d1fae5' },
+        completed: { label: 'Released',  color: '#3f3f46', bg: '#e4e4e7' },
+        rejected:  { label: 'Cancelled', color: '#b91c1c', bg: '#fee2e2' }
+    };
+
+    if (!top.length) {
+        box.innerHTML = '<div style="padding: 10px 12px; font-size: 12px; color: var(--text2);">No matching certificate requests for "' + escapeCertHtml(term) + '".</div>';
+    } else {
+        const header = '<div style="padding: 6px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); background: #F4F4F5; border-bottom: 1px solid var(--border);">'
+            + 'Quick Matches (' + scored.length + ')</div>';
+        const itemsHtml = top.map(item => {
+            const st = statusMap[item.status] || { label: item.status || 'Open', color: '#52525b', bg: '#f4f4f5' };
+            const filterVal = item.personLabel || item.refLabel;
+            const subParts = [];
+            if (item.refLabel) subParts.push(item.refLabel);
+            if (item.applicant && item.applicant.toLowerCase() !== item.personLabel.toLowerCase()) {
+                subParts.push('By: ' + item.applicant);
+            }
+            return '<button type="button" class="cert-suggestion-item" '
+                + 'data-filter="' + escapeCertHtml(filterVal) + '" '
+                + 'data-id="' + item.id + '" '
+                + 'onclick="selectCertSearchSuggestion(this.dataset.filter, this.dataset.id)" '
+                + 'onmouseenter="this.style.background=\'#F4F4F5\'" onmouseleave="this.style.background=\'#FFFFFF\'" '
+                + 'style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; padding: 8px 12px; border: none; border-bottom: 1px solid #f4f4f5; background: #FFFFFF; cursor: pointer; font-family: inherit;">'
+                + '<div style="min-width: 0; flex: 1;">'
+                + '<div style="font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + highlightCertMatch(item.personLabel, term) + '</div>'
+                + '<div style="font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + highlightCertMatch(subParts.join(' · '), term) + '</div>'
+                + '</div>'
+                + '<span style="flex-shrink: 0; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; color: ' + st.color + '; background: ' + st.bg + ';">' + escapeCertHtml(st.label) + '</span>'
+                + '</button>';
+        }).join('');
+        box.innerHTML = header + itemsHtml;
+    }
+
+    box.dataset.activeIdx = '-1';
+    box.style.display = 'block';
+}
+
+function selectCertSearchSuggestion(filterVal, reqId) {
+    const input = document.getElementById('cert-search-input');
+    if (input) {
+        input.value = filterVal || '';
+        filterCertLedger();
+    }
+    hideCertSuggestions('cert-search-suggestions');
+    const row = document.querySelector('#cert-requests-table .cert-table-row[data-id="' + String(reqId || '') + '"]');
+    if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const prevBg = row.style.backgroundColor;
+        row.style.backgroundColor = '#fef9c3';
+        setTimeout(() => { row.style.backgroundColor = prevBg; }, 1200);
+    }
+}
+
+let _certRecordSuggestTimer = null;
+let _certRecordSuggestAbort = null;
+
+function inferCertRecordTypeHint() {
+    const sel = document.getElementById('cert-variant-selector');
+    if (!sel || sel.selectedIndex < 0) return '';
+    const txt = (sel.options[sel.selectedIndex].text || '').toLowerCase();
+    if (txt.includes('baptism')) return 'Baptism';
+    if (txt.includes('marriage')) return 'Wedding';
+    if (txt.includes('burial') || txt.includes('funeral')) return 'Funeral';
+    if (txt.includes('confirmation')) return 'Confirmation';
+    return '';
+}
+
+function handleCertRecordNameInput() {
+    const input = document.getElementById('cert-person-name');
+    const box = document.getElementById('cert-record-suggestions');
+    if (!input || !box) return;
+
+    const q = input.value.trim();
+    if (!q) {
+        if (_certRecordSuggestTimer) clearTimeout(_certRecordSuggestTimer);
+        if (_certRecordSuggestAbort) _certRecordSuggestAbort.abort();
+        hideCertSuggestions('cert-record-suggestions');
+        return;
+    }
+
+    if (_certRecordSuggestTimer) clearTimeout(_certRecordSuggestTimer);
+    _certRecordSuggestTimer = setTimeout(() => {
+        if (_certRecordSuggestAbort) _certRecordSuggestAbort.abort();
+        _certRecordSuggestAbort = new AbortController();
+        const rType = inferCertRecordTypeHint();
+        const url = 'app/controllers/get_cert_record_suggestions.php?q='
+            + encodeURIComponent(q)
+            + (rType ? '&record_type=' + encodeURIComponent(rType) : '');
+
+        fetch(url, { signal: _certRecordSuggestAbort.signal, credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : { suggestions: [] })
+            .then(data => {
+                renderCertRecordSuggestions(data.suggestions || [], q);
+            })
+            .catch(err => {
+                if (err && err.name !== 'AbortError') {
+                    hideCertSuggestions('cert-record-suggestions');
+                }
+            });
+    }, 150);
+}
+
+function renderCertRecordSuggestions(suggestions, query) {
+    const box = document.getElementById('cert-record-suggestions');
+    if (!box) return;
+
+    if (!suggestions.length) {
+        box.innerHTML = '<div style="padding: 9px 12px; font-size: 11.5px; color: var(--text2);">No archive records matching "' + escapeCertHtml(query) + '". You may continue typing the name manually.</div>';
+        box.dataset.activeIdx = '-1';
+        box.style.display = 'block';
+        return;
+    }
+
+    const header = '<div style="padding: 6px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); background: #F4F4F5; border-bottom: 1px solid var(--border);">'
+        + 'Archive Name Matches (Click to fill)</div>';
+
+    const itemsHtml = suggestions.map(rec => {
+        const meta = [];
+        if (rec.record_type) meta.push(rec.record_type);
+        if (rec.year) meta.push(rec.year);
+        if (rec.book_number || rec.page_number) {
+            meta.push('Bk ' + (rec.book_number || '-') + ' / Pg ' + (rec.page_number || '-'));
+        }
+        if (rec.chapel_name) meta.push(rec.chapel_name);
+        return '<button type="button" class="cert-suggestion-item" '
+            + 'data-name="' + escapeCertHtml(rec.person_name || '') + '" '
+            + 'data-year="' + escapeCertHtml(rec.year || '') + '" '
+            + 'onclick="selectCertRecordSuggestion(this.dataset.name, this.dataset.year)" '
+            + 'onmouseenter="this.style.background=\'#F4F4F5\'" onmouseleave="this.style.background=\'#FFFFFF\'" '
+            + 'style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; padding: 8px 12px; border: none; border-bottom: 1px solid #f4f4f5; background: #FFFFFF; cursor: pointer; font-family: inherit;">'
+            + '<div style="min-width: 0; flex: 1;">'
+            + '<div style="font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + highlightCertMatch(rec.person_name || '', query) + '</div>'
+            + '<div style="font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + escapeCertHtml(meta.join(' · ')) + '</div>'
+            + '</div>'
+            + (rec.reference_id ? '<span style="flex-shrink: 0; font-family: monospace; font-size: 10.5px; color: var(--text2); background: #F4F4F5; padding: 2px 6px; border-radius: 4px;">' + escapeCertHtml(rec.reference_id) + '</span>' : '')
+            + '</button>';
+    }).join('');
+
+    box.innerHTML = header + itemsHtml;
+    box.dataset.activeIdx = '-1';
+    box.style.display = 'block';
+}
+
+function selectCertRecordSuggestion(personName, year) {
+    const nameInput = document.getElementById('cert-person-name');
+    const yearInput = document.getElementById('cert-year-input');
+    if (nameInput && personName) {
+        nameInput.value = personName;
+    }
+    if (yearInput && year) {
+        yearInput.value = year;
+    }
+    if (typeof syncCertDynamicTitle === 'function') {
+        syncCertDynamicTitle();
+    }
+    hideCertSuggestions('cert-record-suggestions');
+}
+
+document.addEventListener('click', function(e) {
+    const searchWrap = document.getElementById('cert-search-wrap');
+    if (searchWrap && !searchWrap.contains(e.target)) {
+        hideCertSuggestions('cert-search-suggestions');
+    }
+    const recWrap = document.getElementById('cert-record-search-wrap');
+    if (recWrap && !recWrap.contains(e.target)) {
+        hideCertSuggestions('cert-record-suggestions');
+    }
+});
 
 function filterCertLedger() {
     const input = document.getElementById('cert-search-input');

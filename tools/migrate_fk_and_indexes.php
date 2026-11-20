@@ -15,7 +15,36 @@ if (PHP_SAPI !== 'cli') {
 require_once __DIR__ . '/../config/config.php';
 
 $dryRun = in_array('--dry-run', $argv ?? [], true);
-echo "=== CATHEDRAL DB INTEGRITY MIGRATION (" . ($dryRun ? 'DRY-RUN' : 'APPLY') . ") ===\n";
+$safeBoot = in_array('--safe-boot', $argv ?? [], true);
+echo "=== CATHEDRAL DB INTEGRITY MIGRATION (" . ($dryRun ? 'DRY-RUN' : ($safeBoot ? 'SAFE-BOOT' : 'APPLY')) . ") ===\n";
+
+function columnExists(mysqli $conn, string $table, string $column): bool
+{
+    $stmt = $conn->prepare(
+        "SELECT IS_NULLABLE FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1"
+    );
+    if (!$stmt) return false;
+    $stmt->bind_param('ss', $table, $column);
+    $stmt->execute();
+    $exists = (bool)$stmt->get_result()->fetch_row();
+    $stmt->close();
+    return $exists;
+}
+
+function isColumnNullable(mysqli $conn, string $table, string $column): bool
+{
+    $stmt = $conn->prepare(
+        "SELECT IS_NULLABLE FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1"
+    );
+    if (!$stmt) return false;
+    $stmt->bind_param('ss', $table, $column);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return strtoupper((string)($row['IS_NULLABLE'] ?? 'NO')) === 'YES';
+}
 
 function hasIndex(mysqli $conn, string $table, string $indexName): bool
 {
@@ -130,11 +159,16 @@ foreach ($indexes as [$table, $name, $clause]) {
         $idxAdded++;
         continue;
     }
-    if ($conn->query($sql)) {
-        echo "[IDX OK] {$table}.{$name}\n";
-        $idxAdded++;
-    } else {
-        echo "[IDX ERR] {$table}.{$name}: {$conn->error}\n";
+    try {
+        if ($conn->query($sql)) {
+            echo "[IDX OK] {$table}.{$name}\n";
+            $idxAdded++;
+        } else {
+            echo "[IDX ERR] {$table}.{$name}: {$conn->error}\n";
+            $idxFailed++;
+        }
+    } catch (Throwable $e) {
+        echo "[IDX ERR] {$table}.{$name}: {$e->getMessage()}\n";
         $idxFailed++;
     }
 }
@@ -194,9 +228,25 @@ $fkSkipped = 0;
 $fkFailed = 0;
 
 foreach ($foreignKeys as [$table, $name, $col, $refTable, $refCol, $onDelete, $onUpdate]) {
+    if (!columnExists($conn, $table, $col) || !columnExists($conn, $refTable, $refCol)) {
+        $fkSkipped++;
+        continue;
+    }
     if (hasForeignKey($conn, $table, $name)) {
         $fkSkipped++;
         continue;
+    }
+
+    // Safely normalize legacy zero IDs (e.g. chapel_id = 0) to NULL when nullable
+    if (isColumnNullable($conn, $table, $col)) {
+        $zRes = $conn->query("SELECT COUNT(*) c FROM `{$table}` WHERE `{$col}` = 0");
+        $zCnt = $zRes ? (int)$zRes->fetch_assoc()['c'] : 0;
+        if ($zCnt > 0) {
+            echo "[PRE] Normalizing {$zCnt} zero values in {$table}.{$col} -> NULL\n";
+            if (!$dryRun) {
+                $conn->query("UPDATE `{$table}` SET `{$col}` = NULL WHERE `{$col}` = 0");
+            }
+        }
     }
 
     // Safety pre-flight check before adding FK
@@ -217,11 +267,16 @@ foreach ($foreignKeys as [$table, $name, $col, $refTable, $refCol, $onDelete, $o
         $fkAdded++;
         continue;
     }
-    if ($conn->query($sql)) {
-        echo "[FK OK] {$table}.{$name} ({$col} -> {$refTable}.{$refCol})\n";
-        $fkAdded++;
-    } else {
-        echo "[FK ERR] {$table}.{$name}: {$conn->error}\n";
+    try {
+        if ($conn->query($sql)) {
+            echo "[FK OK] {$table}.{$name} ({$col} -> {$refTable}.{$refCol})\n";
+            $fkAdded++;
+        } else {
+            echo "[FK ERR] {$table}.{$name}: {$conn->error}\n";
+            $fkFailed++;
+        }
+    } catch (Throwable $e) {
+        echo "[FK ERR] {$table}.{$name}: {$e->getMessage()}\n";
         $fkFailed++;
     }
 }
@@ -230,4 +285,7 @@ echo "=== SUMMARY ===\n";
 echo "INDEXES: added={$idxAdded} skipped={$idxSkipped} failed={$idxFailed}\n";
 echo "FOREIGN_KEYS: added={$fkAdded} skipped={$fkSkipped} failed={$fkFailed}\n";
 
+if ($safeBoot) {
+    exit(0);
+}
 exit(($idxFailed + $fkFailed) > 0 ? 1 : 0);

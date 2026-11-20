@@ -30,7 +30,9 @@ class PortalController extends BaseController {
             $_SESSION['portal_flash'] = $res['message'];
             $_SESSION['portal_flash_type'] = $res['type'];
             
-            $target = !empty($_SERVER['PHP_SELF']) ? $_SERVER['PHP_SELF'] : 'request.php';
+            $allowedTargets = ['public_requests.php', 'portal_request.php', 'request.php', 'index.php'];
+            $selfName = basename((string)($_SERVER['PHP_SELF'] ?? 'public_requests.php'));
+            $target = in_array($selfName, $allowedTargets, true) ? $selfName : 'public_requests.php';
             header("Location: " . $target);
             exit();
         }

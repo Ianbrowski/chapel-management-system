@@ -190,8 +190,10 @@ class SacramentalReportingService
                           AND child_name = ? AND YEAR(event_date) = ?
                         LIMIT 1";
                 $stmt = $this->conn->prepare($sql);
-                $year = date('Y', strtotime($data['date_of_birth'] ?? date('Y-m-d')));
-                $stmt->bind_param('si', $data['child_name'], $year);
+                $childName = trim((string)($data['child_name'] ?? $data['person_name'] ?? ''));
+                $dateRef   = $data['event_date'] ?? ($data['date_of_birth'] ?? date('Y-m-d'));
+                $year      = (int)date('Y', strtotime((string)$dateRef) ?: time());
+                $stmt->bind_param('si', $childName, $year);
                 break;
             case 'Wedding':
                 $sql = "SELECT record_id, reference_id, event_date FROM sacramental_records

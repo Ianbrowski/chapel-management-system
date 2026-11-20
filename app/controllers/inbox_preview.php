@@ -84,11 +84,22 @@ try {
         exit();
     }
 
-    // Action: Mark notification as read
-    if (($_GET['action'] ?? '') === 'mark_read') {
+    // Action: Mark notification as read (POST + CSRF required)
+    if (($_REQUEST['action'] ?? '') === 'mark_read') {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            header('Content-Type: application/json', true, 405);
+            echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+            exit();
+        }
+        $csrfToken = $_POST['csrf'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? null);
+        if (!$base->validateCsrf($csrfToken)) {
+            header('Content-Type: application/json', true, 403);
+            echo json_encode(['success' => false, 'error' => 'Invalid security token']);
+            exit();
+        }
         require_once __DIR__ . '/../models/SystemNotification.php';
         $notifModel = new SystemNotification($conn);
-        $notifId = (int)($_GET['id'] ?? 0);
+        $notifId = (int)($_POST['id'] ?? ($_GET['id'] ?? 0));
         if ($notifId > 0) {
             $notifModel->markAsRead($notifId, $userId);
         } else {
@@ -153,7 +164,13 @@ try {
         ]);
         exit();
     } else {
-        $chapelFilter = in_array($role, ['Admin', 'Cathedral Admin'], true) ? null : $chapelId;
+        if (in_array($role, ['Admin', 'Cathedral Admin'], true)) {
+            $chapelFilter = null;
+        } elseif (!empty($chapelId)) {
+            $chapelFilter = (int)$chapelId;
+        } else {
+            $chapelFilter = 'cathedral';
+        }
         $limit = 10;
         $filters = [
             'chapel_id' => $chapelFilter,

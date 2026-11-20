@@ -40,14 +40,20 @@ class InquiryController extends BaseController {
             case 'send_quick_sms':
             case 'send_quick_email':
                 // OWNERSHIP CHECK - Prevent cross-chapel manipulation
-                // Users with no chapel assignment (NULL) can manage all inquiries
                 $inquiry = $this->inquiryModel->getById($id);
                 $userChapelId = $this->chapelId;
-                $canAccess = !$inquiry ? false
-                    : (in_array($this->role, ['Admin', 'Cathedral Admin']) 
-                       || $userChapelId === null
-                       || (int)$userChapelId === (int)$inquiry['chapel_id']
-                       || $inquiry['chapel_id'] === null);
+                $inqChapelId = $inquiry ? ($inquiry['chapel_id'] ?? null) : null;
+                if (!$inquiry) {
+                    $canAccess = false;
+                } elseif (in_array($this->role, ['Admin', 'Cathedral Admin'], true)) {
+                    $canAccess = true;
+                } elseif (!empty($userChapelId)) {
+                    // Chapel-assigned staff/admin can only manage inquiries for their exact assigned chapel
+                    $canAccess = ($inqChapelId !== null && (int)$userChapelId === (int)$inqChapelId);
+                } else {
+                    // Cathedral Staff (no branch chapel) can manage Cathedral inquiries only
+                    $canAccess = ($inqChapelId === null || (int)$inqChapelId === 0);
+                }
                 if (!$canAccess) {
                     $this->flash('error', 'Unauthorized: Record does not exist or belongs to another chapel.');
                     $this->redirect('dashboard.php?section=public_inquiries');
@@ -110,23 +116,29 @@ class InquiryController extends BaseController {
     }
 
     private function fulfillMerchReservation($id) {
-        // 1. Get Details
+        // 1. Get Details & Prevent Duplicate Fulfillment
         $inq = $this->inquiryModel->getById($id);
         if (!$inq) {
             $this->flash('error', 'Inquiry not found.');
             return;
         }
+        if (($inq['status'] ?? '') === 'Completed' || !empty($inq['is_archived'])) {
+            $this->flash('error', 'This merchandise reservation has already been fulfilled or archived.');
+            return;
+        }
 
-        // 2. Extract Data from Details string
-        // Format: "Member Reservation: [Item] x [Qty]. (Item ID: [ID]) ..."
-        preg_match('/\(Item ID: (\d+)\)/', $inq['details'], $idMatch);
-        preg_match('/x (\d+)\./', $inq['details'], $qtyMatch);
+        // 2. Prefer structured columns (item_id, quantity), fall back to details regex
+        $itemId = (int)($inq['item_id'] ?? 0);
+        $qty    = (int)($inq['quantity'] ?? 0);
+        if ($itemId <= 0 && preg_match('/\(Item ID: (\d+)\)/', (string)($inq['details'] ?? ''), $idMatch)) {
+            $itemId = (int)$idMatch[1];
+        }
+        if ($qty <= 0) {
+            $qty = preg_match('/x (\d+)\./', (string)($inq['details'] ?? ''), $qtyMatch) ? (int)$qtyMatch[1] : 1;
+        }
 
-        $itemId = $idMatch ? (int)$idMatch[1] : 0;
-        $qty    = $qtyMatch ? (int)$qtyMatch[1] : 1;
-
-        if (!$itemId) {
-            $this->flash('error', 'Could not identify the merchandise item.');
+        if ($itemId <= 0 || $qty <= 0) {
+            $this->flash('error', 'Could not identify the merchandise item or quantity.');
             return;
         }
 
@@ -320,7 +332,13 @@ class InquiryController extends BaseController {
                 $data['inq_archive_count'] = 0;
                 $data['inq_filters']       = [];
             } else {
-                $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin']) ? $this->chapelId : null;
+                if (in_array($this->role, ['Admin', 'Cathedral Admin'], true)) {
+                    $chapelFilter = null;
+                } elseif (!empty($this->chapelId)) {
+                    $chapelFilter = (int)$this->chapelId;
+                } else {
+                    $chapelFilter = 'cathedral';
+                }
                 $tab    = $_GET['inbox_tab'] ?? 'active';
                 $page   = max(1, (int)($_GET['inq_page'] ?? 1));
                 $status = $_GET['inquiry_status'] ?? null;

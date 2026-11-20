@@ -12,6 +12,12 @@ let selectedPastor = {
     request: null 
 };
 
+function escapeAvailHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[m]));
+}
+
 function getApiUrl(path) {
     const base = (typeof window !== 'undefined' && window.BASE_URL) ? window.BASE_URL.replace(/\/+$/, '') : '';
     const cleanPath = path.replace(/^\/+/, '');
@@ -178,7 +184,7 @@ async function renderAvailabilityTimeline(venue, datetime, scope, eventType, dur
                 staticMBadge.className = 'slot-badge ' + (morningEvent.status === 'Pending' ? 'pending' : 'booked');
                 staticMBadge.innerHTML = `<i class="fa-solid ${morningEvent.status === 'Pending' ? 'fa-clock' : 'fa-lock'}" style="font-size:7px;"></i> ${morningEvent.status === 'Pending' ? 'Pending' : 'Booked'}`;
                 if (staticMChip) {
-                    staticMChip.innerHTML = `<i class="fa-solid fa-lock" style="font-size:9px;"></i> <span>${morningEvent.title || 'Booked'}</span>`;
+                    staticMChip.innerHTML = `<i class="fa-solid fa-lock" style="font-size:9px;"></i> <span>${escapeAvailHtml(morningEvent.title || 'Booked')}</span>`;
                 }
             } else {
                 staticMCard.classList.remove('disabled');
@@ -198,7 +204,7 @@ async function renderAvailabilityTimeline(venue, datetime, scope, eventType, dur
                 staticABadge.className = 'slot-badge ' + (afternoonEvent.status === 'Pending' ? 'pending' : 'booked');
                 staticABadge.innerHTML = `<i class="fa-solid ${afternoonEvent.status === 'Pending' ? 'fa-clock' : 'fa-lock'}" style="font-size:7px;"></i> ${afternoonEvent.status === 'Pending' ? 'Pending' : 'Booked'}`;
                 if (staticAChip) {
-                    staticAChip.innerHTML = `<i class="fa-solid fa-lock" style="font-size:9px;"></i> <span>${afternoonEvent.title || 'Booked'}</span>`;
+                    staticAChip.innerHTML = `<i class="fa-solid fa-lock" style="font-size:9px;"></i> <span>${escapeAvailHtml(afternoonEvent.title || 'Booked')}</span>`;
                 }
             } else {
                 staticACard.classList.remove('disabled');
@@ -234,9 +240,9 @@ async function renderAvailabilityTimeline(venue, datetime, scope, eventType, dur
                         </div>
                         <div class="slot-time-range"><i class="fa-regular fa-clock" style="font-size:9px;"></i> 09:00 AM – 12:00 PM</div>
                         ${morningEvent 
-                            ? `<div class="slot-event-chip" title="${morningEvent.title} (${morningEvent.status})">
-                                 <span class="slot-event-title-text"><i class="fa-solid fa-bookmark" style="color:var(--accent,#c5a059);font-size:9px;margin-right:4px;"></i>${morningEvent.title}</span>
-                                 <span style="font-size:9px;color:var(--text2,#94a3b8);background:var(--bg3,rgba(255,255,255,0.06));padding:1px 5px;border-radius:4px;flex-shrink:0;">${morningEvent.event_type}</span>
+                            ? `<div class="slot-event-chip" title="${escapeAvailHtml(morningEvent.title)} (${escapeAvailHtml(morningEvent.status)})">
+                                 <span class="slot-event-title-text"><i class="fa-solid fa-bookmark" style="color:var(--accent,#c5a059);font-size:9px;margin-right:4px;"></i>${escapeAvailHtml(morningEvent.title)}</span>
+                                 <span style="font-size:9px;color:var(--text2,#94a3b8);background:var(--bg3,rgba(255,255,255,0.06));padding:1px 5px;border-radius:4px;flex-shrink:0;">${escapeAvailHtml(morningEvent.event_type)}</span>
                                </div>` 
                             : '<div class="slot-open-chip"><i class="fa-solid fa-circle-check" style="font-size:10px;"></i> <span>Open for Scheduling</span></div>'}
                     </div>
@@ -254,9 +260,9 @@ async function renderAvailabilityTimeline(venue, datetime, scope, eventType, dur
                         </div>
                         <div class="slot-time-range"><i class="fa-regular fa-clock" style="font-size:9px;"></i> 02:00 PM – 05:00 PM</div>
                         ${afternoonEvent 
-                            ? `<div class="slot-event-chip" title="${afternoonEvent.title} (${afternoonEvent.status})">
-                                 <span class="slot-event-title-text"><i class="fa-solid fa-bookmark" style="color:var(--accent,#c5a059);font-size:9px;margin-right:4px;"></i>${afternoonEvent.title}</span>
-                                 <span style="font-size:9px;color:var(--text2,#94a3b8);background:var(--bg3,rgba(255,255,255,0.06));padding:1px 5px;border-radius:4px;flex-shrink:0;">${afternoonEvent.event_type}</span>
+                            ? `<div class="slot-event-chip" title="${escapeAvailHtml(afternoonEvent.title)} (${escapeAvailHtml(afternoonEvent.status)})">
+                                 <span class="slot-event-title-text"><i class="fa-solid fa-bookmark" style="color:var(--accent,#c5a059);font-size:9px;margin-right:4px;"></i>${escapeAvailHtml(afternoonEvent.title)}</span>
+                                 <span style="font-size:9px;color:var(--text2,#94a3b8);background:var(--bg3,rgba(255,255,255,0.06));padding:1px 5px;border-radius:4px;flex-shrink:0;">${escapeAvailHtml(afternoonEvent.event_type)}</span>
                                </div>` 
                             : '<div class="slot-open-chip"><i class="fa-solid fa-circle-check" style="font-size:10px;"></i> <span>Open for Scheduling</span></div>'}
                     </div>

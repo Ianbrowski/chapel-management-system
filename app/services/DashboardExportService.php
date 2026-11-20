@@ -50,16 +50,29 @@ class DashboardExportService
         fputcsv($out, ['----------------------------------------------------------------------']);
         fputcsv($out, [' SECTION 1: FINANCIAL REVENUE OVERVIEW']);
         fputcsv($out, ['----------------------------------------------------------------------']);
-        $stats_sql = "SELECT 
-            (SELECT SUM(amount) FROM donations d WHERE date_received BETWEEN ? AND ? AND is_archived=0 $whereChapelDonation) as total_donations,
-            (SELECT COUNT(*) FROM donations d WHERE date_received BETWEEN ? AND ? AND is_archived=0 $whereChapelDonation) as count_donations,
-            (SELECT SUM(total_price) FROM merchandise_sales WHERE sale_date BETWEEN ? AND ?) as total_merch_sales,
-            (SELECT SUM(quantity) FROM merchandise_sales WHERE sale_date BETWEEN ? AND ?) as qty_merch_sales,
-            (SELECT COUNT(*) FROM sacramental_records WHERE date_added BETWEEN ? AND ? AND is_archived=0 $whereChapelRecord) as records_added,
-            (SELECT COUNT(*) FROM events WHERE start_time BETWEEN ? AND ? AND status='Completed' AND is_archived=0 $whereChapelEvent) as events_completed
-        ";
-        $stmt = $this->conn->prepare($stats_sql);
-        $stmt->bind_param('ssssssssssss', $p1, $p2, $p1, $p2, $p1, $p2, $p1, $p2, $p1, $p2, $p1, $p2);
+        if ($chapelId) {
+            $stats_sql = "SELECT 
+                (SELECT SUM(amount) FROM donations d WHERE date_received BETWEEN ? AND ? AND is_archived=0 $whereChapelDonation) as total_donations,
+                (SELECT COUNT(*) FROM donations d WHERE date_received BETWEEN ? AND ? AND is_archived=0 $whereChapelDonation) as count_donations,
+                0 as total_merch_sales,
+                0 as qty_merch_sales,
+                (SELECT COUNT(*) FROM sacramental_records WHERE date_added BETWEEN ? AND ? AND is_archived=0 $whereChapelRecord) as records_added,
+                (SELECT COUNT(*) FROM events WHERE start_time BETWEEN ? AND ? AND status='Completed' AND is_archived=0 $whereChapelEvent) as events_completed
+            ";
+            $stmt = $this->conn->prepare($stats_sql);
+            $stmt->bind_param('ssssssss', $p1, $p2, $p1, $p2, $p1, $p2, $p1, $p2);
+        } else {
+            $stats_sql = "SELECT 
+                (SELECT SUM(amount) FROM donations d WHERE date_received BETWEEN ? AND ? AND is_archived=0 $whereChapelDonation) as total_donations,
+                (SELECT COUNT(*) FROM donations d WHERE date_received BETWEEN ? AND ? AND is_archived=0 $whereChapelDonation) as count_donations,
+                (SELECT SUM(total_price) FROM merchandise_sales WHERE sale_date BETWEEN ? AND ?) as total_merch_sales,
+                (SELECT SUM(quantity) FROM merchandise_sales WHERE sale_date BETWEEN ? AND ?) as qty_merch_sales,
+                (SELECT COUNT(*) FROM sacramental_records WHERE date_added BETWEEN ? AND ? AND is_archived=0 $whereChapelRecord) as records_added,
+                (SELECT COUNT(*) FROM events WHERE start_time BETWEEN ? AND ? AND status='Completed' AND is_archived=0 $whereChapelEvent) as events_completed
+            ";
+            $stmt = $this->conn->prepare($stats_sql);
+            $stmt->bind_param('ssssssssssss', $p1, $p2, $p1, $p2, $p1, $p2, $p1, $p2, $p1, $p2, $p1, $p2);
+        }
         $stmt->execute();
         $stats = $stmt->get_result()->fetch_assoc();
         $stmt->close();
@@ -90,24 +103,26 @@ class DashboardExportService
         $stmt->close();
         $br();
 
-        // --- 3. MERCHANDISE BREAKDOWN ---
-        fputcsv($out, ['----------------------------------------------------------------------']);
-        fputcsv($out, [' SECTION 3: MERCHANDISE SALES BY ITEM']);
-        fputcsv($out, ['----------------------------------------------------------------------']);
-        $merch_sql = "SELECT mi.name, SUM(ms.quantity) as qty, SUM(ms.total_price) as total 
-                      FROM merchandise_sales ms JOIN merchandise_items mi ON ms.item_id = mi.id 
-                      WHERE ms.sale_date BETWEEN ? AND ? 
-                      GROUP BY ms.item_id ORDER BY total DESC";
-        $stmt = $this->conn->prepare($merch_sql);
-        $stmt->bind_param('ss', $p1, $p2);
-        $stmt->execute();
-        $res = $stmt->get_result();
-        fputcsv($out, ['ITEM NAME', 'UNITS SOLD', 'TOTAL REVENUE (PHP)']);
-        while ($r = $res->fetch_assoc()) {
-            fputcsv($out, [$r['name'], $r['qty'], number_format((float)$r['total'], 2, '.', '')]);
+        // --- 3. MERCHANDISE BREAKDOWN (Cathedral Store — Admin/Cathedral Admin only) ---
+        if (!$chapelId) {
+            fputcsv($out, ['----------------------------------------------------------------------']);
+            fputcsv($out, [' SECTION 3: MERCHANDISE SALES BY ITEM']);
+            fputcsv($out, ['----------------------------------------------------------------------']);
+            $merch_sql = "SELECT mi.name, SUM(ms.quantity) as qty, SUM(ms.total_price) as total 
+                          FROM merchandise_sales ms JOIN merchandise_items mi ON ms.item_id = mi.id 
+                          WHERE ms.sale_date BETWEEN ? AND ? 
+                          GROUP BY ms.item_id ORDER BY total DESC";
+            $stmt = $this->conn->prepare($merch_sql);
+            $stmt->bind_param('ss', $p1, $p2);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            fputcsv($out, ['ITEM NAME', 'UNITS SOLD', 'TOTAL REVENUE (PHP)']);
+            while ($r = $res->fetch_assoc()) {
+                fputcsv($out, [$r['name'], $r['qty'], number_format((float)$r['total'], 2, '.', '')]);
+            }
+            $stmt->close();
+            $br();
         }
-        $stmt->close();
-        $br();
 
         // --- 4. EVENTS BREAKDOWN ---
         fputcsv($out, ['----------------------------------------------------------------------']);
@@ -224,28 +239,30 @@ class DashboardExportService
         $stmt->close();
         $br();
 
-        // --- 9. INDIVIDUAL MERCHANDISE SALES ---
-        fputcsv($out, ['----------------------------------------------------------------------']);
-        fputcsv($out, [' SECTION 9: DETAILED MERCHANDISE SALES LEDGER']);
-        fputcsv($out, ['----------------------------------------------------------------------']);
-        $sql = "SELECT ms.id, mi.name as item, ms.buyer_name, ms.quantity, ms.total_price, ms.sale_date FROM merchandise_sales ms JOIN merchandise_items mi ON ms.item_id=mi.id WHERE ms.sale_date BETWEEN ? AND ? ORDER BY ms.sale_date DESC";
-        $stmt = $this->conn->prepare($sql);
-        $stmt->bind_param('ss', $p1, $p2);
-        $stmt->execute();
-        $res = $stmt->get_result();
-        fputcsv($out, ['SALE ID', 'ITEM NAME', 'BUYER NAME', 'QUANTITY', 'TOTAL VALUE (PHP)', 'SALE DATE']);
-        while ($row = $res->fetch_assoc()) {
-            fputcsv($out, [
-                'SALE-' . str_pad($row['id'], 6, '0', STR_PAD_LEFT),
-                $row['item'],
-                $row['buyer_name'],
-                $row['quantity'],
-                number_format((float)$row['total_price'], 2, '.', ''),
-                date('Y-m-d h:i A', strtotime($row['sale_date']))
-            ]);
+        // --- 9. INDIVIDUAL MERCHANDISE SALES (Cathedral Store — Admin/Cathedral Admin only) ---
+        if (!$chapelId) {
+            fputcsv($out, ['----------------------------------------------------------------------']);
+            fputcsv($out, [' SECTION 9: DETAILED MERCHANDISE SALES LEDGER']);
+            fputcsv($out, ['----------------------------------------------------------------------']);
+            $sql = "SELECT ms.id, mi.name as item, ms.buyer_name, ms.quantity, ms.total_price, ms.sale_date FROM merchandise_sales ms JOIN merchandise_items mi ON ms.item_id=mi.id WHERE ms.sale_date BETWEEN ? AND ? ORDER BY ms.sale_date DESC";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bind_param('ss', $p1, $p2);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            fputcsv($out, ['SALE ID', 'ITEM NAME', 'BUYER NAME', 'QUANTITY', 'TOTAL VALUE (PHP)', 'SALE DATE']);
+            while ($row = $res->fetch_assoc()) {
+                fputcsv($out, [
+                    'SALE-' . str_pad($row['id'], 6, '0', STR_PAD_LEFT),
+                    $row['item'],
+                    $row['buyer_name'],
+                    $row['quantity'],
+                    number_format((float)$row['total_price'], 2, '.', ''),
+                    date('Y-m-d h:i A', strtotime($row['sale_date']))
+                ]);
+            }
+            $stmt->close();
+            $br();
         }
-        $stmt->close();
-        $br();
 
         // --- 10. INDIVIDUAL SACRAMENTAL RECORDS ---
         fputcsv($out, ['----------------------------------------------------------------------']);
@@ -265,7 +282,9 @@ class DashboardExportService
         fputcsv($out, ['----------------------------------------------------------------------']);
         fputcsv($out, [' SECTION 11: CERTIFICATES ISSUANCES LOG']);
         fputcsv($out, ['----------------------------------------------------------------------']);
-        $sql = "SELECT certificate_no, issued_to, purpose, issued_at FROM certificate_issuances WHERE issued_at BETWEEN ? AND ? ORDER BY issued_at DESC";
+        $sql = $chapelId
+            ? "SELECT ci.certificate_no, ci.issued_to, ci.purpose, ci.issued_at FROM certificate_issuances ci JOIN sacramental_records sr ON ci.record_id = sr.record_id WHERE ci.issued_at BETWEEN ? AND ? AND sr.chapel_id = " . (int)$chapelId . " ORDER BY ci.issued_at DESC"
+            : "SELECT certificate_no, issued_to, purpose, issued_at FROM certificate_issuances WHERE issued_at BETWEEN ? AND ? ORDER BY issued_at DESC";
         $stmt = $this->conn->prepare($sql);
         $stmt->bind_param('ss', $p1, $p2);
         $stmt->execute();
@@ -286,7 +305,9 @@ class DashboardExportService
         fputcsv($out, ['----------------------------------------------------------------------']);
         fputcsv($out, [' SECTION 12: INCOMING INQUIRIES & TICKETS SUMMARY']);
         fputcsv($out, ['----------------------------------------------------------------------']);
-        $sql = "SELECT status, COUNT(*) as cnt FROM tickets WHERE created_at BETWEEN ? AND ? GROUP BY status";
+        $sql = $chapelId
+            ? "SELECT status, COUNT(*) as cnt FROM tickets WHERE created_at BETWEEN ? AND ? AND chapel_id = " . (int)$chapelId . " GROUP BY status"
+            : "SELECT status, COUNT(*) as cnt FROM tickets WHERE created_at BETWEEN ? AND ? GROUP BY status";
         $stmt = $this->conn->prepare($sql);
         $stmt->bind_param('ss', $p1, $p2);
         $stmt->execute();
@@ -321,7 +342,9 @@ class DashboardExportService
         fputcsv($out, ['----------------------------------------------------------------------']);
         fputcsv($out, [' SECTION 14: SYSTEM AUDIT & STAFF ACTIVITY LOGS']);
         fputcsv($out, ['----------------------------------------------------------------------']);
-        $sql = "SELECT performed_by_name, action, module, COUNT(*) as cnt FROM audit_logs WHERE created_at BETWEEN ? AND ? GROUP BY performed_by_name, action, module ORDER BY cnt DESC LIMIT 15";
+        $sql = $chapelId
+            ? "SELECT al.performed_by_name, al.action, al.module, COUNT(*) as cnt FROM audit_logs al JOIN users u ON al.performed_by_id = u.id WHERE al.created_at BETWEEN ? AND ? AND u.chapel_id = " . (int)$chapelId . " GROUP BY al.performed_by_name, al.action, al.module ORDER BY cnt DESC LIMIT 15"
+            : "SELECT performed_by_name, action, module, COUNT(*) as cnt FROM audit_logs WHERE created_at BETWEEN ? AND ? GROUP BY performed_by_name, action, module ORDER BY cnt DESC LIMIT 15";
         $stmt = $this->conn->prepare($sql);
         $stmt->bind_param('ss', $p1, $p2);
         $stmt->execute();

@@ -279,12 +279,20 @@
 
             const clickedItem = (this.cachedData || []).find(it => it.id == id);
 
-            // Mark notification as read in background
+            // Mark notification as read in background (POST + CSRF)
             try {
                 const baseUrl = (typeof window !== 'undefined' && window.BASE_URL) ? window.BASE_URL.replace(/\/+$/, '') : '';
                 const endpoint = baseUrl ? `${baseUrl}/app/controllers/inbox_preview.php` : 'app/controllers/inbox_preview.php';
-                fetch(`${endpoint}?action=mark_read&id=${encodeURIComponent(id)}`, {
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                const csrfToken = (typeof window !== 'undefined' && window.CSRF_TOKEN) ? window.CSRF_TOKEN : '';
+                const body = new URLSearchParams({ action: 'mark_read', id: String(id), csrf: csrfToken });
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: body.toString()
                 }).catch(() => {});
                 if (clickedItem && clickedItem.is_pending) {
                     clickedItem.is_pending = false;

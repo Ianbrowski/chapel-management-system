@@ -178,8 +178,9 @@ class DashboardController extends BaseController
         $title = trim((string) ($_POST['title'] ?? ''));
         $subtitle = trim((string) ($_POST['subtitle'] ?? ''));
         $color = $_POST['dot_color'] ?? '#c9a84c';
+        $isGlobalBulletinAdmin = in_array($this->role, ['Admin', 'Cathedral Admin'], true);
         $rawChapelId = (!empty($_POST['chapel_id']) && (int)$_POST['chapel_id'] > 0) ? (int)$_POST['chapel_id'] : null;
-        $chapelId = in_array($this->role, ['Admin', 'Cathedral Admin', 'Priest', 'Pastor'], true)
+        $chapelId = $isGlobalBulletinAdmin
             ? $rawChapelId
             : $this->getAppliedChapelId($rawChapelId);
 
@@ -190,7 +191,7 @@ class DashboardController extends BaseController
                 $this->redirect('dashboard.php?section=bulletin');
                 return;
             }
-            if (!in_array($this->role, ['Admin', 'Cathedral Admin', 'Priest', 'Pastor'], true) && !$this->checkChapelAccess($existing['chapel_id'] ?? null)) {
+            if (!$isGlobalBulletinAdmin && !$this->checkChapelAccess($existing['chapel_id'] ?? null)) {
                 $this->flash('error', 'Unauthorized: You can only modify announcements belonging to your assigned chapel.');
                 $this->redirect('dashboard.php?section=bulletin');
                 return;
@@ -428,7 +429,9 @@ class DashboardController extends BaseController
                 $data['stale_count'] = count($this->eventM->getStaleConfirmedEvents($auditScope, $chapelFilter));
                 $data['audit_issue_count'] += $data['stale_count'];
             }
-            $inqFilter = is_numeric($chapelFilter) ? (int)$chapelFilter : null;
+            $inqFilter = in_array($this->role, ['Admin', 'Cathedral Admin', 'Priest', 'Pastor'], true)
+                ? null
+                : ($chapelFilter === 'cathedral' ? 'cathedral' : (is_numeric($chapelFilter) ? (int)$chapelFilter : null));
             $data['pending_inquiries'] = $this->inquiryM->getActiveCount($inqFilter);
         }
 
@@ -605,7 +608,7 @@ class DashboardController extends BaseController
                     if ($this->role !== 'Admin') return $this->loadViewData('events');
                 } elseif ($activeTab === 'reports') {
                     if (!$p['can_reports'] && !$p['can_finance_reports']) return $this->loadViewData('events');
-                    $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin']) ? $this->chapelId : null;
+                    $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin'], true) ? ($this->chapelId !== null ? (int)$this->chapelId : null) : null;
                     try {
                         $data = $this->sectionDataService->loadReportsSectionData($data, $chapelFilter);
                     } catch (InvalidArgumentException | RuntimeException $e) {
@@ -705,7 +708,7 @@ class DashboardController extends BaseController
                 if (!$p['can_reports'] && !$p['can_finance_reports'])
                     return $this->loadViewData('events');
                 $data['settings_tab'] = 'reports';
-                $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin']) ? $this->chapelId : null;
+                $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin'], true) ? ($this->chapelId !== null ? (int)$this->chapelId : null) : null;
                 try {
                     $data = $this->sectionDataService->loadReportsSectionData($data, $chapelFilter);
                 } catch (InvalidArgumentException | RuntimeException $e) {
@@ -736,7 +739,7 @@ class DashboardController extends BaseController
                 $data = $this->loadViewData('events');
                 $data['active_section'] = 'schedule_audit';
                 $auditScope = in_array($this->role, ['Admin', 'Cathedral Admin', 'Priest']) ? null : 'chapel';
-                $roleFilter = !in_array($this->role, ['Admin', 'Cathedral Admin']) ? $this->chapelId : null;
+                $roleFilter = !in_array($this->role, ['Admin', 'Cathedral Admin'], true) ? ($this->chapelId !== null ? (int)$this->chapelId : null) : null;
                 $data['stale_events'] = $this->eventM->getStaleConfirmedEvents($auditScope, $roleFilter);
                 $data['blocked_requests'] = $this->eventM->getOverduePendingRequests($roleFilter);
                 $data['schedule_conflicts'] = $this->eventM->getScheduleConflicts($roleFilter);
@@ -775,7 +778,7 @@ class DashboardController extends BaseController
     private function exportReportCsv()
     {
         try {
-            $chapelFilter = in_array($this->role, ['Admin', 'Cathedral Admin']) ? null : $this->chapelId;
+            $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin'], true) ? ($this->chapelId !== null ? (int)$this->chapelId : null) : null;
             $this->exportService->streamReportCsv($_GET['from'] ?? '', $_GET['to'] ?? '', $chapelFilter);
         } catch (InvalidArgumentException | RuntimeException $e) {
             $this->flash('error', $e->getMessage());

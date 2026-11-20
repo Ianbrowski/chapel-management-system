@@ -12,7 +12,10 @@ function previewPic(input) {
         if (img) { img.src = e.target.result; img.style.display = 'block'; }
         if (initials) initials.style.display = 'none';
         const dz = document.getElementById('drop-zone');
-        if (dz) dz.innerHTML = `<i class="fa-solid fa-check" style="color:#16a34a;font-size:20px;display:block;margin-bottom:6px;"></i><span style="color:#16a34a;font-weight:600;">${input.files[0].name}</span>`;
+        if (dz) {
+            const safeName = String(input.files[0].name).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+            dz.innerHTML = `<i class="fa-solid fa-check" style="color:#16a34a;font-size:20px;display:block;margin-bottom:6px;"></i><span style="color:#16a34a;font-weight:600;">${safeName}</span>`;
+        }
     };
     reader.readAsDataURL(input.files[0]);
 }

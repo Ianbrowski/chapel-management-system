@@ -6,6 +6,10 @@ config/config.local.php
 tmp/
 scratch/
 docs/
+tests/
+screenshots/
+guest_*.html
+storage/rate_limits/*
 backups/*.zip
 backups/*.sql
 backups/work_*/

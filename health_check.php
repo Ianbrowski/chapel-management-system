@@ -16,6 +16,15 @@ $baseDir = __DIR__;
 // Load core configuration
 require_once $baseDir . '/config/config.php';
 
+if (PHP_SAPI !== 'cli') {
+    $sessionRole = $_SESSION['role'] ?? '';
+    if (!isset($_SESSION['user_id']) || $sessionRole !== 'Admin') {
+        http_response_code(403);
+        header('Content-Type: text/plain; charset=utf-8');
+        exit('Forbidden: Diagnostics utility requires CLI execution or Super Admin session.');
+    }
+}
+
 $issues   = [];
 $warnings = [];
 $ok       = [];

@@ -71,8 +71,10 @@ class Inquiry {
             $params[] = $status;
             $types  .= "s";
         }
-        if ($chapelId) {
-            $where .= " AND (i.chapel_id = ? OR i.chapel_id IS NULL)";
+        if ($chapelId === 'cathedral') {
+            $where .= " AND (i.chapel_id IS NULL OR i.chapel_id = 0)";
+        } elseif (!empty($chapelId)) {
+            $where .= " AND i.chapel_id = ?";
             $params[] = (int)$chapelId;
             $types  .= "i";
         }
@@ -138,8 +140,10 @@ class Inquiry {
         $params = [];
         $types  = "";
 
-        if ($chapelId) {
-            $where .= " AND (i.chapel_id = ? OR i.chapel_id IS NULL)";
+        if ($chapelId === 'cathedral') {
+            $where .= " AND (i.chapel_id IS NULL OR i.chapel_id = 0)";
+        } elseif (!empty($chapelId)) {
+            $where .= " AND i.chapel_id = ?";
             $params[] = (int)$chapelId;
             $types  .= "i";
         }
@@ -196,7 +200,11 @@ class Inquiry {
         } else {
             $sql = "SELECT COUNT(*) as c FROM public_inquiries WHERE is_archived = 0";
         }
-        if ($chapelId) $sql .= " AND (chapel_id = " . (int)$chapelId . " OR chapel_id IS NULL)";
+        if ($chapelId === 'cathedral') {
+            $sql .= " AND (chapel_id IS NULL OR chapel_id = 0)";
+        } elseif (!empty($chapelId)) {
+            $sql .= " AND chapel_id = " . (int)$chapelId;
+        }
         $res = $this->conn->query($sql);
         return $res ? (int)($res->fetch_assoc()['c'] ?? 0) : 0;
     }
@@ -207,7 +215,11 @@ class Inquiry {
     public function getArchivedCount($chapelId = null) {
         if (!$this->hasIsArchived()) return 0;
         $sql = "SELECT COUNT(*) as c FROM public_inquiries WHERE is_archived = 1";
-        if ($chapelId) $sql .= " AND (chapel_id = " . (int)$chapelId . " OR chapel_id IS NULL)";
+        if ($chapelId === 'cathedral') {
+            $sql .= " AND (chapel_id IS NULL OR chapel_id = 0)";
+        } elseif (!empty($chapelId)) {
+            $sql .= " AND chapel_id = " . (int)$chapelId;
+        }
         $res = $this->conn->query($sql);
         return $res ? (int)($res->fetch_assoc()['c'] ?? 0) : 0;
     }
@@ -264,8 +276,10 @@ class Inquiry {
     public function getPendingCount($chapelId = null) {
         $archiveClause = $this->hasIsArchived() ? " AND is_archived = 0" : "";
         $sql = "SELECT COUNT(*) as c FROM public_inquiries WHERE status = 'Pending'{$archiveClause}";
-        if ($chapelId) {
-            $sql .= " AND (chapel_id = " . (int)$chapelId . " OR chapel_id IS NULL)";
+        if ($chapelId === 'cathedral') {
+            $sql .= " AND (chapel_id IS NULL OR chapel_id = 0)";
+        } elseif (!empty($chapelId)) {
+            $sql .= " AND chapel_id = " . (int)$chapelId;
         }
         $res = $this->conn->query($sql);
         return $res ? (int)($res->fetch_assoc()['c'] ?? 0) : 0;

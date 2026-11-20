@@ -52,6 +52,12 @@ class AdminController extends BaseController {
         $chapelId = !empty($_POST['chapel_id']) ? (int)$_POST['chapel_id'] : null;
 
         if (in_array($action, ['create', 'update'], true)) {
+            $allowedRoles = ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff', 'Priest', 'Member'];
+            if (!in_array($role, $allowedRoles, true)) {
+                $this->flash('error', 'Invalid role selected.');
+                $this->redirect('dashboard.php?section=users');
+                return;
+            }
             if ($user === '') {
                 $this->flash('error', 'Username cannot be empty.');
                 $this->redirect('dashboard.php?section=users');
@@ -104,6 +110,36 @@ class AdminController extends BaseController {
                 $target = $this->userModel->getById($id);
                 if ($target && $target['role'] === 'Admin') {
                     $this->flash('error', 'Cathedral Admins cannot modify System Administrator accounts.');
+                    $this->redirect('dashboard.php?section=users');
+                    return;
+                }
+            }
+        }
+
+        $emailNormalized = $email !== '' ? strtolower(trim($email)) : null;
+        if ($emailNormalized !== null && !filter_var($emailNormalized, FILTER_VALIDATE_EMAIL)) {
+            $this->flash('error', 'Please enter a valid email address.');
+            $this->redirect('dashboard.php?section=users');
+            return;
+        }
+        if ($emailNormalized !== null && in_array($action, ['create', 'update'], true)) {
+            if ($action === 'update' && $id > 0) {
+                $chkEmail = $this->conn->prepare("SELECT id FROM users WHERE LOWER(TRIM(email)) = LOWER(?) AND (status IS NULL OR status != 'rejected') AND id != ? LIMIT 1");
+                if ($chkEmail) {
+                    $chkEmail->bind_param('si', $emailNormalized, $id);
+                }
+            } else {
+                $chkEmail = $this->conn->prepare("SELECT id FROM users WHERE LOWER(TRIM(email)) = LOWER(?) AND (status IS NULL OR status != 'rejected') LIMIT 1");
+                if ($chkEmail) {
+                    $chkEmail->bind_param('s', $emailNormalized);
+                }
+            }
+            if (!empty($chkEmail)) {
+                $chkEmail->execute();
+                $dupEmail = $chkEmail->get_result()->num_rows > 0;
+                $chkEmail->close();
+                if ($dupEmail) {
+                    $this->flash('error', 'An active account with this email address already exists.');
                     $this->redirect('dashboard.php?section=users');
                     return;
                 }
@@ -363,7 +399,7 @@ class AdminController extends BaseController {
 
     private function handleParishInfoActions($action) {
         if (!$this->permissions['can_parish_info']) return;
-        
+
         switch ($action) {
             case 'update_contact':
                 $name = $_POST['parish_name'] ?? 'IFI Cathedral';
@@ -376,7 +412,15 @@ class AdminController extends BaseController {
                 $hrs  = $_POST['office_hours'] ?? '';
                 $map  = trim($_POST['map_embed_url'] ?? '');
                 if (preg_match('/src=["\']([^"\']+)["\']/i', $map, $mapMatches)) {
-                    $map = $mapMatches[1];
+                    $map = trim($mapMatches[1]);
+                }
+                if ($map !== '') {
+                    $parsedMap = parse_url($map);
+                    if (!$parsedMap || strtolower((string)($parsedMap['scheme'] ?? '')) !== 'https' || empty($parsedMap['host'])) {
+                        $this->flash('error', 'Map embed URL must be a valid HTTPS URL.');
+                        $this->redirect('dashboard.php?section=parish_info');
+                        return;
+                    }
                 }
 
                 $imagePath = null;

@@ -73,11 +73,16 @@ class SacramentalController extends BaseController {
         $scope = $_POST['scope'] ?? 'cathedral';
         $type  = $_POST['record_type'] ?? '';
 
-        // Force Chapel Admin to their assigned scope and chapel
-        if ($this->role === 'Chapel Admin' && $this->chapelId !== null) {
-            $_POST['chapel_id'] = $this->chapelId;
+        $isGlobalAdmin = in_array($this->role, ['Admin', 'Cathedral Admin'], true);
+        // Force non-global admins (Chapel Admin / Chapel Staff / Cathedral Staff) to their assigned chapel or Cathedral
+        if (!$isGlobalAdmin && $this->chapelId !== null && (int)$this->chapelId > 0) {
+            $_POST['chapel_id'] = (int)$this->chapelId;
             $_POST['scope'] = 'chapel';
             $scope = 'chapel';
+        } elseif (!$isGlobalAdmin) {
+            $_POST['chapel_id'] = 0;
+            $_POST['scope'] = 'cathedral';
+            $scope = 'cathedral';
         } else {
             // Auto-correct scope based on chapel_id for Super/Cathedral Admins
             if (!empty($_POST['chapel_id'])) {
@@ -546,14 +551,14 @@ class SacramentalController extends BaseController {
         }
 
         // Enforce role-based chapel isolation on scope & chapel_id
-        if ($this->role === 'Chapel Admin' && $this->chapelId !== null) {
+        if (!$isAdmin && $this->chapelId !== null && (int)$this->chapelId > 0) {
             $scope = 'chapel';
             $chapelId = (int)$this->chapelId;
-        } elseif ($targetRecordId > 0 && !$isAdmin) {
-            $scope = $oldRecord['scope'] ?? 'chapel';
-            $chapelId = (int)($oldRecord['chapel_id'] ?? 0);
+        } elseif (!$isAdmin) {
+            $scope = 'cathedral';
+            $chapelId = 0;
         } else {
-            $requestedScope = trim($_POST['scope'] ?? ($isAdmin ? 'cathedral' : 'chapel'));
+            $requestedScope = trim($_POST['scope'] ?? 'cathedral');
             $scope = in_array($requestedScope, ['cathedral', 'chapel'], true) ? $requestedScope : 'cathedral';
             $chapelId = (int)($_POST['chapel_id'] ?? ($scope === 'chapel' ? $userChapel : 0));
             if ($scope === 'cathedral') {

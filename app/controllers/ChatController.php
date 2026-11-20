@@ -74,10 +74,11 @@ class ChatController extends BaseController {
                     break;
             }
         } catch (Throwable $e) {
+            error_log('ChatController error: ' . $e->getMessage());
             http_response_code(500);
             echo json_encode([
                 'success' => false,
-                'error'   => 'Chat server error: ' . $e->getMessage()
+                'error'   => 'An unexpected chat server error occurred. Please try again.'
             ]);
         }
         exit();
@@ -265,7 +266,7 @@ class ChatController extends BaseController {
     private function ajaxMarkRead(): void {
         $roomId = (int)($_POST['room_id'] ?? ($_GET['room_id'] ?? 0));
         $userId = (int)$this->userId;
-        if ($roomId > 0) {
+        if ($roomId > 0 && $this->chatModel->canAccessRoom($roomId, $userId)) {
             $this->chatModel->markAsRead($roomId, $userId);
         }
         $totalUnread = $this->chatModel->getTotalUnreadCount($userId);

@@ -74,7 +74,7 @@ $voided_donations = fetch_all_params($conn, "SELECT donor_name, amount, date_rec
 $ticketSql = $userChapelId ? "SELECT status, COUNT(*) as cnt FROM tickets WHERE created_at BETWEEN ? AND ? AND chapel_id = $userChapelId GROUP BY status" : "SELECT status, COUNT(*) as cnt FROM tickets WHERE created_at BETWEEN ? AND ? GROUP BY status";
 $tickets_status = fetch_all_params($conn, $ticketSql, [$p1, $p2]);
 $auditSql = $userChapelId
-    ? "SELECT al.performed_by_name, al.action, al.module, COUNT(*) as cnt FROM audit_logs al JOIN users u ON al.performed_by = u.id WHERE al.created_at BETWEEN ? AND ? AND u.chapel_id = $userChapelId GROUP BY al.performed_by_name, al.action, al.module ORDER BY cnt DESC LIMIT 15"
+    ? "SELECT al.performed_by_name, al.action, al.module, COUNT(*) as cnt FROM audit_logs al JOIN users u ON al.performed_by_id = u.id WHERE al.created_at BETWEEN ? AND ? AND u.chapel_id = $userChapelId GROUP BY al.performed_by_name, al.action, al.module ORDER BY cnt DESC LIMIT 15"
     : "SELECT performed_by_name, action, module, COUNT(*) as cnt FROM audit_logs WHERE created_at BETWEEN ? AND ? GROUP BY performed_by_name, action, module ORDER BY cnt DESC LIMIT 15";
 $staff_activity = fetch_all_params($conn, $auditSql, [$p1, $p2]);
 

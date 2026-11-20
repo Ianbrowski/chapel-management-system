@@ -235,21 +235,26 @@ class FinanceController extends BaseController {
         }
         
         $amount   = (float)($_POST['amount'] ?? 0);
-        if ($amount <= 0) {
-            $this->flash('error', 'Donation amount must be greater than zero.');
+        if (!is_finite($amount) || $amount <= 0 || $amount > 100000000) {
+            $this->flash('error', 'Donation amount must be greater than zero and within valid limits.');
             $this->redirect('dashboard.php?section=donations');
         }
 
-        $purpose  = $_POST['purpose'] ?? '';
-        $donor    = $_POST['donor_name'] ?? '';
+        $purpose  = mb_substr(trim((string)($_POST['purpose'] ?? '')), 0, 255);
+        $donor    = mb_substr(trim((string)($_POST['donor_name'] ?? '')), 0, 150);
+        if ($donor === '') {
+            $donor = 'Anonymous';
+        }
         $date     = $_POST['date_received'] ?? date('Y-m-d');
-        if (strtotime($date) > time()) {
-            $this->flash('error', 'Donation date cannot be in the future.');
+        if (strtotime($date) === false || strtotime($date) > time()) {
+            $this->flash('error', 'Donation date is invalid or cannot be in the future.');
             $this->redirect('dashboard.php?section=donations');
         }
-        $method   = $_POST['payment_method'] ?? 'Cash';
+        $allowedMethods = ['Cash', 'GCash', 'Bank Transfer', 'Maya', 'Check', 'Other'];
+        $rawMethod = trim((string)($_POST['payment_method'] ?? 'Cash'));
+        $method   = in_array($rawMethod, $allowedMethods, true) ? $rawMethod : 'Cash';
         $chapelId = $this->getAppliedChapelId($_POST['chapel_id'] ?? 0);
-        $donorRef = trim($_POST['donor_ref_id'] ?? '');
+        $donorRef = mb_substr(trim((string)($_POST['donor_ref_id'] ?? '')), 0, 100);
         $refId    = $this->donationModel->generateRefId();
 
         $id = $this->donationModel->log($chapelId, $amount, $purpose, $donor, $date, $refId, $this->userId, $method, $donorRef);

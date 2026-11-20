@@ -342,7 +342,7 @@ class Event
                         LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
                         LEFT JOIN users u ON e.pastor_id = u.id
                         LEFT JOIN users u_req ON e.requested_by = u_req.id
-                        WHERE (e.chapel_id IS NULL OR e.chapel_id = 0) AND e.is_archived = 0 AND e.event_type != 'Ecclesiastical Certificates'
+                        WHERE (e.chapel_id IS NULL OR e.chapel_id = 0) AND e.is_archived = 0 AND e.event_type != 'Ecclesiastical Certificates' AND e.event_type NOT LIKE '%Certificate%' AND (e.service_id IS NULL OR e.service_id != 8)
                         ORDER BY e.start_time DESC LIMIT ?";
                 $s = $this->conn->prepare($sql);
                 if (!$s) {
@@ -358,7 +358,7 @@ class Event
                    LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
                    LEFT JOIN users u ON e.pastor_id = u.id
                    LEFT JOIN users u_req ON e.requested_by = u_req.id
-                   WHERE e.chapel_id = ? AND e.is_archived = 0 AND e.event_type != 'Ecclesiastical Certificates'
+                   WHERE e.chapel_id = ? AND e.is_archived = 0 AND e.event_type != 'Ecclesiastical Certificates' AND e.event_type NOT LIKE '%Certificate%' AND (e.service_id IS NULL OR e.service_id != 8)
                    ORDER BY e.start_time DESC LIMIT ?");
                 if (!$s) {
                     return $events;
@@ -375,7 +375,7 @@ class Event
                LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
                LEFT JOIN users u ON e.pastor_id = u.id
                LEFT JOIN users u_req ON e.requested_by = u_req.id
-               WHERE e.is_archived = 0 AND e.event_type != 'Ecclesiastical Certificates'
+               WHERE e.is_archived = 0 AND e.event_type != 'Ecclesiastical Certificates' AND e.event_type NOT LIKE '%Certificate%' AND (e.service_id IS NULL OR e.service_id != 8)
                ORDER BY e.start_time DESC LIMIT ?");
             if (!$s) {
                 return $events;

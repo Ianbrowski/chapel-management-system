@@ -39,6 +39,7 @@ function sendChurchEmail($recipientEmail, $recipientName, $subject, $body, $chap
                 $config['secure'] = $row['smtp_secure'] ?: 'tls';
                 if (!empty($row['from_name'])) $config['from_name'] = $row['from_name'];
                 if (!empty($row['from_email'])) $config['from_email'] = $row['from_email'];
+                $config['enabled'] = !empty($config['host']) && !empty($config['user']) && !empty($config['pass']);
             }
         }
     }

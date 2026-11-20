@@ -200,7 +200,7 @@ class EventConflictService
             $sql .= "chapel_id = ?";
         }
 
-        $sql .= " AND start_time >= DATE_SUB(?, INTERVAL 1 DAY) AND start_time <= DATE_ADD(?, INTERVAL 1 DAY) AND status NOT IN ('Cancelled', 'Rejected') AND is_archived = 0 AND (event_type != 'Ecclesiastical Certificates' AND event_type NOT LIKE '%Certificate%') FOR UPDATE";
+        $sql .= " AND start_time >= DATE_SUB(?, INTERVAL 1 DAY) AND start_time <= DATE_ADD(?, INTERVAL 1 DAY) AND status NOT IN ('Cancelled', 'Rejected') AND is_archived = 0 AND COALESCE(event_type, '') != 'Ecclesiastical Certificates' AND COALESCE(event_type, '') NOT LIKE '%Certificate%' AND (service_id IS NULL OR service_id != 8) FOR UPDATE";
 
         $stmt = $this->conn->prepare($sql);
         $fullStart = date('Y-m-d H:i:s', $newStartTs);
@@ -240,7 +240,9 @@ class EventConflictService
                 AND start_time <= DATE_ADD(?, INTERVAL 1 DAY)
                 AND status NOT IN ('Cancelled', 'Rejected')
                 AND is_archived = 0
-                AND (event_type != 'Ecclesiastical Certificates' AND event_type NOT LIKE '%Certificate%') FOR UPDATE"
+                AND COALESCE(event_type, '') != 'Ecclesiastical Certificates'
+                AND COALESCE(event_type, '') NOT LIKE '%Certificate%'
+                AND (service_id IS NULL OR service_id != 8) FOR UPDATE"
         );
         $fullStart = date('Y-m-d H:i:s', $newStartTs);
         $stmt->bind_param('iss', $pastorId, $fullStart, $fullStart);

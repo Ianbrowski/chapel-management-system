@@ -1,6 +1,9 @@
 <?php
 class EventAnalyticsService
 {
+    private const NON_CERT_SQL = "(COALESCE(event_type, '') != 'Ecclesiastical Certificates' AND COALESCE(event_type, '') NOT LIKE '%Certificate%' AND (service_id IS NULL OR service_id != 8))";
+    private const NON_CERT_E_SQL = "(COALESCE(e.event_type, '') != 'Ecclesiastical Certificates' AND COALESCE(e.event_type, '') NOT LIKE '%Certificate%' AND (e.service_id IS NULL OR e.service_id != 8))";
+
     private mysqli $conn;
 
     public function __construct(mysqli $conn)
@@ -17,7 +20,7 @@ class EventAnalyticsService
                  FROM events e
                  LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
                  WHERE e.start_time >= NOW() AND e.chapel_id = ? AND e.is_archived = 0
-                   AND (e.event_type != 'Ecclesiastical Certificates' AND e.event_type NOT LIKE '%Certificate%')
+                   AND " . self::NON_CERT_E_SQL . "
                  ORDER BY e.start_time ASC LIMIT ?"
             );
             $stmt->bind_param('ii', $chapelId, $limit);
@@ -27,7 +30,7 @@ class EventAnalyticsService
                  FROM events e
                  LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
                  WHERE e.start_time >= NOW() AND e.is_archived = 0
-                   AND (e.event_type != 'Ecclesiastical Certificates' AND e.event_type NOT LIKE '%Certificate%')
+                   AND " . self::NON_CERT_E_SQL . "
                  ORDER BY e.start_time ASC LIMIT ?"
             );
             $stmt->bind_param('i', $limit);
@@ -94,7 +97,7 @@ class EventAnalyticsService
             $chapelId = null;
         }
         
-        $sql = "SELECT event_type, COUNT(*) as c FROM events WHERE is_archived = 0";
+        $sql = "SELECT event_type, COUNT(*) as c FROM events WHERE is_archived = 0 AND " . self::NON_CERT_SQL;
         $params = [];
         $types = '';
         if ($chapelId !== null) {
@@ -113,7 +116,7 @@ class EventAnalyticsService
             $chapelId = null;
         }
         
-        $sql = "SELECT status, COUNT(*) as c FROM events WHERE is_archived = 0";
+        $sql = "SELECT status, COUNT(*) as c FROM events WHERE is_archived = 0 AND " . self::NON_CERT_SQL;
         $params = [];
         $types = '';
         if ($chapelId !== null) {
@@ -134,7 +137,7 @@ class EventAnalyticsService
         
         $params = [];
         $types = '';
-        $where = "WHERE is_archived = 0 AND start_time >= DATE_SUB(NOW(), INTERVAL 12 MONTH)";
+        $where = "WHERE is_archived = 0 AND " . self::NON_CERT_SQL . " AND start_time >= DATE_SUB(NOW(), INTERVAL 12 MONTH)";
         if ($chapelId !== null) {
             $where .= " AND chapel_id = ?";
             $params[] = $chapelId;

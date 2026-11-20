@@ -566,7 +566,7 @@ class EventController extends BaseController {
             $this->conn->begin_transaction();
             // Optional: Re-check conflict before final approval (skip for office-only Certificates)
             $recType = (string)($record['event_type'] ?? '');
-            $isCertRecord = ($recType === 'Ecclesiastical Certificates' || stripos($recType, 'Certificate') !== false);
+            $isCertRecord = ($recType === 'Ecclesiastical Certificates' || stripos($recType, 'Certificate') !== false || (int)($record['service_id'] ?? 0) === 8);
             if (!$isCertRecord) {
                 $conflict = $this->eventModel->checkConflict($record['start_time'], $pastor, $record['chapel_id'], $recType, $id, $record['custom_duration']);
                 if ($conflict['conflict']) {

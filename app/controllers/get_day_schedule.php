@@ -39,7 +39,10 @@ $sql = "SELECT event_id, title, start_time, event_type, status, custom_duration
         WHERE " . ($venueId === null ? "(chapel_id IS NULL OR chapel_id = 0)" : "chapel_id = ?") . "
           AND DATE(start_time) = ? 
           AND status NOT IN ('Cancelled', 'Rejected') 
-          AND is_archived = 0";
+          AND is_archived = 0
+          AND COALESCE(event_type, '') != 'Ecclesiastical Certificates'
+          AND COALESCE(event_type, '') NOT LIKE '%Certificate%'
+          AND (service_id IS NULL OR service_id != 8)";
 
 if ($exclude) {
     $sql .= " AND event_id != " . (int)$exclude;

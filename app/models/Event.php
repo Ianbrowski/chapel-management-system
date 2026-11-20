@@ -4,6 +4,9 @@ require_once __DIR__ . '/../services/EventAnalyticsService.php';
 
 class Event
 {
+    private const NON_CERT_SQL = "(COALESCE(event_type, '') != 'Ecclesiastical Certificates' AND COALESCE(event_type, '') NOT LIKE '%Certificate%' AND (service_id IS NULL OR service_id != 8))";
+    private const NON_CERT_E_SQL = "(COALESCE(e.event_type, '') != 'Ecclesiastical Certificates' AND COALESCE(e.event_type, '') NOT LIKE '%Certificate%' AND (e.service_id IS NULL OR e.service_id != 8))";
+
     private $conn;
     private EventConflictService $conflicts;
     private EventAnalyticsService $analytics;
@@ -342,7 +345,7 @@ class Event
                         LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
                         LEFT JOIN users u ON e.pastor_id = u.id
                         LEFT JOIN users u_req ON e.requested_by = u_req.id
-                        WHERE (e.chapel_id IS NULL OR e.chapel_id = 0) AND e.is_archived = 0 AND e.event_type != 'Ecclesiastical Certificates' AND e.event_type NOT LIKE '%Certificate%' AND (e.service_id IS NULL OR e.service_id != 8)
+                        WHERE (e.chapel_id IS NULL OR e.chapel_id = 0) AND e.is_archived = 0 AND " . self::NON_CERT_E_SQL . "
                         ORDER BY e.start_time DESC LIMIT ?";
                 $s = $this->conn->prepare($sql);
                 if (!$s) {
@@ -358,7 +361,7 @@ class Event
                    LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
                    LEFT JOIN users u ON e.pastor_id = u.id
                    LEFT JOIN users u_req ON e.requested_by = u_req.id
-                   WHERE e.chapel_id = ? AND e.is_archived = 0 AND e.event_type != 'Ecclesiastical Certificates' AND e.event_type NOT LIKE '%Certificate%' AND (e.service_id IS NULL OR e.service_id != 8)
+                   WHERE e.chapel_id = ? AND e.is_archived = 0 AND " . self::NON_CERT_E_SQL . "
                    ORDER BY e.start_time DESC LIMIT ?");
                 if (!$s) {
                     return $events;
@@ -375,7 +378,7 @@ class Event
                LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
                LEFT JOIN users u ON e.pastor_id = u.id
                LEFT JOIN users u_req ON e.requested_by = u_req.id
-               WHERE e.is_archived = 0 AND e.event_type != 'Ecclesiastical Certificates' AND e.event_type NOT LIKE '%Certificate%' AND (e.service_id IS NULL OR e.service_id != 8)
+               WHERE e.is_archived = 0 AND " . self::NON_CERT_E_SQL . "
                ORDER BY e.start_time DESC LIMIT ?");
             if (!$s) {
                 return $events;
@@ -463,15 +466,15 @@ class Event
         $requests = [];
         $st = strtolower($filters['status'] ?? 'pending');
         if ($st === 'all') {
-            $where = "WHERE e.is_archived = 0";
+            $where = "WHERE e.is_archived = 0 AND " . self::NON_CERT_E_SQL;
         } elseif ($st === 'confirmed' || $st === 'approved') {
-            $where = "WHERE e.status = 'Confirmed' AND e.is_archived = 0";
+            $where = "WHERE e.status = 'Confirmed' AND e.is_archived = 0 AND " . self::NON_CERT_E_SQL;
         } elseif ($st === 'rejected' || $st === 'cancelled') {
-            $where = "WHERE e.status IN ('Rejected', 'Cancelled') AND e.is_archived = 0";
+            $where = "WHERE e.status IN ('Rejected', 'Cancelled') AND e.is_archived = 0 AND " . self::NON_CERT_E_SQL;
         } elseif ($st === 'urgent') {
-            $where = "WHERE e.status = 'Pending' AND e.is_archived = 0 AND (e.start_time < NOW() OR e.start_time <= DATE_ADD(NOW(), INTERVAL 3 DAY))";
+            $where = "WHERE e.status = 'Pending' AND e.is_archived = 0 AND " . self::NON_CERT_E_SQL . " AND (e.start_time < NOW() OR e.start_time <= DATE_ADD(NOW(), INTERVAL 3 DAY))";
         } else {
-            $where = "WHERE e.status = 'Pending' AND e.is_archived = 0";
+            $where = "WHERE e.status = 'Pending' AND e.is_archived = 0 AND " . self::NON_CERT_E_SQL;
         }
         $params = [];
         $types = "";
@@ -598,7 +601,7 @@ class Event
                 SUM(CASE WHEN status = 'Confirmed' THEN 1 ELSE 0 END) as confirmed,
                 SUM(CASE WHEN status IN ('Rejected', 'Cancelled') THEN 1 ELSE 0 END) as rejected
             FROM events
-            WHERE is_archived = 0 $chapelClause
+            WHERE is_archived = 0 AND " . self::NON_CERT_SQL . " $chapelClause
         ";
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) {
@@ -621,7 +624,7 @@ class Event
 
     public function getPendingCount($chapelId = null): int
     {
-        $sql = "SELECT COUNT(*) as total FROM events WHERE status = 'Pending' AND is_archived = 0";
+        $sql = "SELECT COUNT(*) as total FROM events WHERE status = 'Pending' AND is_archived = 0 AND " . self::NON_CERT_SQL;
         if ($chapelId !== null) {
             $isCathedral = ($chapelId === 'cathedral' || (is_numeric($chapelId) && (int)$chapelId === 0));
             if ($isCathedral) {
@@ -727,7 +730,7 @@ class Event
                 LEFT JOIN users u ON e.requested_by = u.id
                 LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
                 LEFT JOIN users pu ON e.pastor_id = pu.id
-                WHERE e.status='Pending' AND e.is_archived = 0 AND e.start_time < NOW()";
+                WHERE e.status='Pending' AND e.is_archived = 0 AND e.start_time < NOW() AND " . self::NON_CERT_E_SQL;
         if ($chapelId !== null) {
             $isCathedral = ($chapelId === 'cathedral' || (is_numeric($chapelId) && (int)$chapelId === 0));
             if ($isCathedral) {
@@ -794,12 +797,12 @@ class Event
         if ($chapelId !== null) {
             $isCathedral = ($chapelId === 'cathedral' || (is_numeric($chapelId) && (int)$chapelId === 0));
             if ($isCathedral) {
-                $s = $this->conn->prepare("SELECT COUNT(*) as c FROM events WHERE (chapel_id IS NULL OR chapel_id = 0) AND is_archived = 0");
+                $s = $this->conn->prepare("SELECT COUNT(*) as c FROM events WHERE (chapel_id IS NULL OR chapel_id = 0) AND is_archived = 0 AND " . self::NON_CERT_SQL);
                 if (!$s) {
                     return 0;
                 }
             } else {
-                $s = $this->conn->prepare("SELECT COUNT(*) as c FROM events WHERE chapel_id = ? AND is_archived = 0");
+                $s = $this->conn->prepare("SELECT COUNT(*) as c FROM events WHERE chapel_id = ? AND is_archived = 0 AND " . self::NON_CERT_SQL);
                 if (!$s) {
                     return 0;
                 }
@@ -807,7 +810,7 @@ class Event
                 $s->bind_param('i', $cid);
             }
         } else {
-            $s = $this->conn->prepare("SELECT COUNT(*) as c FROM events WHERE is_archived = 0");
+            $s = $this->conn->prepare("SELECT COUNT(*) as c FROM events WHERE is_archived = 0 AND " . self::NON_CERT_SQL);
             if (!$s) {
                 return 0;
             }
@@ -823,12 +826,12 @@ class Event
         if ($chapelId !== null) {
             $isCathedral = ($chapelId === 'cathedral' || (is_numeric($chapelId) && (int)$chapelId === 0));
             if ($isCathedral) {
-                $s = $this->conn->prepare("SELECT COUNT(*) as c FROM events WHERE (chapel_id IS NULL OR chapel_id = 0) AND is_archived = 1");
+                $s = $this->conn->prepare("SELECT COUNT(*) as c FROM events WHERE (chapel_id IS NULL OR chapel_id = 0) AND is_archived = 1 AND " . self::NON_CERT_SQL);
                 if (!$s) {
                     return 0;
                 }
             } else {
-                $s = $this->conn->prepare("SELECT COUNT(*) as c FROM events WHERE chapel_id = ? AND is_archived = 1");
+                $s = $this->conn->prepare("SELECT COUNT(*) as c FROM events WHERE chapel_id = ? AND is_archived = 1 AND " . self::NON_CERT_SQL);
                 if (!$s) {
                     return 0;
                 }
@@ -836,7 +839,7 @@ class Event
                 $s->bind_param('i', $cid);
             }
         } else {
-            $s = $this->conn->prepare("SELECT COUNT(*) as c FROM events WHERE is_archived = 1");
+            $s = $this->conn->prepare("SELECT COUNT(*) as c FROM events WHERE is_archived = 1 AND " . self::NON_CERT_SQL);
             if (!$s) {
                 return 0;
             }
@@ -849,7 +852,7 @@ class Event
 
     public function getCountByStatus($status, $chapelId = null)
     {
-        $where = "WHERE status=? AND is_archived=0";
+        $where = "WHERE status=? AND is_archived=0 AND " . self::NON_CERT_SQL;
         $params = [$status];
         $types = "s";
         
@@ -948,7 +951,7 @@ class Event
                 FROM events e 
                 LEFT JOIN chapels c ON e.chapel_id = c.chapel_id 
                 LEFT JOIN users u ON e.pastor_id = u.id 
-                WHERE e.status = 'Confirmed' AND e.start_time < NOW() AND e.is_archived = 0";
+                WHERE e.status = 'Confirmed' AND e.start_time < NOW() AND e.is_archived = 0 AND " . self::NON_CERT_E_SQL;
 
         $params = [];
         $types = "";
@@ -1001,7 +1004,7 @@ class Event
     public function getScheduleMisplacements($chapelId = null): array
     {
         $issues = [];
-        $where = "WHERE e.is_archived = 0 AND e.status NOT IN ('Cancelled', 'Rejected')";
+        $where = "WHERE e.is_archived = 0 AND e.status NOT IN ('Cancelled', 'Rejected') AND " . self::NON_CERT_E_SQL;
         $params = [];
         $types = '';
 
@@ -1045,7 +1048,7 @@ class Event
     public function getScheduleConflicts($chapelId = null): array
     {
         $events = [];
-        $where = "WHERE e.is_archived = 0 AND e.status NOT IN ('Cancelled', 'Rejected')";
+        $where = "WHERE e.is_archived = 0 AND e.status NOT IN ('Cancelled', 'Rejected') AND " . self::NON_CERT_E_SQL;
         $params = [];
         $types = '';
 
@@ -1177,10 +1180,11 @@ class Event
         }
 
         if (!empty($filters['is_certificate'])) {
-            $where[] = "(e.event_type = 'Ecclesiastical Certificates' OR e.event_type LIKE '%Certificate%' OR e.service_id = 8)";
+            $where[] = "(COALESCE(e.event_type, '') = 'Ecclesiastical Certificates' OR COALESCE(e.event_type, '') LIKE '%Certificate%' OR e.service_id = 8)";
         } elseif (!empty($filters['exclude_certificates'])) {
-            $where[] = "(e.event_type != 'Ecclesiastical Certificates' AND e.event_type NOT LIKE '%Certificate%' AND (e.service_id IS NULL OR e.service_id != 8))";
-        } elseif (!empty($filters['event_type'])) {
+            $where[] = self::NON_CERT_E_SQL;
+        }
+        if (!empty($filters['event_type'])) {
             $where[] = 'e.event_type = ?';
             $params[] = $filters['event_type'];
             $types .= 's';

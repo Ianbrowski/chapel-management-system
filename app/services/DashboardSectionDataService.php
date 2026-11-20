@@ -385,7 +385,8 @@ class DashboardSectionDataService
         $evPage = (int) ($_GET['page'] ?? $_GET['ev_page'] ?? 1);
         $filters = [
             'venue_scope' => $scope,
-            'sort' => $_GET['sort'] ?? $_GET['ev_sort'] ?? 'date_desc'
+            'sort' => $_GET['sort'] ?? $_GET['ev_sort'] ?? 'date_desc',
+            'exclude_certificates' => true,
         ];
         if (!empty($_GET['search'])) {
             $filters['search'] = trim($_GET['search']);

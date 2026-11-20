@@ -142,11 +142,25 @@ $isAllActive = empty($curType);
 }
 .records-split-panel {
     display: flex;
-    gap: 16px;
+    gap: 14px;
     width: 100%;
     flex: 1;
     min-height: 0;
     overflow: hidden;
+}
+.records-split-panel .panel {
+    padding: 0 !important;
+    margin-bottom: 0 !important;
+}
+.records-split-panel .panel-header {
+    padding: 11px 16px !important;
+}
+.records-split-right .panel-body {
+    padding: 12px 14px !important;
+}
+.records-filter-toolbar select {
+    width: auto !important;
+    flex: 0 0 auto;
 }
 .records-split-left {
     flex: 1 1 64%;
@@ -276,9 +290,9 @@ $isAllActive = empty($curType);
                 </div>
 
                 <!-- Dedicated Integrated Filter Toolbar -->
-                <div style="padding: 10px 14px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                <div class="records-filter-toolbar" style="padding: 9px 14px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
                     <!-- Left: Search Box -->
-                    <form method="GET" style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px; max-width: 380px; margin: 0;" id="records-filter-form">
+                    <form method="GET" style="display: flex; align-items: center; gap: 8px; flex: 1 1 180px; min-width: 160px; margin: 0;" id="records-filter-form">
                         <input type="hidden" name="section" value="<?php echo $active_section; ?>">
                         <?php if (!empty($curType)): ?>
                         <input type="hidden" name="record_type" value="<?php echo htmlspecialchars($curType); ?>">
@@ -304,7 +318,7 @@ $isAllActive = empty($curType);
                     </form>
 
                     <!-- Right: Dropdown Filters & Sort -->
-                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 0 0 auto;">
                         <?php if ($scope === 'chapel' && in_array($role, ['Admin', 'Cathedral Admin']) && !empty($chapels)): ?>
                         <select id="chapel-records-filter-select"
                                 onchange="window.location.href='dashboard.php?section=<?php echo $active_section; ?>' + (this.value ? '&chapel_id=' + this.value : '') + '<?php echo !empty($curType) ? '&record_type=' . urlencode($curType) : ''; ?><?php echo !empty($searchQuery) ? '&search=' . urlencode($searchQuery) : ''; ?><?php echo !empty($curSort) ? '&rec_sort=' . urlencode($curSort) : ''; ?><?php echo !empty($curTimeframe) ? '&timeframe=' . urlencode($curTimeframe) : ''; ?><?php echo !empty($curPriest) ? '&priest=' . urlencode($curPriest) : ''; ?>'"
@@ -321,7 +335,7 @@ $isAllActive = empty($curType);
 
                         <!-- Timeframe Filter -->
                         <select onchange="document.getElementById('filter-timeframe-val').value = this.value; document.getElementById('records-filter-form').submit();"
-                                style="height: 34px; padding: 0 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; font-weight: 500; cursor: pointer; outline: none;"
+                                style="height: 34px; padding: 0 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; font-weight: 500; cursor: pointer; outline: none; width: auto !important; max-width: 145px;"
                                 title="Filter records by date">
                             <option value="">All Dates</option>
                             <option value="recently_added" <?php echo ($curTimeframe === 'recently_added') ? 'selected' : ''; ?>>Recently Added (30 Days)</option>

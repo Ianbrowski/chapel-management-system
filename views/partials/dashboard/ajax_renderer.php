@@ -65,3 +65,16 @@ switch ($active_section) {
         break;
 }
 ?>
+<script>
+if (typeof window.initSearchAutocomplete !== 'function') {
+    var _parishAcScript = document.createElement('script');
+    _parishAcScript.src = 'assets/js/search-autocomplete.js?v=' + Date.now();
+    _parishAcScript.onload = function() {
+        if (typeof window.initSearchAutocomplete === 'function') window.initSearchAutocomplete();
+    };
+    document.head.appendChild(_parishAcScript);
+} else {
+    if (typeof window.hideSearchAutocomplete === 'function') window.hideSearchAutocomplete();
+    window.initSearchAutocomplete();
+}
+</script>

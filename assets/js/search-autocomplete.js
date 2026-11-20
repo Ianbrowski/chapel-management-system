@@ -123,21 +123,27 @@
                 searchText = [label, sub, badge].join(' ');
             } else if (preset === 'user') {
                 const cells = el.cells || [];
-                const nameCell = cells[0] ? cells[0].innerText.replace(/\s+/g, ' ').trim() : '';
-                const lines = (cells[0] ? cells[0].innerText : '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
-                label = lines[0] || el.dataset.name || nameCell;
+                const profileCell = cells[1] || cells[0];
+                const nameSpan = profileCell ? profileCell.querySelector('div[style*="font-weight: 600"] > span') : null;
+                const rawLines = (profileCell ? profileCell.innerText : '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+                label = (nameSpan ? nameSpan.textContent.trim() : '') || rawLines[0] || el.dataset.name || '';
                 value = label;
-                sub = lines.slice(1, 3).join(' · ');
-                badge = cells[1] ? cells[1].innerText.replace(/\s+/g, ' ').trim() : '';
-                searchText = [label, sub, el.dataset.name || '', el.dataset.email || '', nameCell].join(' ');
+                const handleEmail = rawLines.filter(function (line) { return line.startsWith('@') || line.includes('@'); }).slice(0, 2);
+                sub = handleEmail.join(' · ') || rawLines.slice(1, 3).join(' · ');
+                const roleBadge = cells[2] ? cells[2].querySelector('.badge') : null;
+                badge = roleBadge ? roleBadge.textContent.trim() : (el.dataset.role || '').toUpperCase();
+                searchText = [label, sub, el.dataset.name || '', el.getAttribute('data-status-filter') || ''].join(' ');
             } else if (preset === 'chapel') {
                 const cells = el.cells || [];
-                const lines = (cells[0] ? cells[0].innerText : '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
-                label = lines[0] || el.dataset.name || '';
+                const infoCell = cells[1] || cells[0];
+                const strongEl = infoCell ? infoCell.querySelector('strong') : null;
+                const rawLines = (infoCell ? infoCell.innerText : '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+                label = (strongEl ? strongEl.textContent.trim() : '') || rawLines[0] || el.dataset.name || '';
                 value = label;
-                const loc = cells[1] ? cells[1].innerText.replace(/\s+/g, ' ').trim() : '';
-                const saint = cells[2] ? cells[2].innerText.replace(/\s+/g, ' ').trim() : '';
-                sub = [loc, saint].filter(Boolean).join(' · ');
+                sub = rawLines.slice(1).join(' · ').replace(new RegExp('^' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*'), '').trim();
+                if (!sub && cells[2]) {
+                    sub = cells[2].innerText.replace(/\s+/g, ' ').trim();
+                }
                 badge = (el.dataset.status || '').toUpperCase();
                 searchText = [label, sub, el.dataset.name || ''].join(' ');
             } else if (preset === 'catalog') {
@@ -152,26 +158,32 @@
                 searchText = [label, sub, el.dataset.name || ''].join(' ');
             } else if (preset === 'sale') {
                 const cells = el.cells || [];
-                const buyer = cells[1] ? cells[1].innerText.replace(/\s+/g, ' ').trim() : (el.dataset.buyer || '');
-                const item = cells[2] ? cells[2].innerText.replace(/\s+/g, ' ').trim() : (el.dataset.item || '');
+                const item = cells[1] ? cells[1].innerText.replace(/\s+/g, ' ').trim() : (el.dataset.item || '');
+                const buyer = cells[2] ? cells[2].innerText.replace(/\s+/g, ' ').trim() : (el.dataset.buyer || '');
+                const dateTxt = cells[0] ? cells[0].innerText.split('\n')[0].trim() : '';
                 label = item || buyer;
                 value = item || buyer;
-                sub = buyer ? ('Buyer: ' + buyer) : '';
+                sub = [buyer ? ('Buyer: ' + buyer) : '', dateTxt].filter(Boolean).join(' · ');
                 badge = cells[4] ? cells[4].innerText.replace(/\s+/g, ' ').trim() : '';
                 searchText = [item, buyer, el.dataset.item || '', el.dataset.buyer || ''].join(' ');
             } else if (preset === 'pos') {
-                const titleEl = el.querySelector('.pos-card-title, div[style*="font-weight: 700"]');
+                const titleEl = el.querySelector('div[style*="font-weight: 700"][style*="text-overflow"]') || el.querySelector('div[style*="font-weight: 700"]');
                 label = (titleEl ? titleEl.textContent.trim() : '') || (el.dataset.name || '');
                 value = label;
-                const metaText = el.innerText.replace(/\s+/g, ' ').trim();
-                sub = metaText.replace(label, '').trim().slice(0, 60);
-                searchText = [label, el.dataset.name || '', metaText].join(' ');
+                const priceEl = el.querySelector('div[style*="bottom: 6px"][style*="right: 6px"]');
+                badge = priceEl ? priceEl.textContent.trim() : '';
+                const stockSpan = el.querySelector('span');
+                sub = stockSpan ? stockSpan.textContent.replace(/\s+/g, ' ').trim() : '';
+                searchText = [label, el.dataset.name || '', sub].join(' ');
             } else if (preset === 'inquiry') {
                 const cell = (el.cells && el.cells[1]) ? el.cells[1] : el;
+                const strongName = cell.querySelector('strong');
+                const catSpan = cell.querySelector('div[style*="font-weight: 600"] > span:first-of-type');
                 const lines = cell.innerText.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
-                label = lines[0] || '';
+                label = (strongName ? strongName.textContent.trim() : '') || lines[0] || '';
                 value = label;
-                sub = lines.slice(1, 3).join(' · ');
+                sub = [catSpan ? catSpan.textContent.trim() : '', lines[0] || ''].filter(Boolean).join(' · ');
+                if (sub === label) sub = lines.slice(1).join(' · ');
                 const statusCell = el.cells && el.cells[el.cells.length - 1];
                 badge = statusCell ? statusCell.innerText.replace(/\s+/g, ' ').trim().slice(0, 20) : '';
                 searchText = cell.innerText;

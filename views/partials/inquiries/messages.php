@@ -9,7 +9,7 @@
 ?>
 <link rel="stylesheet" href="assets/css/workspace.css?v=2.5">
 
-<div class="workspace workspace-fluid">
+<div class="workspace workspace-fluid inbox-workspace">
 
     <!-- ─── PAGE HEADER (ROW 1: TITLE + STAT BADGES PINNED TOP-RIGHT) ─── -->
     <div class="page-header-bar" style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 6px; flex-wrap: wrap; gap: 10px;">
@@ -43,7 +43,7 @@
 
     <?php if (!$isMember): ?>
     <!-- ─── SUBNAV ROW (ROW 2: TABS ON LEFT, ACTIONS ON RIGHT) ─── -->
-    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 0; flex-wrap: wrap;">
         <!-- Left: Segmented Navigation Tabs -->
         <div style="display: inline-flex; align-items: center; background: var(--bg3, #F4F4F5); padding: 3px; border-radius: 999px; border: 1px solid var(--border); gap: 2px;">
             <a href="dashboard.php?section=public_inquiries&inbox_tab=active"
@@ -298,6 +298,14 @@
 </form>
 
 <style>
+.inbox-workspace {
+    gap: 10px !important;
+    padding: 14px 20px 20px !important;
+}
+.inbox-workspace .page-header-bar {
+    padding-bottom: 10px !important;
+    margin-bottom: 0 !important;
+}
 .inbox-split-panel {
     display: flex;
     gap: var(--split-gap, clamp(16px, 1.8vw, 24px));

@@ -18,59 +18,61 @@ $dryRun = in_array('--dry-run', $argv ?? [], true);
 $safeBoot = in_array('--safe-boot', $argv ?? [], true);
 echo "=== CATHEDRAL DB INTEGRITY MIGRATION (" . ($dryRun ? 'DRY-RUN' : ($safeBoot ? 'SAFE-BOOT' : 'APPLY')) . ") ===\n";
 
-function columnExists(mysqli $conn, string $table, string $column): bool
-{
-    $stmt = $conn->prepare(
-        "SELECT IS_NULLABLE FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1"
-    );
-    if (!$stmt) return false;
-    $stmt->bind_param('ss', $table, $column);
-    $stmt->execute();
-    $exists = (bool)$stmt->get_result()->fetch_row();
-    $stmt->close();
-    return $exists;
+if (!isset($conn) || !($conn instanceof mysqli) || $conn->connect_error) {
+    echo "[SKIP] Database connection unavailable.\n";
+    exit($safeBoot ? 0 : 1);
 }
 
-function isColumnNullable(mysqli $conn, string $table, string $column): bool
-{
-    $stmt = $conn->prepare(
-        "SELECT IS_NULLABLE FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1"
-    );
-    if (!$stmt) return false;
-    $stmt->bind_param('ss', $table, $column);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    return strtoupper((string)($row['IS_NULLABLE'] ?? 'NO')) === 'YES';
+// Batch-fetch metadata in 3 queries (avoids hundreds of roundtrips over remote TLS)
+$existingIndexes = [];
+$rIdx = $conn->query("SELECT TABLE_NAME, INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE()");
+if ($rIdx) {
+    while ($row = $rIdx->fetch_assoc()) {
+        $existingIndexes[$row['TABLE_NAME'] . '.' . $row['INDEX_NAME']] = true;
+    }
+    $rIdx->free();
+}
+
+$existingColumns = [];
+$rCols = $conn->query("SELECT TABLE_NAME, COLUMN_NAME, IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()");
+if ($rCols) {
+    while ($row = $rCols->fetch_assoc()) {
+        $existingColumns[$row['TABLE_NAME'] . '.' . $row['COLUMN_NAME']] = (strtoupper((string)$row['IS_NULLABLE']) === 'YES');
+    }
+    $rCols->free();
+}
+
+$existingFks = [];
+$rFks = $conn->query("SELECT TABLE_NAME, CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_TYPE = 'FOREIGN KEY'");
+if ($rFks) {
+    while ($row = $rFks->fetch_assoc()) {
+        $existingFks[$row['TABLE_NAME'] . '.' . $row['CONSTRAINT_NAME']] = true;
+    }
+    $rFks->free();
 }
 
 function hasIndex(mysqli $conn, string $table, string $indexName): bool
 {
-    $stmt = $conn->prepare(
-        "SELECT 1 FROM information_schema.STATISTICS
-         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1"
-    );
-    $stmt->bind_param('ss', $table, $indexName);
-    $stmt->execute();
-    $exists = (bool)$stmt->get_result()->fetch_row();
-    $stmt->close();
-    return $exists;
+    global $existingIndexes;
+    return isset($existingIndexes[$table . '.' . $indexName]);
 }
 
 function hasForeignKey(mysqli $conn, string $table, string $fkName): bool
 {
-    $stmt = $conn->prepare(
-        "SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
-         WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = ?
-           AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY' LIMIT 1"
-    );
-    $stmt->bind_param('ss', $table, $fkName);
-    $stmt->execute();
-    $exists = (bool)$stmt->get_result()->fetch_row();
-    $stmt->close();
-    return $exists;
+    global $existingFks;
+    return isset($existingFks[$table . '.' . $fkName]);
+}
+
+function columnExists(mysqli $conn, string $table, string $column): bool
+{
+    global $existingColumns;
+    return array_key_exists($table . '.' . $column, $existingColumns);
+}
+
+function isColumnNullable(mysqli $conn, string $table, string $column): bool
+{
+    global $existingColumns;
+    return !empty($existingColumns[$table . '.' . $column]);
 }
 
 // Step 0: Normalize empty reference_id in sacramental_records to NULL for UNIQUE index safety

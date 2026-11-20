@@ -24,10 +24,10 @@ WORKDIR /var/www/html
 COPY . /var/www/html
 
 # Ensure writable runtime directories exist
-RUN mkdir -p storage/logs storage/uploads storage/merchandise tmp backups \
+RUN mkdir -p storage/logs storage/uploads storage/merchandise storage/rate_limits tmp backups \
     && chown -R www-data:www-data storage tmp backups
 
 EXPOSE 80
 
-# Render injects $PORT at runtime; bind Apache to it and ensure idempotent DB indexes/FKs before starting
-CMD ["sh", "-c", "PORT=${PORT:-80}; sed -i \"s/Listen 80/Listen ${PORT}/g\" /etc/apache2/ports.conf && sed -i \"s/:80/:${PORT}/g\" /etc/apache2/sites-available/000-default.conf && (php /var/www/html/tools/migrate_fk_and_indexes.php --safe-boot || true) && exec apache2-foreground"]
+# Render injects $PORT at runtime; bind Apache to it first and run idempotent DB migration in background
+CMD ["sh", "-c", "PORT=${PORT:-80}; sed -i \"s/Listen 80/Listen ${PORT}/g\" /etc/apache2/ports.conf && sed -i \"s/:80/:${PORT}/g\" /etc/apache2/sites-available/000-default.conf || exit 1; (php /var/www/html/tools/migrate_fk_and_indexes.php --safe-boot >/proc/1/fd/1 2>&1 || true) & exec apache2-foreground"]

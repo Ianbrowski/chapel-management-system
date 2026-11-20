@@ -453,9 +453,91 @@ class BackupService
 
         $result = $this->runProcess($args, $sqlFile);
         $code = $result['code'];
-        if ($code !== 0) {
-            $msg = trim($result['output']);
-            throw new RuntimeException('mysql import failed. ' . ($msg !== '' ? $msg : 'No output.'));
+        if ($code === 0) {
+            return;
+        }
+
+        // Fallback to pure-PHP mysqli SQL restore if mysql binary is unavailable or fails TLS flags
+        $this->importDatabaseViaPhp($sqlFile);
+    }
+
+    private function importDatabaseViaPhp(string $sqlFile): void
+    {
+        $sql = @file_get_contents($sqlFile);
+        if ($sql === false || trim($sql) === '') {
+            throw new RuntimeException('Unable to read SQL file for PHP restore.');
+        }
+
+        // Remove conditional mysqldump /*! ... */ or standard SQL comments cleanly statement-by-statement
+        $statements = [];
+        $len = strlen($sql);
+        $buf = '';
+        $inSingle = false;
+        $inDouble = false;
+        $inBacktick = false;
+        $escaped = false;
+
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $sql[$i];
+            $next = ($i + 1 < $len) ? $sql[$i + 1] : '';
+
+            if (!$inSingle && !$inDouble && !$inBacktick) {
+                if ($ch === '-' && $next === '-' && ($i + 2 < $len && ($sql[$i + 2] === ' ' || $sql[$i + 2] === "\t" || $sql[$i + 2] === "\r" || $sql[$i + 2] === "\n"))) {
+                    while ($i < $len && $sql[$i] !== "\n") $i++;
+                    continue;
+                }
+                if ($ch === '#' ) {
+                    while ($i < $len && $sql[$i] !== "\n") $i++;
+                    continue;
+                }
+                if ($ch === '/' && $next === '*') {
+                    $end = strpos($sql, '*/', $i + 2);
+                    $i = ($end === false) ? $len : ($end + 1);
+                    continue;
+                }
+            }
+
+            $buf .= $ch;
+
+            if ($inSingle || $inDouble) {
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ($ch === '\\') {
+                    $escaped = true;
+                } elseif ($inSingle && $ch === "'") {
+                    if ($next === "'") {
+                        $buf .= $next;
+                        $i++;
+                    } else {
+                        $inSingle = false;
+                    }
+                } elseif ($inDouble && $ch === '"') {
+                    $inDouble = false;
+                }
+            } elseif ($inBacktick) {
+                if ($ch === '`') $inBacktick = false;
+            } else {
+                if ($ch === "'") $inSingle = true;
+                elseif ($ch === '"') $inDouble = true;
+                elseif ($ch === '`') $inBacktick = true;
+                elseif ($ch === ';') {
+                    $stmt = trim(substr($buf, 0, -1));
+                    if ($stmt !== '') {
+                        $statements[] = $stmt;
+                    }
+                    $buf = '';
+                }
+            }
+        }
+        $tail = trim($buf);
+        if ($tail !== '') {
+            $statements[] = $tail;
+        }
+
+        foreach ($statements as $stmt) {
+            if (!$this->conn->query($stmt)) {
+                throw new RuntimeException('PHP SQL restore error: ' . $this->conn->error);
+            }
         }
     }
 

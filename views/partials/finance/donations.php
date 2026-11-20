@@ -237,7 +237,7 @@ $voidedCount = count($voided_donations ?? []);
 
                     <div style="position: relative; flex: 1; min-width: 180px;">
                         <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text2, #71717A); font-size: 11.5px; pointer-events: none; z-index: 2;"></i>
-                        <input type="text" id="donations-search-input" placeholder="Search donor name, reference ID, or purpose..." oninput="filterDonationsLedger()" 
+                        <input type="text" id="donations-search-input" data-ac-mode="dom" data-ac-target="#donations-data-table .donation-row" data-ac-extract="donation" placeholder="Search donor name, reference ID, or purpose..." oninput="filterDonationsLedger()" 
                                style="width: 100%; height: 34px; padding-left: 34px !important; padding-right: 26px !important; font-size: 12.5px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; outline: none; background: var(--bg2, #FFFFFF); color: var(--text);">
                         <span id="donations-clear-search" onclick="clearDonationsSearch()" title="Clear search" style="display: none; position: absolute; right: 9px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text2); font-size: 14px; line-height: 1;">&times;</span>
                     </div>

@@ -82,7 +82,7 @@
 
             <div style="flex: 1; min-width: 220px; position: relative;">
                 <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text2, #737373); pointer-events: none; z-index: 2;"></i>
-                <input type="text" name="ticket_search" placeholder="Search by subject, description, or #..." 
+                <input type="text" name="ticket_search" data-ac-mode="server" data-ac-scope="tickets" placeholder="Search by subject, description, or #..." 
                        value="<?php echo htmlspecialchars($_GET['ticket_search'] ?? ''); ?>"
                        style="width: 100%; height: 32px; padding-left: 32px !important; padding-right: <?php echo !empty($_GET['ticket_search']) ? '26px' : '10px'; ?> !important; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); box-sizing: border-box;">
                 <?php if (!empty($_GET['ticket_search'])): ?>

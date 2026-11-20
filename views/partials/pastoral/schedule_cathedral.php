@@ -184,7 +184,7 @@ $activeStatus = $ev_filters['status'] ?? '';
                 <!-- Search Input with Clear -->
                 <div style="position: relative; min-width: 160px; max-width: 220px; flex: 1 1 160px;">
                     <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text2, #737373); pointer-events: none; z-index: 2;"></i>
-                    <input type="text" name="search" placeholder="Search event or priest..." 
+                    <input type="text" name="search" data-ac-mode="server" data-ac-scope="cathedral_events" placeholder="Search event or priest..." 
                            value="<?php echo htmlspecialchars($searchQuery); ?>"
                            style="width: 100%; height: 32px; padding-left: 32px !important; padding-right: <?php echo !empty($searchQuery) ? '24px' : '8px'; ?> !important; font-size: 12px; background: var(--bg2, #FFFFFF); color: var(--text); border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box;">
                     <?php if (!empty($searchQuery)): ?>

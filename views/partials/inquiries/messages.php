@@ -84,6 +84,7 @@
                         <div style="flex: 1 1 160px; min-width: 140px; position: relative;">
                             <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text2); pointer-events: none; z-index: 2;"></i>
                             <input type="text" id="inq-search" name="inq_search"
+                                   data-ac-mode="dom" data-ac-target=".inq-row" data-ac-extract="inquiry"
                                    placeholder="Search by requester, type..."
                                    value="<?php echo htmlspecialchars($_GET['inq_search'] ?? ''); ?>"
                                    onkeyup="filterInquiries()"

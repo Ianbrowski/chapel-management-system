@@ -1798,7 +1798,7 @@ $isCathedralStaff = ($role === 'Staff' && empty($chapel_id));
 
                     <div style="position: relative; display: inline-flex; align-items: center;">
                         <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 11px; font-size: 11px; color: var(--text2); pointer-events: none; z-index: 2;"></i>
-                        <input type="text" name="ev_search" placeholder="Search events..." 
+                        <input type="text" name="ev_search" data-ac-mode="server" data-ac-scope="calendar_events" placeholder="Search events..." 
                                style="padding: 5px 10px 5px 32px !important; font-size: 12.5px; height: 32px; width: 180px; border-radius: 6px; background: var(--bg2); border: 1px solid var(--border); color: var(--text); box-sizing: border-box;" 
                                value="<?php echo htmlspecialchars($ev_filters['search'] ?? ''); ?>">
                     </div>

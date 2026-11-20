@@ -246,7 +246,7 @@
                 <!-- Search Input with Proper Left Padding and Clear Button -->
                 <div style="position: relative; flex: 1;">
                     <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text2, #737373); font-size: 11px; pointer-events: none; z-index: 2;"></i>
-                    <input type="text" id="user-table-search" placeholder="Search users by name, username, or email..." oninput="filterUserTable()" 
+                    <input type="text" id="user-table-search" data-ac-mode="dom" data-ac-target=".user-table-row" data-ac-extract="user" placeholder="Search users by name, username, or email..." oninput="filterUserTable()" 
                            style="width: 100%; height: 32px; padding-left: 32px !important; padding-right: 24px !important; background: var(--bg2, #FFFFFF); border: 1px solid var(--border); border-radius: 6px; color: var(--text, #111111); font-size: 12px; outline: none; box-sizing: border-box;">
                     <span id="user-clear-search" onclick="clearUserSearch()" title="Clear search" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text2); font-size: 14px; line-height: 1;">&times;</span>
                 </div>

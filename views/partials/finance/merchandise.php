@@ -338,7 +338,7 @@ if (!in_array($initialTab, ['catalog', 'sales', 'pos', 'archived'], true)) {
 
                     <div style="position: relative; flex: 1;">
                         <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text2, #71717A); font-size: 11px; pointer-events: none; z-index: 2;"></i>
-                        <input type="text" id="catalog-search-input" placeholder="Search item name or description..." oninput="filterCatalogTable()" 
+                        <input type="text" id="catalog-search-input" data-ac-mode="dom" data-ac-target="#catalog-data-table .catalog-row" data-ac-extract="catalog" placeholder="Search item name or description..." oninput="filterCatalogTable()" 
                                style="width: 100%; height: 32px; padding-left: 32px !important; padding-right: 24px !important; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg2, #FFFFFF); color: var(--text); box-sizing: border-box; outline: none;">
                         <span id="catalog-clear-search" onclick="clearCatalogSearch()" title="Clear search" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text2); font-size: 14px; line-height: 1;">&times;</span>
                     </div>
@@ -455,7 +455,7 @@ if (!in_array($initialTab, ['catalog', 'sales', 'pos', 'archived'], true)) {
 
                     <div style="position: relative; flex: 1;">
                         <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text2, #71717A); font-size: 11px; pointer-events: none; z-index: 2;"></i>
-                        <input type="text" id="sales-search-input" placeholder="Search by buyer name or item..." oninput="filterSalesTable()" 
+                        <input type="text" id="sales-search-input" data-ac-mode="dom" data-ac-target="#sales-data-table .sales-row" data-ac-extract="sale" placeholder="Search by buyer name or item..." oninput="filterSalesTable()" 
                                style="width: 100%; height: 32px; padding-left: 32px !important; padding-right: 24px !important; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg2, #FFFFFF); color: var(--text); box-sizing: border-box; outline: none;">
                         <span id="sales-clear-search" onclick="clearSalesSearch()" title="Clear search" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text2); font-size: 14px; line-height: 1;">&times;</span>
                     </div>
@@ -559,7 +559,7 @@ if (!in_array($initialTab, ['catalog', 'sales', 'pos', 'archived'], true)) {
                     </div>
                     <div style="position: relative; width: 220px;">
                         <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text2, #71717A); font-size: 11px; pointer-events: none; z-index: 2;"></i>
-                        <input type="text" id="pos-product-search" placeholder="Quick find product..." oninput="filterPosProductGrid()" 
+                        <input type="text" id="pos-product-search" data-ac-mode="dom" data-ac-target="#pos-product-grid .pos-product-card" data-ac-extract="pos" placeholder="Quick find product..." oninput="filterPosProductGrid()" 
                                style="width: 100%; height: 32px; padding-left: 32px !important; padding-right: 24px !important; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; outline: none; background: var(--bg2, #FAFAFA); color: var(--text); box-sizing: border-box;">
                         <span id="pos-clear-search" onclick="clearPosSearch()" title="Clear search" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text2); font-size: 14px; line-height: 1;">&times;</span>
                     </div>

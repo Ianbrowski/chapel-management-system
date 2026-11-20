@@ -64,7 +64,7 @@ $dot_colors = [
                 <!-- Search Input with Clear Button -->
                 <div style="position: relative; flex: 1; min-width: 190px;">
                     <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text2, #737373); font-size: 11px; pointer-events: none; z-index: 2;"></i>
-                    <input type="text" id="bulletinSearchInput" placeholder="Search announcements..." oninput="filterBulletinTable()" 
+                    <input type="text" id="bulletinSearchInput" data-ac-mode="dom" data-ac-target="#bulletinFeedContainer .bulletin-feed-row" data-ac-extract="bulletin" placeholder="Search announcements..." oninput="filterBulletinTable()" 
                            style="width: 100%; height: 32px; padding-left: 30px !important; padding-right: 24px !important; background: var(--bg2, #FAFAFA); border: 1px solid var(--border); border-radius: 6px; color: var(--text, #111111); font-size: 12px; outline: none; box-sizing: border-box;">
                     <span id="bulletin-clear-search" onclick="clearBulletinSearch()" title="Clear search" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text2); font-size: 14px; line-height: 1;">&times;</span>
                 </div>

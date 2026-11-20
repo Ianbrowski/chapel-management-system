@@ -728,6 +728,7 @@ try {
 
     <!-- ── MODULAR SCRIPTS ── -->
     <script src="assets/js/dashboard-core.js?v=<?= time() ?>"></script>
+    <script src="assets/js/search-autocomplete.js?v=<?= time() ?>"></script>
     <script src="assets/js/ph-geo-data.js?v=<?= time() ?>"></script>
     <script src="assets/js/dashboard-nav.js?v=<?= time() ?>"></script>
     <script src="assets/js/dashboard-availability.js?v=<?= time() ?>"></script>

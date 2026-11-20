@@ -1102,7 +1102,7 @@ $riteMetadata = [
                 <!-- Search Input -->
                 <div style="position: relative; width: 170px;">
                     <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 11.5px; pointer-events: none; z-index: 2;"></i>
-                    <input type="text" name="search" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search duty..." 
+                    <input type="text" name="search" data-ac-mode="server" data-ac-scope="priest_duties" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search duty..." 
                             style="width: 100%; height: 32px; padding-left: 32px !important; padding-right: <?php echo !empty($searchQuery) ? '24px' : '8px'; ?> !important; background: var(--bg2, var(--surface)); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 12px; box-sizing: border-box;">
                     <?php if (!empty($searchQuery)): ?>
                     <a href="dashboard.php?section=priest_schedule&amp;tab=schedule<?php echo !empty($selected_priest_id) ? '&amp;priest_id=' . urlencode((string)$selected_priest_id) : ''; ?><?php echo !empty($curStatus) ? '&amp;status=' . urlencode($curStatus) : ''; ?><?php echo !empty($curType) ? '&amp;event_type=' . urlencode($curType) : ''; ?><?php echo !empty($curTimeframe) ? '&amp;timeframe=' . urlencode($curTimeframe) : ''; ?>&amp;sort=<?php echo urlencode($curSort); ?>" 

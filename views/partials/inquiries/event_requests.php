@@ -192,7 +192,7 @@ $tp = (int)($total_pages ?? 1);
                 <!-- Search Input with Clear '×' Button -->
                 <div style="position: relative; width: 230px;">
                     <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 11.5px; color: var(--text2); pointer-events: none; z-index: 2;"></i>
-                    <input type="text" name="search" placeholder="Search title or requester..." 
+                    <input type="text" name="search" data-ac-mode="server" data-ac-scope="events" placeholder="Search title or requester..." 
                            value="<?php echo htmlspecialchars($searchQuery); ?>"
                            style="height: 34px; font-size: 12.5px; width: 100%; background: var(--bg2); border: 1px solid var(--border); color: var(--text); padding-left: 32px !important; padding-right: <?php echo !empty($searchQuery) ? '26px' : '10px'; ?>; border-radius: 8px; box-sizing: border-box; outline: none; transition: border-color 0.15s ease;">
                     <?php if (!empty($searchQuery)): ?>

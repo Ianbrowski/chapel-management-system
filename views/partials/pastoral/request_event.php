@@ -335,6 +335,8 @@ $defaultTab = $_GET['tab'] ?? ($isGuest ? 'catalog' : ($totalReqs > 0 ? 'request
                     <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text2); font-size: 11.5px; pointer-events: none;"></i>
                     <input type="text" 
                            name="search" 
+                           data-ac-mode="server"
+                           data-ac-scope="my_events"
                            value="<?php echo htmlspecialchars($searchQuery); ?>" 
                            placeholder="Search requests..." 
                            style="width: 100%; height: 34px; padding-left: 30px !important; padding-right: <?php echo !empty($searchQuery) ? '26px' : '10px'; ?> !important; font-size: 12.5px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg2); color: var(--text); box-sizing: border-box; outline: none; transition: border-color 0.15s ease;">

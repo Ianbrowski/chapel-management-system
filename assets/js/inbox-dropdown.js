@@ -20,6 +20,8 @@
             this.list = document.getElementById('inboxDdList');
             this.countPill = document.getElementById('inboxDdCountPill');
             this.refreshBtn = document.getElementById('inboxDdRefreshBtn');
+            this.readAllBtn = document.getElementById('inboxDdReadAllBtn');
+            this.isMember = false;
 
             if (!this.wrapper || !this.btn || !this.menu) return;
 
@@ -120,6 +122,7 @@
 
                 if (data.success) {
                     this.cachedData = Array.isArray(data.items) ? data.items : [];
+                    this.isMember = Boolean(data.is_member);
                     this.lastFetched = Date.now();
                     this.updateBadges(data.pending_count || 0);
                     this.render();
@@ -141,10 +144,15 @@
         },
 
         updateBadges(pendingCount) {
+            const unreadItems = (this.cachedData || []).filter(it => it.is_unread !== undefined ? Boolean(it.is_unread) : Boolean(it.is_pending)).length;
+            if (this.readAllBtn) {
+                this.readAllBtn.disabled = unreadItems <= 0;
+            }
+
             // Update dropdown pill
             if (this.countPill) {
                 if (pendingCount > 0) {
-                    this.countPill.textContent = pendingCount + ' pending';
+                    this.countPill.textContent = pendingCount + (this.isMember ? ' unread' : ' pending');
                     this.countPill.style.display = 'inline-flex';
                 } else {
                     this.countPill.style.display = 'none';
@@ -167,8 +175,14 @@
             if (!this.list) return;
 
             const items = this.cachedData || [];
+            const isItemUnread = (it) => (it.is_unread !== undefined ? Boolean(it.is_unread) : Boolean(it.is_pending));
+            const unreadTotal = items.filter(isItemUnread).length;
+            if (this.readAllBtn) {
+                this.readAllBtn.disabled = unreadTotal <= 0;
+            }
+
             const filtered = this.currentTab === 'pending'
-                ? items.filter(it => it.is_pending)
+                ? items.filter(isItemUnread)
                 : items;
 
             if (filtered.length === 0) {
@@ -176,9 +190,9 @@
                 this.list.innerHTML = `
                     <div class="inbox-dd-empty">
                         <i class="fa-solid fa-envelope-open-text"></i>
-                        <div class="inbox-dd-empty-title">${isPendingTab ? 'No Pending Requests' : 'All Caught Up'}</div>
+                        <div class="inbox-dd-empty-title">${isPendingTab ? 'No Unread Notifications' : 'All Caught Up'}</div>
                         <div class="inbox-dd-empty-sub">
-                            ${isPendingTab ? 'All current inquiries have been addressed or resolved.' : 'Your inbox has no recent messages or inquiries.'}
+                            ${isPendingTab ? 'Everything in your inbox has been marked as read.' : 'Your inbox has no recent messages or notifications.'}
                         </div>
                     </div>
                 `;
@@ -193,14 +207,17 @@
                 const escapedChapel = it.chapel_name ? this.escapeHtml(it.chapel_name) : '';
                 const escapedSnippet = this.escapeHtml(it.snippet || '');
                 const escapedTime = this.escapeHtml(it.time_ago || '');
-                const unreadClass = it.is_pending ? 'is-unread' : '';
-                const unreadDot = it.is_pending ? '<span class="inbox-unread-dot" title="Pending"></span>' : '';
+                const isUnread = isItemUnread(it);
+                const stateClass = isUnread ? 'is-unread' : 'is-read';
+                const stateBadge = isUnread
+                    ? '<span class="inbox-state-pill unread" title="Unread"><span class="inbox-unread-dot"></span>Unread</span>'
+                    : '<span class="inbox-state-pill read" title="Read"><i class="fa-solid fa-check"></i>Read</span>';
 
                 html += `
-                    <div class="inbox-dd-item ${unreadClass}"
+                    <div class="inbox-dd-item ${stateClass}"
                          role="button"
                          tabindex="0"
-                         title="View inquiry from ${escapedName}"
+                         title="${isUnread ? 'Unread — click to view' : 'Read — click to view'}"
                          onclick="InboxDropdown.handleItemClick(${it.id}, event)"
                          onkeydown="if(event.key==='Enter'||event.key===' '){ event.preventDefault(); InboxDropdown.handleItemClick(${it.id}, event); }">
                         <div class="inbox-dd-avatar ${it.icon_class || 'inbox-icon-general'}">
@@ -209,7 +226,10 @@
                         <div class="inbox-dd-content">
                             <div class="inbox-dd-row1">
                                 <span class="inbox-dd-name">${escapedName}</span>
-                                <span class="inbox-dd-time">${escapedTime}</span>
+                                <span class="inbox-dd-meta-right">
+                                    ${stateBadge}
+                                    <span class="inbox-dd-time">${escapedTime}</span>
+                                </span>
                             </div>
                             <div class="inbox-dd-row2">
                                 <span class="inbox-dd-type-badge">${escapedType}${escapedCategory ? ' • ' + escapedCategory : ''}</span>
@@ -217,7 +237,6 @@
                             </div>
                             <div class="inbox-dd-snippet">${escapedSnippet}</div>
                         </div>
-                        ${unreadDot}
                     </div>
                 `;
             });
@@ -294,17 +313,14 @@
                     },
                     body: body.toString()
                 }).catch(() => {});
-                if (clickedItem && clickedItem.is_pending) {
-                    clickedItem.is_pending = false;
-                    const badge = document.getElementById('badge-inquiries');
-                    if (badge) {
-                        const cur = parseInt(badge.textContent || '0', 10);
-                        if (cur > 1) {
-                            badge.textContent = cur - 1;
-                        } else {
-                            badge.style.display = 'none';
-                        }
+                if (clickedItem && (clickedItem.is_unread || clickedItem.is_pending)) {
+                    clickedItem.is_unread = false;
+                    if (this.isMember) {
+                        clickedItem.is_pending = false;
+                        const unreadRem = (this.cachedData || []).filter(it => it.is_unread).length;
+                        this.updateBadges(unreadRem);
                     }
+                    this.render();
                 }
             } catch(err) {}
 
@@ -363,6 +379,54 @@
             }
         },
 
+        async markAllRead(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            const items = this.cachedData || [];
+            const ids = items.map(it => it.id).filter(Boolean).join(',');
+            if (this.readAllBtn) {
+                this.readAllBtn.disabled = true;
+            }
+            try {
+                const baseUrl = (typeof window !== 'undefined' && window.BASE_URL) ? window.BASE_URL.replace(/\/+$/, '') : '';
+                const endpoint = baseUrl ? `${baseUrl}/app/controllers/inbox_preview.php` : 'app/controllers/inbox_preview.php';
+                const csrfToken = (typeof window !== 'undefined' && window.CSRF_TOKEN) ? window.CSRF_TOKEN : '';
+                const body = new URLSearchParams({ action: 'mark_read', id: '0', ids, csrf: csrfToken });
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: body.toString()
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.success) {
+                    items.forEach(it => {
+                        it.is_unread = false;
+                        if (this.isMember) {
+                            it.is_pending = false;
+                            it.status = 'Read';
+                        }
+                    });
+                    if (this.isMember) {
+                        this.updateBadges(0);
+                    } else {
+                        const unreadRem = items.filter(it => it.is_unread).length;
+                        if (this.readAllBtn) this.readAllBtn.disabled = unreadRem <= 0;
+                    }
+                    this.render();
+                } else if (this.readAllBtn) {
+                    this.readAllBtn.disabled = false;
+                }
+            } catch (err) {
+                if (this.readAllBtn) this.readAllBtn.disabled = false;
+            }
+        },
+
         escapeHtml(str) {
             if (!str) return '';
             return String(str)
@@ -380,6 +444,7 @@
     window.refreshInboxDropdown = function(e) { e && e.stopPropagation(); InboxDropdown.fetchData(true); };
     window.switchInboxDdTab = function(tab, btn) { InboxDropdown.switchTab(tab, btn); };
     window.handleInboxFullView = function(e) { InboxDropdown.handleFullView(e); };
+    window.markAllInboxRead = function(e) { InboxDropdown.markAllRead(e); };
 
     // Auto-initialize when DOM is ready
     if (document.readyState === 'loading') {

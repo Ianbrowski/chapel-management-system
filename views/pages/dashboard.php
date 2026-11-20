@@ -419,6 +419,10 @@ try {
                                     </span>
                                 </div>
                                 <div class="inbox-dd-actions">
+                                    <button type="button" class="inbox-dd-readall-btn" id="inboxDdReadAllBtn" title="Mark all as read" onclick="markAllInboxRead(event)">
+                                        <i class="fa-solid fa-check-double"></i>
+                                        <span>Read all</span>
+                                    </button>
                                     <button type="button" class="inbox-dd-icon-btn" id="inboxDdRefreshBtn" title="Refresh messages" onclick="refreshInboxDropdown(event)">
                                         <i class="fa-solid fa-rotate-right"></i>
                                     </button>
@@ -433,7 +437,7 @@ try {
 
                             <div class="inbox-dd-tabs">
                                 <button type="button" class="inbox-dd-tab active" data-tab="all" onclick="switchInboxDdTab('all', this)">All</button>
-                                <button type="button" class="inbox-dd-tab" data-tab="pending" onclick="switchInboxDdTab('pending', this)"><?php echo $isMember ? 'Unread' : 'Pending'; ?></button>
+                                <button type="button" class="inbox-dd-tab" data-tab="pending" onclick="switchInboxDdTab('pending', this)">Unread</button>
                             </div>
 
                             <div class="inbox-dd-body" id="inboxDdList">

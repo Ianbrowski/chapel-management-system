@@ -564,10 +564,26 @@
 }
 
 .inbox-dd-item.is-unread {
-    background: rgba(201, 168, 76, 0.04);
+    background: rgba(201, 168, 76, 0.11);
+    border-left: 3px solid var(--accent);
+    padding-left: 13px;
 }
 .inbox-dd-item.is-unread:hover {
-    background: rgba(201, 168, 76, 0.08);
+    background: rgba(201, 168, 76, 0.17);
+}
+.inbox-dd-item.is-read {
+    border-left: 3px solid transparent;
+    padding-left: 13px;
+    opacity: 0.72;
+}
+.inbox-dd-item.is-read:hover {
+    opacity: 0.95;
+}
+[data-theme="light"] .inbox-dd-item.is-unread {
+    background: rgba(184, 134, 11, 0.09);
+}
+[data-theme="light"] .inbox-dd-item.is-unread:hover {
+    background: rgba(184, 134, 11, 0.14);
 }
 
 .inbox-dd-avatar {
@@ -642,6 +658,80 @@
 
 .inbox-dd-item.is-unread .inbox-dd-name {
     font-weight: 700;
+    color: var(--text);
+}
+
+.inbox-dd-item.is-unread .inbox-dd-snippet {
+    color: var(--text);
+    font-weight: 500;
+}
+
+.inbox-dd-meta-right {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.inbox-state-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.64rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    border-radius: 999px;
+    line-height: 1.3;
+}
+
+.inbox-state-pill.unread {
+    background: rgba(201, 168, 76, 0.18);
+    color: var(--accent);
+    border: 1px solid rgba(201, 168, 76, 0.35);
+}
+
+[data-theme="light"] .inbox-state-pill.unread {
+    background: rgba(184, 134, 11, 0.12);
+    color: #855D10;
+    border-color: rgba(184, 134, 11, 0.3);
+}
+
+.inbox-state-pill.read {
+    background: transparent;
+    color: var(--text2);
+    opacity: 0.7;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    padding: 0 2px;
+}
+
+.inbox-dd-readall-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(201, 168, 76, 0.35);
+    background: rgba(201, 168, 76, 0.12);
+    color: var(--accent);
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.16s ease;
+}
+
+.inbox-dd-readall-btn:hover:not(:disabled) {
+    background: rgba(201, 168, 76, 0.22);
+    transform: translateY(-1px);
+}
+
+.inbox-dd-readall-btn:disabled {
+    opacity: 0.42;
+    cursor: default;
 }
 
 .inbox-dd-time {
@@ -689,14 +779,13 @@
 }
 
 .inbox-unread-dot {
-    width: 9px;
-    height: 9px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background: var(--accent);
-    box-shadow: 0 0 8px var(--accent);
-    align-self: center;
+    box-shadow: 0 0 6px var(--accent);
+    display: inline-block;
     flex-shrink: 0;
-    margin-left: 4px;
 }
 
 /* Empty State */

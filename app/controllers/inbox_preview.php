@@ -97,16 +97,51 @@ try {
             echo json_encode(['success' => false, 'error' => 'Invalid security token']);
             exit();
         }
-        require_once __DIR__ . '/../models/SystemNotification.php';
-        $notifModel = new SystemNotification($conn);
         $notifId = (int)($_POST['id'] ?? ($_GET['id'] ?? 0));
-        if ($notifId > 0) {
-            $notifModel->markAsRead($notifId, $userId);
+        if ($isMember) {
+            require_once __DIR__ . '/../models/SystemNotification.php';
+            $notifModel = new SystemNotification($conn);
+            if ($notifId > 0) {
+                $notifModel->markAsRead($notifId, $userId);
+            } else {
+                $notifModel->markAllAsRead($userId);
+            }
+            $remainingUnread = $notifModel->getUnreadCount($userId);
         } else {
-            $notifModel->markAllAsRead($userId);
+            if (!isset($_SESSION['inbox_seen_ids']) || !is_array($_SESSION['inbox_seen_ids'])) {
+                $_SESSION['inbox_seen_ids'] = [];
+            }
+            if ($notifId > 0) {
+                if (!in_array($notifId, $_SESSION['inbox_seen_ids'], true)) {
+                    $_SESSION['inbox_seen_ids'][] = $notifId;
+                }
+            } else {
+                $idsRaw = $_POST['ids'] ?? '';
+                if ($idsRaw !== '') {
+                    foreach (explode(',', (string)$idsRaw) as $rawId) {
+                        $iid = (int)trim($rawId);
+                        if ($iid > 0 && !in_array($iid, $_SESSION['inbox_seen_ids'], true)) {
+                            $_SESSION['inbox_seen_ids'][] = $iid;
+                        }
+                    }
+                } else {
+                    $chapelFilterTmp = in_array($role, ['Admin', 'Cathedral Admin'], true)
+                        ? null
+                        : (!empty($chapelId) ? (int)$chapelId : 'cathedral');
+                    $inqTmp = new Inquiry($conn);
+                    $resTmp = $inqTmp->getAll(['chapel_id' => $chapelFilterTmp, 'sort' => 'date_desc'], 1, 25);
+                    foreach (($resTmp['records'] ?? []) as $rowTmp) {
+                        $iid = (int)$rowTmp['inquiry_id'];
+                        if ($iid > 0 && !in_array($iid, $_SESSION['inbox_seen_ids'], true)) {
+                            $_SESSION['inbox_seen_ids'][] = $iid;
+                        }
+                    }
+                }
+            }
+            $remainingUnread = null;
         }
         header('Content-Type: application/json');
-        echo json_encode(['success' => true]);
+        echo json_encode(['success' => true, 'unread_count' => $remainingUnread]);
         exit();
     }
 
@@ -136,6 +171,7 @@ try {
                 $iconClass = 'inbox-icon-general';
             }
 
+            $isUnread = empty($n['is_read']);
             $items[] = [
                 'id'           => (int)$n['id'],
                 'name'         => 'Cathedral Notice',
@@ -144,8 +180,9 @@ try {
                 'category'     => ucfirst($type),
                 'chapel_name'  => 'Mother Cathedral',
                 'snippet'      => htmlspecialchars($n['message'], ENT_QUOTES, 'UTF-8'),
-                'status'       => $n['is_read'] ? 'Read' : 'New',
-                'is_pending'   => !$n['is_read'],
+                'status'       => $isUnread ? 'New' : 'Read',
+                'is_pending'   => $isUnread,
+                'is_unread'    => $isUnread,
                 'created_at'   => $n['created_at'] ?? '',
                 'time_ago'     => formatRelativeTime($n['created_at'] ?? ''),
                 'icon'         => $icon,
@@ -157,8 +194,10 @@ try {
         header('Content-Type: application/json');
         echo json_encode([
             'success'       => true,
+            'is_member'     => true,
             'total'         => count($items),
             'pending_count' => (int)$pendingCount,
+            'unread_count'  => (int)$pendingCount,
             'items'         => $items,
             'timestamp'     => date('H:i:s')
         ]);
@@ -181,11 +220,18 @@ try {
         $pendingCount = $inquiryModel->getPendingCount($chapelFilter);
     }
 
+    $seenIds = isset($_SESSION['inbox_seen_ids']) && is_array($_SESSION['inbox_seen_ids']) ? $_SESSION['inbox_seen_ids'] : [];
     $items = [];
+    $unreadCount = 0;
     foreach ($records as $row) {
         $visuals = getInquiryVisuals((string)($row['request_type'] ?? ''), (string)($row['service_category'] ?? ''));
         $status = $row['status'] ?: 'Pending';
         $isPending = ($status === 'Pending');
+        $inqId = (int)$row['inquiry_id'];
+        $isUnread = $isPending && !in_array($inqId, $seenIds, true);
+        if ($isUnread) {
+            $unreadCount++;
+        }
 
         $rawDetails = strip_tags((string)($row['details'] ?? ''));
         $snippet = mb_strimwidth($rawDetails, 0, 75, '...');
@@ -194,7 +240,7 @@ try {
         }
 
         $items[] = [
-            'id'           => (int)$row['inquiry_id'],
+            'id'           => $inqId,
             'name'         => htmlspecialchars($row['full_name'] ?? 'Parishioner', ENT_QUOTES, 'UTF-8'),
             'email'        => htmlspecialchars($row['email'] ?? '', ENT_QUOTES, 'UTF-8'),
             'request_type' => htmlspecialchars($row['request_type'] ?? 'General Inquiry', ENT_QUOTES, 'UTF-8'),
@@ -203,6 +249,7 @@ try {
             'snippet'      => htmlspecialchars($snippet, ENT_QUOTES, 'UTF-8'),
             'status'       => htmlspecialchars($status, ENT_QUOTES, 'UTF-8'),
             'is_pending'   => $isPending,
+            'is_unread'    => $isUnread,
             'created_at'   => $row['created_at'] ?? '',
             'time_ago'     => formatRelativeTime($row['created_at'] ?? ''),
             'icon'         => $visuals['icon'],
@@ -213,8 +260,10 @@ try {
     header('Content-Type: application/json');
     echo json_encode([
         'success'       => true,
+        'is_member'     => false,
         'total'         => count($items),
         'pending_count' => (int)$pendingCount,
+        'unread_count'  => (int)$unreadCount,
         'items'         => $items,
         'timestamp'     => date('H:i:s')
     ]);

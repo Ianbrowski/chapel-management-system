@@ -406,13 +406,21 @@ class DashboardController extends BaseController
         $srvModel = new ServiceModel($this->conn);
         $data['services_catalog'] = $srvModel->getFullCatalog(true);
 
-        // Badges: always load these for the sidebar (zeroed out for guests and members)
-        if ($this->isGuest || $this->isMember) {
+        // Badges: always load these for the sidebar (zeroed out for guests; unread count for members)
+        if ($this->isGuest) {
             $data['pending_count'] = 0;
             $data['overdue_request_count'] = 0;
             $data['audit_issue_count'] = 0;
             $data['stale_count'] = 0;
             $data['pending_inquiries'] = 0;
+        } elseif ($this->isMember) {
+            $data['pending_count'] = 0;
+            $data['overdue_request_count'] = 0;
+            $data['audit_issue_count'] = 0;
+            $data['stale_count'] = 0;
+            require_once __DIR__ . '/../models/SystemNotification.php';
+            $notifM = new SystemNotification($this->conn);
+            $data['pending_inquiries'] = $notifM->getUnreadCount((int)$this->userId);
         } else {
             if (in_array($this->role, ['Admin', 'Cathedral Admin', 'Priest', 'Pastor'], true)) {
                 $chapelFilter = null;

@@ -349,9 +349,9 @@ $readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_request
                                 <th style="padding: 9px 16px; text-align: left; font-size: 11px; text-transform: uppercase; width: auto;">Certificate / Person</th>
                                 <th style="padding: 9px 14px; text-align: left; font-size: 11px; text-transform: uppercase; width: 175px;">Sacrament Details</th>
                                 <th style="padding: 9px 14px; text-align: left; font-size: 11px; text-transform: uppercase; width: 135px;">Target Pickup</th>
-                                <th style="padding: 9px 14px; text-align: right; font-size: 11px; text-transform: uppercase; width: 115px;">Document Fee</th>
-                                <th style="padding: 9px 14px; text-align: center; font-size: 11px; text-transform: uppercase; width: 110px;">Status</th>
-                                <th style="padding: 9px 16px; text-align: center; font-size: 11px; text-transform: uppercase; width: 80px;">Actions</th>
+                                <th style="padding: 9px 14px; text-align: right; font-size: 11px; text-transform: uppercase; width: 128px;">Document Fee</th>
+                                <th style="padding: 9px 12px; text-align: center; font-size: 11px; text-transform: uppercase; width: 110px;">Status</th>
+                                <th style="padding: 9px 12px; text-align: center; font-size: 11px; text-transform: uppercase; width: 88px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -408,18 +408,18 @@ $readyCertCount   = $certCounts['confirmed'] ?? count(array_filter($cert_request
                                     ₱<?php echo number_format($fee, 2); ?>
                                 </td>
 
-                                <td style="padding: 10px 14px; text-align: center; white-space: nowrap;">
+                                <td style="padding: 10px 12px; text-align: center; white-space: nowrap;">
                                     <?php if ($isConfirmed): ?>
                                         <span class="badge" style="background: rgba(46,158,91,0.12); color: #2E9E5B; border: 1px solid rgba(46,158,91,0.3); font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px;">
-                                            <i class="fa-solid fa-circle-check" style="font-size: 9px; margin-right: 3px;"></i> Ready
+                                            Ready
                                         </span>
                                     <?php elseif ($isCancelled): ?>
                                         <span class="badge" style="background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px;">
-                                            <i class="fa-solid fa-ban" style="font-size: 9px; margin-right: 3px;"></i> <?php echo htmlspecialchars($st); ?>
+                                            <?php echo htmlspecialchars($st); ?>
                                         </span>
                                     <?php else: ?>
                                         <span class="badge" style="background: rgba(197,160,89,0.14); color: var(--accent, #c5a059); border: 1px solid rgba(197,160,89,0.3); font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px;">
-                                            <i class="fa-solid fa-clock" style="font-size: 9px; margin-right: 3px;"></i> Pending
+                                            Pending
                                         </span>
                                     <?php endif; ?>
                                 </td>

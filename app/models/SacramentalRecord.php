@@ -641,16 +641,35 @@ class SacramentalRecord
         $type = ($type === 'First Communion') ? 'Communion' : $type;
         $prefix = self::PREFIX[$type] ?? 'REC';
         $year   = date('Y');
+        $pattern = sprintf('%s-%s-%%', $prefix, $year);
 
-        // Locking for Uniqueness: Use FOR UPDATE to prevent race conditions during peak entry times
-        $sql  = "SELECT COUNT(*) AS cnt FROM sacramental_records WHERE record_type=? AND YEAR(date_added)=? FOR UPDATE";
+        // Find highest existing sequential number for this prefix+year (safe against prior deletions)
+        $sql  = "SELECT reference_id FROM sacramental_records WHERE reference_id LIKE ? ORDER BY reference_id DESC LIMIT 1 FOR UPDATE";
         $stmt = $this->conn->prepare($sql);
-        $stmt->bind_param('si', $type, $year);
-        $stmt->execute();
-        $cnt  = ($stmt->get_result()->fetch_assoc()['cnt'] ?? 0) + 1;
-        $stmt->close();
+        $maxNum = 0;
+        if ($stmt) {
+            $stmt->bind_param('s', $pattern);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if ($row && preg_match('/-(\d+)$/', (string)$row['reference_id'], $m)) {
+                $maxNum = (int)$m[1];
+            }
+        }
 
-        return sprintf('%s-%s-%05d', $prefix, $year, $cnt);
+        // Also ensure no collision with COUNT-based numbering
+        $cStmt = $this->conn->prepare("SELECT COUNT(*) AS cnt FROM sacramental_records WHERE record_type=? AND YEAR(date_added)=?");
+        if ($cStmt) {
+            $cStmt->bind_param('si', $type, $year);
+            $cStmt->execute();
+            $cnt = (int)($cStmt->get_result()->fetch_assoc()['cnt'] ?? 0);
+            $cStmt->close();
+            if ($cnt > $maxNum) {
+                $maxNum = $cnt;
+            }
+        }
+
+        return sprintf('%s-%s-%05d', $prefix, $year, $maxNum + 1);
     }
 
     private function generateCertNo(int $record_id): string

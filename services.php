@@ -246,9 +246,10 @@ $contact_info = $parishModel->getContactInfo();
                         </div>
                     </td>
                     <td class="service-ledger-cell col-action">
+                        <?php $isCertRow = ($catCode === 'certificates' || stripos($srv['name'] ?? '', 'certificate') !== false); ?>
                         <div class="action-cell-wrap">
-                            <a href="index.php?open_login=1&redirect=request_event" class="btn-ledger-schedule">
-                                <i class="fa-solid fa-calendar-check"></i> Request Schedule
+                            <a href="index.php?open_login=1&amp;redirect=<?php echo $isCertRow ? 'request_certificate' : 'request_event'; ?>" class="btn-ledger-schedule">
+                                <i class="fa-solid <?php echo $isCertRow ? 'fa-file-invoice' : 'fa-calendar-check'; ?>"></i> <?php echo $isCertRow ? 'Request Certificate' : 'Request Schedule'; ?>
                             </a>
                         </div>
                     </td>

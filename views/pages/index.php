@@ -1540,6 +1540,7 @@ document.addEventListener('keydown', function(e) {
             <form id="modalLoginForm" method="POST" action="app/controllers/authenticate.php" autocomplete="on">
                 <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf ?? ''); ?>">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf ?? ''); ?>">
+                <input type="hidden" name="redirect" value="<?php echo htmlspecialchars($_GET['redirect'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
 
                 <div class="modal-form-group">
                     <label for="modalUsername" class="modal-form-label">Username or Email</label>

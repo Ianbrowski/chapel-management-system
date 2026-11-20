@@ -254,16 +254,25 @@ class AuthController extends BaseController {
             }
         }
 
+        $allowedRedirectSections = ['request_event', 'request_certificate', 'events', 'bulletin', 'merchandise', 'public_inquiries'];
+        $reqRedirect = trim((string)($_POST['redirect'] ?? $_GET['redirect'] ?? ''));
+        $destSection = in_array($reqRedirect, $allowedRedirectSections, true) ? $reqRedirect : '';
+        if (in_array($destSection, ['request_event', 'request_certificate'], true) && in_array($user['role'] ?? '', ['Priest', 'Pastor'], true)) {
+            $destSection = '';
+        }
+        $ajaxRedirect = $destSection !== '' ? ('dashboard.php?section=' . urlencode($destSection)) : 'dashboard.php';
+        $fullRedirect = $destSection !== '' ? ('../../dashboard.php?section=' . urlencode($destSection)) : '../../dashboard.php';
+
         if ($this->isAjaxRequest()) {
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode([
                 'success'  => true,
-                'redirect' => 'dashboard.php'
+                'redirect' => $ajaxRedirect
             ]);
             exit();
         }
 
-        $this->redirect('../../dashboard.php');
+        $this->redirect($fullRedirect);
     }
 
     // ─── FAILED LOGIN ─────────────────────────────────────────────────────────

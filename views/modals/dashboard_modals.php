@@ -867,23 +867,49 @@ function openChapelHubModal(chapel) {
                 <span id="ve-approved-at" style="font-size: 11px; color: var(--text2);">—</span>
             </div>
 
+            <!-- Finance / Payment Status & Quick Stamp Bar -->
+            <div id="ve-payment-container" style="display: none; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                    <i id="ve-payment-icon" class="fa-solid fa-receipt" style="color: var(--accent); font-size: 13px;"></i>
+                    <span id="ve-payment-summary" style="font-size: 12px; font-weight: 600; color: var(--text);">—</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                    <button type="button" id="ve-stamp-paid-btn" class="btn btn-sm" style="display: none; height: 28px; padding: 0 10px; font-size: 11.5px; font-weight: 600; background: #16a34a; color: #FFFFFF; border: 1px solid #15803d; border-radius: 6px; cursor: pointer; align-items: center; gap: 5px;">
+                        <i class="fa-solid fa-peso-sign"></i> Stamp Paid (Finance)
+                    </button>
+                    <a id="ve-go-finance-link" href="dashboard.php?section=donations&tab=ledger" class="btn btn-gray btn-sm" style="display: inline-flex; height: 28px; padding: 0 10px; font-size: 11.5px; font-weight: 600; align-items: center; gap: 5px; text-decoration: none; border-radius: 6px;">
+                        <i class="fa-solid fa-vault" style="color: var(--accent);"></i> Open Finance
+                    </a>
+                </div>
+            </div>
+
             <!-- Guided Step Info Bar -->
             <div id="ve-next-step-guide" style="background: var(--bg2); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--text); line-height: 1.45;"></div>
         </div>
 
         <!-- Action Toolbar Footer -->
         <div class="modal-footer" style="padding: 12px 20px; background: var(--panel-header-bg, var(--bg3)); border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px;">
-            <div style="display: flex; gap: 8px; align-items: center;" id="ve-review-actions-group">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;" id="ve-review-actions-group">
                 <button type="button" class="btn btn-success btn-sm" id="ve-approve-btn" style="display: none; height: 34px; padding: 0 16px; font-weight: 600;">
                     <i class="fa-solid fa-check-double"></i> Approve Request
                 </button>
                 <button type="button" class="btn btn-danger btn-sm" id="ve-reject-btn" style="display: none; height: 34px; padding: 0 14px; font-weight: 600;">
                     <i class="fa-solid fa-xmark"></i> Reject
                 </button>
+                <button type="button" class="btn btn-sm" id="ve-complete-btn" style="display: none; height: 34px; padding: 0 14px; font-weight: 600; background: #2563eb; color: #FFFFFF; border: 1px solid #1d4ed8; border-radius: 6px; cursor: pointer; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-flag-checkered"></i> Mark Completed (Step 3)
+                </button>
                 <button type="button" class="btn btn-gray btn-sm" id="ve-chat-btn" style="display: none; height: 34px; padding: 0 14px; font-weight: 600;">
                     <i class="fa-solid fa-comments" style="color: var(--accent);"></i> Chat Requester
                 </button>
             </div>
+            <form id="ve-fallback-complete-form" method="POST" action="dashboard.php?section=event_requests" style="display: none;">
+                <input type="hidden" name="form_section" value="review_request">
+                <input type="hidden" name="redirect_section" value="event_requests">
+                <input type="hidden" name="action" value="complete">
+                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                <input type="hidden" name="id" id="ve-fallback-complete-id">
+            </form>
             <div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
                 <button type="button" class="btn btn-primary btn-sm" id="ve-edit-btn" style="height: 34px; padding: 0 14px; font-weight: 600;">
                     <i class="fa-solid fa-pen-to-square"></i> Edit Event

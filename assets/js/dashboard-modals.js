@@ -616,22 +616,127 @@ function viewEventDetails(input, readonly = false, options = {}) {
         if (rejectBtn) rejectBtn.style.display = 'none';
     }
 
+    const isStaffView = ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff', 'Priest'].includes(userRole);
+    const canManageFlow = ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff'].includes(userRole);
+
+    // Finance / Payment Status Bar
+    const payBox = document.getElementById('ve-payment-container');
+    const payIcon = document.getElementById('ve-payment-icon');
+    const paySummary = document.getElementById('ve-payment-summary');
+    const stampPaidBtn = document.getElementById('ve-stamp-paid-btn');
+    const goFinanceLink = document.getElementById('ve-go-finance-link');
+
+    const totalFee = parseFloat(ev.total_fee || 0) || 0;
+    const paidAmt = parseFloat(ev.paid_amount || 0) || 0;
+    const isPaid = Boolean(ev.is_paid) || (totalFee > 0 && paidAmt >= (totalFee - 0.01));
+    const balance = Math.max(0, totalFee - paidAmt);
+    const fmtPhp = (v) => '₱' + Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    if (payBox) {
+        if (isStaffView && !['Rejected', 'Cancelled'].includes(st)) {
+            payBox.style.display = 'flex';
+            if (totalFee > 0) {
+                if (isPaid) {
+                    if (payIcon) { payIcon.className = 'fa-solid fa-circle-check'; payIcon.style.color = '#16a34a'; }
+                    if (paySummary) paySummary.innerHTML = `Service Fee: <strong>${fmtPhp(totalFee)}</strong> &mdash; <span style="color:#16a34a;">Paid in Finance</span>`;
+                    if (stampPaidBtn) stampPaidBtn.style.display = 'none';
+                    if (goFinanceLink) {
+                        goFinanceLink.href = 'dashboard.php?section=donations&tab=ledger';
+                        goFinanceLink.innerHTML = '<i class="fa-solid fa-vault" style="color: var(--accent);"></i> View in Finance';
+                    }
+                } else {
+                    if (payIcon) { payIcon.className = 'fa-solid fa-clock'; payIcon.style.color = '#b45309'; }
+                    const statusTxt = paidAmt > 0 ? `Partial (${fmtPhp(paidAmt)} paid &bull; Balance: ${fmtPhp(balance)})` : 'Unpaid';
+                    if (paySummary) paySummary.innerHTML = `Service Fee: <strong>${fmtPhp(totalFee)}</strong> &mdash; <span style="color:#b45309;">${statusTxt}</span>`;
+                    if (stampPaidBtn && canManageFlow) {
+                        stampPaidBtn.style.display = 'inline-flex';
+                        stampPaidBtn.onclick = () => {
+                            if (typeof window.openEventPaymentModal === 'function' && document.getElementById('ev-payment-modal')) {
+                                closeModal('modal-view-event-details');
+                                window.openEventPaymentModal({
+                                    getAttribute: (attr) => {
+                                        if (attr === 'data-id') return String(eventId || '');
+                                        if (attr === 'data-title') return String(ev.title || '');
+                                        if (attr === 'data-balance') return balance.toFixed(2);
+                                        return '';
+                                    }
+                                });
+                            } else {
+                                window.location.href = `dashboard.php?section=donations&tab=log`;
+                            }
+                        };
+                    } else if (stampPaidBtn) {
+                        stampPaidBtn.style.display = 'none';
+                    }
+                    if (goFinanceLink) {
+                        goFinanceLink.href = 'dashboard.php?section=donations&tab=log';
+                        goFinanceLink.innerHTML = '<i class="fa-solid fa-vault" style="color: var(--accent);"></i> Go to Finance';
+                    }
+                }
+            } else {
+                if (payIcon) { payIcon.className = 'fa-solid fa-receipt'; payIcon.style.color = 'var(--text2)'; }
+                if (paySummary) paySummary.innerHTML = 'No fixed service fee set &mdash; <span style="color:var(--text2); font-weight:500;">Optional stipend or offering can be logged in Finance.</span>';
+                if (stampPaidBtn) stampPaidBtn.style.display = 'none';
+                if (goFinanceLink) {
+                    goFinanceLink.href = 'dashboard.php?section=donations&tab=log';
+                    goFinanceLink.innerHTML = '<i class="fa-solid fa-vault" style="color: var(--accent);"></i> Log in Finance';
+                }
+            }
+        } else {
+            payBox.style.display = 'none';
+        }
+    }
+
+    // Quick Mark Completed (Step 3) button
+    const completeBtn = document.getElementById('ve-complete-btn');
+    if (completeBtn) {
+        if (st === 'Confirmed' && canManageFlow) {
+            completeBtn.style.display = 'inline-flex';
+            completeBtn.onclick = () => {
+                if (typeof window.completeEventRequestRow === 'function' && document.getElementById('ev-req-complete-form')) {
+                    closeModal('modal-view-event-details');
+                    window.completeEventRequestRow(eventId, ev.title || 'this event');
+                } else {
+                    if (!confirm('Mark "' + (ev.title || '#' + eventId) + '" as completed (Step 3 of 3)?')) return;
+                    const idInp = document.getElementById('ve-fallback-complete-id');
+                    const frm = document.getElementById('ve-fallback-complete-form');
+                    if (idInp && frm) {
+                        idInp.value = eventId;
+                        frm.submit();
+                    }
+                }
+            };
+        } else {
+            completeBtn.style.display = 'none';
+        }
+    }
+
     const guideEl = document.getElementById('ve-next-step-guide');
     if (guideEl) {
         const stLower = String(ev.status || 'Pending').toLowerCase();
-        const isStaffView = ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff', 'Priest'].includes(userRole);
+        const isPastEvent = Boolean(ev.start_time && !isNaN(new Date(ev.start_time.replace(/-/g, '/')).getTime()) && new Date(ev.start_time.replace(/-/g, '/')).getTime() < Date.now());
         let guideHtml = '';
         if (stLower === 'pending') {
+            guideEl.style.borderLeftColor = 'var(--accent)';
             guideHtml = isStaffView
-                ? '<strong>Step 1 of 3 &mdash; Pending Review:</strong> Check venue &amp; priest schedule or message the requester, then click <strong>Approve Request</strong> or <strong>Reject</strong> below.'
+                ? '<strong>Step 1 of 3 &mdash; Pending Review (Not yet on Calendar):</strong> Check venue &amp; priest schedule or message the requester, then click <strong>Approve Request</strong> or <strong>Reject</strong> below.'
                 : '<strong>Step 1 of 3 &mdash; Submitted:</strong> Waiting for Parish Office review and priest assignment. You can message the office anytime.';
         } else if (stLower === 'confirmed') {
-            guideHtml = isStaffView
-                ? '<strong>Step 2 of 3 &mdash; Approved on Calendar:</strong> Record fee payment in Event Approvals if applicable, then mark <strong>Completed</strong> after the rite.'
-                : '<strong>Step 2 of 3 &mdash; Approved:</strong> Your schedule is confirmed on the parish calendar. Please settle any applicable stipend at the Parish Office.';
+            guideEl.style.borderLeftColor = isPastEvent ? '#d97706' : 'var(--accent)';
+            if (isStaffView) {
+                if (isPastEvent) {
+                    guideHtml = '<strong>Step 2 of 3 &mdash; Pending Completion (Not yet in Step 3):</strong> This scheduled event date has already passed. Stamp any service fee in Finance if applicable, then click <strong>Mark Completed (Step 3)</strong> below.';
+                } else {
+                    guideHtml = '<strong>Step 2 of 3 &mdash; Approved on Calendar (Not yet in Step 3):</strong> Record payment in Finance when settled, then click <strong>Mark Completed (Step 3)</strong> after the rite finishes.';
+                }
+            } else {
+                guideHtml = '<strong>Step 2 of 3 &mdash; Approved:</strong> Your schedule is confirmed on the parish calendar. Please settle any applicable stipend at the Parish Office.';
+            }
         } else if (stLower === 'completed') {
+            guideEl.style.borderLeftColor = '#16a34a';
             guideHtml = '<strong>Step 3 of 3 &mdash; Completed:</strong> This booking has completed its lifecycle.';
         } else {
+            guideEl.style.borderLeftColor = '#dc2626';
             guideHtml = '<strong>Closed:</strong> This request was cancelled or rejected.';
         }
         guideEl.innerHTML = `<i class="fa-solid fa-list-check" style="color: var(--accent); margin-right: 6px;"></i>${guideHtml}`;

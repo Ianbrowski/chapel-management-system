@@ -248,7 +248,13 @@ $tp = (int)($total_pages ?? 1);
                     foreach ($pending_requests as $req): 
                         $isOverdue = !empty($req['start_time']) && strtotime($req['start_time']) < time();
                         $evType = $req['event_type'] ?? 'Liturgy';
-                        $reqJson = htmlspecialchars(json_encode($req, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP), ENT_QUOTES);
+                        $evFee = (float)($req['total_fee'] ?? 0);
+                        $evPaid = (float)(($event_paid_map ?? [])[(int)$req['event_id']] ?? 0);
+                        $evIsPaid = ($evFee > 0 && $evPaid >= ($evFee - 0.01));
+                        $reqWithFinance = $req;
+                        $reqWithFinance['paid_amount'] = $evPaid;
+                        $reqWithFinance['is_paid'] = $evIsPaid;
+                        $reqJson = htmlspecialchars(json_encode($reqWithFinance, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP), ENT_QUOTES);
                     ?>
                     <tr style="cursor: pointer; transition: background 0.15s; border-bottom: 1px solid var(--border); <?php echo $isOverdue ? 'border-left: 3px solid #D64545;' : ''; ?>" 
                         data-req="<?php echo $reqJson; ?>" 

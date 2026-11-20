@@ -32,14 +32,26 @@ class EventConflictService
         return $defaults[$eventType] ?? 60;
     }
 
+    private function isNonExclusiveService(string $eventType, ?int $serviceId = null): bool
+    {
+        if ($serviceId !== null && in_array($serviceId, [4, 7, 8], true)) {
+            return true;
+        }
+        return $eventType === 'Ecclesiastical Certificates'
+            || stripos($eventType, 'Certificate') !== false
+            || stripos($eventType, 'Thanksgiving') !== false
+            || stripos($eventType, 'Requiem') !== false
+            || stripos($eventType, 'Intention') !== false;
+    }
+
     /**
      * Checks for venue AND pastor time-overlap conflicts.
      * Returns an array with conflict status and details.
      */
-    public function checkConflict(string $startTime, $pastorId, $chapelId, string $eventType = 'Other', $excludeId = null, ?int $customDuration = null): array
+    public function checkConflict(string $startTime, $pastorId, $chapelId, string $eventType = 'Other', $excludeId = null, ?int $customDuration = null, ?int $serviceId = null): array
     {
-        // Certificates are administrative office transactions, not altar/sanctuary events
-        if ($eventType === 'Ecclesiastical Certificates' || stripos($eventType, 'Certificate') !== false) {
+        // Certificates and shared Mass Intentions do not exclusively occupy the church altar
+        if ($this->isNonExclusiveService($eventType, $serviceId)) {
             return ['conflict' => false];
         }
 
@@ -80,9 +92,9 @@ class EventConflictService
         return ['conflict' => false];
     }
 
-    public function checkVenueOnly($chapelId, string $startTime, string $eventType = 'Other', $excludeId = null, ?int $customDuration = null): array
+    public function checkVenueOnly($chapelId, string $startTime, string $eventType = 'Other', $excludeId = null, ?int $customDuration = null, ?int $serviceId = null): array
     {
-        if ($eventType === 'Ecclesiastical Certificates' || stripos($eventType, 'Certificate') !== false) {
+        if ($this->isNonExclusiveService($eventType, $serviceId)) {
             return ['conflict' => false];
         }
 
@@ -200,7 +212,7 @@ class EventConflictService
             $sql .= "chapel_id = ?";
         }
 
-        $sql .= " AND start_time >= DATE_SUB(?, INTERVAL 1 DAY) AND start_time <= DATE_ADD(?, INTERVAL 1 DAY) AND status NOT IN ('Cancelled', 'Rejected') AND is_archived = 0 AND COALESCE(event_type, '') != 'Ecclesiastical Certificates' AND COALESCE(event_type, '') NOT LIKE '%Certificate%' AND (service_id IS NULL OR service_id != 8) FOR UPDATE";
+        $sql .= " AND start_time >= DATE_SUB(?, INTERVAL 1 DAY) AND start_time <= DATE_ADD(?, INTERVAL 1 DAY) AND status NOT IN ('Cancelled', 'Rejected') AND is_archived = 0 AND COALESCE(event_type, '') != 'Ecclesiastical Certificates' AND COALESCE(event_type, '') NOT LIKE '%Certificate%' AND (service_id IS NULL OR service_id NOT IN (4, 7, 8)) FOR UPDATE";
 
         $stmt = $this->conn->prepare($sql);
         $fullStart = date('Y-m-d H:i:s', $newStartTs);
@@ -242,7 +254,7 @@ class EventConflictService
                 AND is_archived = 0
                 AND COALESCE(event_type, '') != 'Ecclesiastical Certificates'
                 AND COALESCE(event_type, '') NOT LIKE '%Certificate%'
-                AND (service_id IS NULL OR service_id != 8) FOR UPDATE"
+                AND (service_id IS NULL OR service_id NOT IN (4, 7, 8)) FOR UPDATE"
         );
         $fullStart = date('Y-m-d H:i:s', $newStartTs);
         $stmt->bind_param('iss', $pastorId, $fullStart, $fullStart);

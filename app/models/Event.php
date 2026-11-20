@@ -362,7 +362,7 @@ class Event
      *
      * @param int|null $customDuration Total duration override (minutes) for the NEW event
      */
-    public function checkConflict($startTime, $pastorId, $chapelId, $eventType = 'Other', $excludeId = null, $customDuration = null)
+    public function checkConflict($startTime, $pastorId, $chapelId, $eventType = 'Other', $excludeId = null, $customDuration = null, ?int $serviceId = null)
     {
         return $this->conflicts->checkConflict(
             (string) $startTime,
@@ -370,8 +370,53 @@ class Event
             $chapelId,
             (string) $eventType,
             $excludeId,
-            $customDuration !== null ? (int) $customDuration : null
+            $customDuration !== null ? (int) $customDuration : null,
+            $serviceId
         );
+    }
+
+    public function getPaidAmountsMap(array $eventIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $eventIds), fn($id) => $id > 0)));
+        if (empty($ids)) {
+            return [];
+        }
+
+        $refToId = [];
+        $refs = [];
+        foreach ($ids as $id) {
+            $pad = str_pad((string)$id, 4, '0', STR_PAD_LEFT);
+            $evRef = 'EV-' . $pad;
+            $reqRef = 'REQ-' . $pad;
+            $refToId[$evRef] = $id;
+            $refToId[$reqRef] = $id;
+            $refs[] = $evRef;
+            $refs[] = $reqRef;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($refs), '?'));
+        $types = str_repeat('s', count($refs));
+        $sql = "SELECT reference_id, COALESCE(SUM(amount), 0) AS paid_total
+                FROM donations
+                WHERE is_archived = 0 AND voided_at IS NULL AND reference_id IN ($placeholders)
+                GROUP BY reference_id";
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param($types, ...$refs);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $map = [];
+        while ($row = $res->fetch_assoc()) {
+            $ref = (string)($row['reference_id'] ?? '');
+            if (isset($refToId[$ref])) {
+                $eid = $refToId[$ref];
+                $map[$eid] = ($map[$eid] ?? 0.0) + (float)($row['paid_total'] ?? 0);
+            }
+        }
+        $stmt->close();
+        return $map;
     }
 
     // ──────────────────────────────────────────────────────────────────────────

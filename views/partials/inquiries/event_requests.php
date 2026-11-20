@@ -35,10 +35,10 @@ $tp = (int)($total_pages ?? 1);
             </div>
             <div>
                 <h1 class="page-title" style="font-family: var(--font-family, 'Inter', sans-serif); font-size: var(--font-page-title, 20px); font-weight: 700; color: var(--text); margin: 0; line-height: 1.2;">
-                    Event Requests
+                    Event Approvals &amp; Bookings
                 </h1>
                 <p class="page-subtitle" style="font-size: var(--font-page-subtitle, 14px); color: var(--text2); margin: 3px 0 0 0;">
-                    Review and approve baptism, wedding, and blessing requests from members
+                    Review, assign priests, chat with parishioners, record payments, and approve liturgical requests
                 </p>
             </div>
         </div>
@@ -261,13 +261,23 @@ $tp = (int)($total_pages ?? 1);
                             <div style="font-weight: 600; font-size: 12.5px; color: var(--text, #111111); line-height: 1.3;">
                                 <?php echo htmlspecialchars($req['title']); ?>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 6px; margin-top: 3px;">
+                            <?php
+                                $evFee = (float)($req['total_fee'] ?? 0);
+                                $evPaid = (float)(($event_paid_map ?? [])[(int)$req['event_id']] ?? 0);
+                                $evIsPaid = ($evFee > 0 && $evPaid >= ($evFee - 0.01));
+                            ?>
+                            <div style="display: flex; align-items: center; gap: 6px; margin-top: 3px; flex-wrap: wrap;">
                                 <span class="badge" style="background: var(--bg2, #F6F6F6); color: var(--text, #111111); border: 1px solid var(--border, #E5E5E5); font-size: 11.5px; padding: 2px 7px; border-radius: 4px; font-weight: 600;">
                                     <?php echo htmlspecialchars($evType); ?>
                                 </span>
                                 <?php if (!empty($req['event_scope'])): ?>
                                 <span style="font-size: 11.5px; color: var(--text2, #737373);">
                                     &bull; <?php echo htmlspecialchars($req['event_scope']); ?>
+                                </span>
+                                <?php endif; ?>
+                                <?php if ($evFee > 0): ?>
+                                <span style="font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 4px; <?php echo $evIsPaid ? 'background: rgba(22,163,74,0.12); color: #16a34a;' : 'background: rgba(197,160,89,0.14); color: #9a7418;'; ?>">
+                                    ₱<?php echo number_format($evFee, 2); ?> &bull; <?php echo $evIsPaid ? 'Paid' : ($evPaid > 0 ? 'Partial' : 'Unpaid'); ?>
                                 </span>
                                 <?php endif; ?>
                             </div>
@@ -356,6 +366,17 @@ $tp = (int)($total_pages ?? 1);
                                             style="width: 100%; border: none; background: transparent; padding: 7px 10px; font-size: 12px; font-weight: 600; color: #16a34a; cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 5px; text-align: left; transition: background 0.15s ease;">
                                         <i class="fa-solid fa-circle-check" style="font-size: 13px;"></i>
                                         <span>Check / Approve</span>
+                                    </button>
+                                    <?php endif; ?>
+                                    <?php if ($evFee > 0 && !$evIsPaid): ?>
+                                    <button type="button" class="req-popover-item"
+                                            data-id="<?php echo (int)$req['event_id']; ?>"
+                                            data-title="<?php echo htmlspecialchars($req['title'], ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-balance="<?php echo number_format(max(0, $evFee - $evPaid), 2, '.', ''); ?>"
+                                            onclick="closeAllReqActionBoxes(); openEventPaymentModal(this);"
+                                            style="width: 100%; border: none; background: transparent; padding: 7px 10px; font-size: 12px; font-weight: 600; color: #16a34a; cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 5px; text-align: left; transition: background 0.15s ease;">
+                                        <i class="fa-solid fa-peso-sign" style="font-size: 13px;"></i>
+                                        <span>Record Payment</span>
                                     </button>
                                     <?php endif; ?>
                                     <?php if ($status === 'Confirmed'): ?>
@@ -466,6 +487,51 @@ $tp = (int)($total_pages ?? 1);
     <input type="hidden" name="id" id="ev-req-complete-id">
 </form>
 
+<div class="modal-overlay" id="ev-payment-modal" style="z-index: 10000;">
+    <div class="modal" style="max-width: 420px; width: 92%; padding: 22px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <h3 style="font-size: 15px; font-weight: 700; color: var(--text); margin: 0;">Record Service Fee Payment</h3>
+            <button type="button" onclick="closeEventPaymentModal()" style="border: none; background: transparent; color: var(--text2); font-size: 18px; cursor: pointer;">&times;</button>
+        </div>
+        <p id="ev-pay-title-label" style="font-size: 12px; color: var(--text2); margin: 0 0 14px;"></p>
+        <form method="POST" action="dashboard.php?section=event_requests" style="display: flex; flex-direction: column; gap: 10px;">
+            <input type="hidden" name="form_section" value="review_request">
+            <input type="hidden" name="redirect_section" value="event_requests">
+            <input type="hidden" name="action" value="record_payment">
+            <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+            <input type="hidden" name="id" id="ev-pay-id-input">
+            <div>
+                <label style="font-size: 11px; font-weight: 700; color: var(--text2); display: block; margin-bottom: 4px;">Amount (₱)</label>
+                <input type="number" step="0.01" min="0.01" name="amount" id="ev-pay-amount-input" required style="width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg2); color: var(--text); box-sizing: border-box;">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: var(--text2); display: block; margin-bottom: 4px;">Method</label>
+                    <select name="payment_method" style="width: 100%; height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg2); color: var(--text);">
+                        <option value="Cash">Cash</option>
+                        <option value="GCash">GCash</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Maya">Maya</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: var(--text2); display: block; margin-bottom: 4px;">Date</label>
+                    <input type="date" name="date_received" value="<?php echo date('Y-m-d'); ?>" required style="width: 100%; height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg2); color: var(--text); box-sizing: border-box;">
+                </div>
+            </div>
+            <div>
+                <label style="font-size: 11px; font-weight: 700; color: var(--text2); display: block; margin-bottom: 4px;">OR / Reference # <span style="font-weight: 400;">(optional)</span></label>
+                <input type="text" name="donor_ref_id" maxlength="100" placeholder="e.g. OR-2026-001" style="width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg2); color: var(--text); box-sizing: border-box;">
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 6px;">
+                <button type="button" class="btn btn-gray" onclick="closeEventPaymentModal()" style="flex: 1; border-radius: 6px;">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="flex: 1; border-radius: 6px;">Save Payment</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 function viewRequestDetailsFromRow(tr) {
     const dataAttr = tr.getAttribute('data-req');
@@ -525,6 +591,21 @@ function completeEventRequestRow(id, title) {
         inp.value = id;
         frm.submit();
     }
+}
+function openEventPaymentModal(el) {
+    if (!el) return;
+    const idInp = document.getElementById('ev-pay-id-input');
+    const amtInp = document.getElementById('ev-pay-amount-input');
+    const lbl = document.getElementById('ev-pay-title-label');
+    if (idInp) idInp.value = el.getAttribute('data-id') || '';
+    if (amtInp) amtInp.value = el.getAttribute('data-balance') || '';
+    if (lbl) lbl.textContent = el.getAttribute('data-title') || '';
+    const m = document.getElementById('ev-payment-modal');
+    if (m) { m.style.display = 'flex'; m.classList.add('open'); }
+}
+function closeEventPaymentModal() {
+    const m = document.getElementById('ev-payment-modal');
+    if (m) { m.style.display = 'none'; m.classList.remove('open'); }
 }
 document.addEventListener('click', closeAllReqActionBoxes);
 </script>

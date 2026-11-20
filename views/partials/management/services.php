@@ -18,9 +18,9 @@ $certTypes = $certificate_types ?? [];
             </div>
             <div>
                 <h1 class="page-title" style="font-family: var(--font-family, 'Inter', sans-serif); font-size: var(--font-page-title, 20px); font-weight: 700; color: var(--text); margin: 0; line-height: 1.2;">
-                    Services
+                    Service Catalog &amp; Fee Schedule
                 </h1>
-                <p class="page-subtitle" style="font-size: var(--font-page-subtitle, 14px); color: var(--text2); margin: 3px 0 0 0;">Parish liturgical rites, sacrament tiers, and service requirements</p>
+                <p class="page-subtitle" style="font-size: var(--font-page-subtitle, 14px); color: var(--text2); margin: 3px 0 0 0;">Configure parish liturgical rites, sacrament rate tiers, certificate fees, and requirements</p>
             </div>
         </div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">

@@ -130,6 +130,7 @@ class DashboardSectionDataService
         $res = $this->eventM->search($filters, $page, $limit);
         
         $data['my_requests'] = $res['records'];
+        $data['event_paid_map'] = $this->eventM->getPaidAmountsMap(array_column($data['my_requests'], 'event_id'));
         $data['limit'] = $limit;
         $data['ev_filters'] = $filters;
         $data['current_page'] = $res['page'];
@@ -174,6 +175,7 @@ class DashboardSectionDataService
         $res = $this->eventM->search($filters, $page, $limit);
         
         $data['my_requests'] = $res['records'];
+        $data['event_paid_map'] = $this->eventM->getPaidAmountsMap(array_column($data['my_requests'], 'event_id'));
         $data['limit'] = $limit;
         $data['ev_filters'] = $filters;
         $data['current_page'] = $res['page'];

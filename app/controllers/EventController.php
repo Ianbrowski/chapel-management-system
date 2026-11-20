@@ -454,22 +454,22 @@ class EventController extends BaseController {
                 $status = 'Confirmed';
             }
         }
+        // Service Catalog Pricing & Snapshotting
+        $serviceId = isset($_POST['service_id']) && (int)$_POST['service_id'] > 0 ? (int)$_POST['service_id'] : null;
+        $variantId = isset($_POST['variant_id']) && (int)$_POST['variant_id'] > 0 ? (int)$_POST['variant_id'] : null;
+        $selectedAddons = isset($_POST['addons']) && is_array($_POST['addons']) ? $_POST['addons'] : [];
+        $locationType = in_array($_POST['location_type'] ?? '', ['Church', 'Outside']) ? $_POST['location_type'] : 'Church';
+
         $this->conn->begin_transaction();
-        // Conflict Check: Certificates have ZERO church altar occupancy and do not conflict with liturgical events
+        // Conflict Check: Certificates and shared Mass Intentions bypass altar exclusivity
         if (!$isCertSection && $type !== 'Ecclesiastical Certificates') {
-            $conflict = $this->eventModel->checkConflict($start, $pastor, $loc, $type, null, $customDuration);
+            $conflict = $this->eventModel->checkConflict($start, $pastor, $loc, $type, null, $customDuration, $serviceId);
             if ($conflict['conflict']) {
                 $this->conn->rollback();
                 $this->flash('error', "Schedule conflict detected ({$conflict['type']}): {$conflict['details']}. Please choose a different time.");
                 $this->redirect($redirectUrl);
             }
         }
-
-        // Service Catalog Pricing & Snapshotting
-        $serviceId = isset($_POST['service_id']) && (int)$_POST['service_id'] > 0 ? (int)$_POST['service_id'] : null;
-        $variantId = isset($_POST['variant_id']) && (int)$_POST['variant_id'] > 0 ? (int)$_POST['variant_id'] : null;
-        $selectedAddons = isset($_POST['addons']) && is_array($_POST['addons']) ? $_POST['addons'] : [];
-        $locationType = in_array($_POST['location_type'] ?? '', ['Church', 'Outside']) ? $_POST['location_type'] : 'Church';
 
         $serviceFee = 0.00;
         $addonsFee  = 0.00;
@@ -576,9 +576,10 @@ class EventController extends BaseController {
             $this->conn->begin_transaction();
             // Optional: Re-check conflict before final approval (skip for office-only Certificates)
             $recType = (string)($record['event_type'] ?? '');
-            $isCertRecord = ($recType === 'Ecclesiastical Certificates' || stripos($recType, 'Certificate') !== false || (int)($record['service_id'] ?? 0) === 8);
+            $recServiceId = isset($record['service_id']) && (int)$record['service_id'] > 0 ? (int)$record['service_id'] : null;
+            $isCertRecord = ($recType === 'Ecclesiastical Certificates' || stripos($recType, 'Certificate') !== false || $recServiceId === 8);
             if (!$isCertRecord) {
-                $conflict = $this->eventModel->checkConflict($record['start_time'], $pastor, $record['chapel_id'], $recType, $id, $record['custom_duration']);
+                $conflict = $this->eventModel->checkConflict($record['start_time'], $pastor, $record['chapel_id'], $recType, $id, $record['custom_duration'], $recServiceId);
                 if ($conflict['conflict']) {
                     $this->conn->rollback();
                     $this->flash('error', "Schedule conflict detected during approval ({$conflict['type']}): {$conflict['details']}.");
@@ -688,6 +689,73 @@ class EventController extends BaseController {
 
             AuditLogger::logFromSession($this->conn, 'completed', $isCertRecord ? 'Certificates' : 'Event Requests', "Marked ID {$id} as Completed/Released");
             $this->flash('success', $isCertRecord ? 'Certificate marked as released.' : 'Event marked as completed.');
+        } elseif ($action === 'record_payment') {
+            $amount = round((float)($_POST['amount'] ?? 0), 2);
+            $method = trim((string)($_POST['payment_method'] ?? 'Cash'));
+            $allowedMethods = ['Cash', 'GCash', 'Bank Transfer', 'Maya', 'Other'];
+            if (!in_array($method, $allowedMethods, true)) {
+                $method = 'Cash';
+            }
+            $dateRecv = trim((string)($_POST['date_received'] ?? date('Y-m-d')));
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateRecv)) {
+                $dateRecv = date('Y-m-d');
+            }
+            $donorRef = mb_substr(trim((string)($_POST['donor_ref_id'] ?? '')), 0, 120);
+
+            if ($amount <= 0) {
+                $this->flash('error', 'Payment amount must be greater than zero.');
+                $this->redirect($redirectUrl);
+            }
+
+            $isCertRecord = ((int)($record['service_id'] ?? 0) === 8) || stripos((string)($record['title'] ?? ''), 'Certificate') !== false;
+            $padId = str_pad((string)$id, 4, '0', STR_PAD_LEFT);
+            $refId = ($isCertRecord ? 'REQ-' : 'EV-') . $padId;
+
+            $donorName = 'Parishioner';
+            if (!empty($record['requested_by'])) {
+                $reqUser = $this->userModel->getById((int)$record['requested_by']);
+                if (is_array($reqUser)) {
+                    $donorName = (string)($reqUser['full_name'] ?: ($reqUser['user'] ?: 'Parishioner'));
+                }
+            } elseif (!empty($record['requester_email'])) {
+                $donorName = (string)$record['requester_email'];
+            }
+            $donorName = mb_substr(trim($donorName), 0, 100);
+            $purposePrefix = $isCertRecord ? 'Certificate Fee: ' : 'Service Fee: ';
+            $purpose = mb_substr($purposePrefix . trim((string)($record['title'] ?? 'Service Request')), 0, 100);
+
+            require_once __DIR__ . '/../models/Donation.php';
+            $donationModel = new Donation($this->conn);
+            $donId = $donationModel->create([
+                'chapel_id'      => !empty($record['chapel_id']) ? (int)$record['chapel_id'] : null,
+                'amount'         => $amount,
+                'purpose'        => $purpose,
+                'donor_name'     => $donorName,
+                'date_received'  => $dateRecv,
+                'reference_id'   => $refId,
+                'donor_ref_id'   => $donorRef,
+                'logger_id'      => $this->userId,
+                'payment_method' => $method,
+            ]);
+
+            if ($donId) {
+                if (!empty($record['requested_by'])) {
+                    require_once __DIR__ . '/../models/SystemNotification.php';
+                    $sysNotif = new SystemNotification($this->conn);
+                    $evTitle = $record['title'] ?: 'Service Request';
+                    $sysNotif->create(
+                        (int)$record['requested_by'],
+                        "Payment Recorded",
+                        "Payment of PHP " . number_format($amount, 2) . " ({$method}) for \"{$evTitle}\" ({$refId}) has been recorded.",
+                        'payment_recorded',
+                        (int)$id
+                    );
+                }
+                AuditLogger::logFromSession($this->conn, 'created', 'Finance', "Recorded fee payment PHP " . number_format($amount, 2) . " for {$refId}");
+                $this->flash('success', "Payment of ₱" . number_format($amount, 2) . " recorded to Finance ({$refId}).");
+            } else {
+                $this->flash('error', 'Failed to record payment.');
+            }
         }
 
         $this->redirect($redirectUrl);

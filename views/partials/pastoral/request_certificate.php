@@ -195,10 +195,10 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
             </div>
             <div>
                 <h1 class="page-title" style="font-family: var(--font-family, 'Inter', sans-serif); font-size: var(--font-page-title, 20px); font-weight: 700; color: var(--text); margin: 0; line-height: 1.2;">
-                    Certificates
+                    <?php echo $isAdmin ? 'Certificate Queue' : 'Request Certificates'; ?>
                 </h1>
                 <p class="page-subtitle" style="font-size: var(--font-page-subtitle, 14px); color: var(--text2); margin: 3px 0 0 0;">
-                    Request official baptism, confirmation, marriage, or christian burial certificates &bull; Releasing at Parish Office (Tue&ndash;Sun, 8am&ndash;5pm)
+                    <?php echo $isAdmin ? 'Process archive certificate requests, record fees, mark ready or released for parish office pickup' : 'Request official baptism, confirmation, marriage, or christian burial certificates &bull; Releasing at Parish Office (Tue&ndash;Sun, 8am&ndash;5pm)'; ?>
                 </p>
             </div>
         </div>
@@ -409,8 +409,18 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
                                     <?php echo htmlspecialchars($pickupTime); ?>
                                 </td>
 
+                                <?php
+                                    $paidMap = $event_paid_map ?? [];
+                                    $paidFee = (float)($paidMap[(int)$req['event_id']] ?? 0);
+                                    $isPaidFee = ($fee > 0 && $paidFee >= ($fee - 0.01));
+                                ?>
                                 <td style="padding: 10px 14px; font-size: 12.5px; font-weight: 700; color: var(--text); text-align: right; white-space: nowrap;">
-                                    ₱<?php echo number_format($fee, 2); ?>
+                                    <div>₱<?php echo number_format($fee, 2); ?></div>
+                                    <?php if ($fee > 0): ?>
+                                        <span style="display: inline-block; margin-top: 2px; font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 4px; <?php echo $isPaidFee ? 'background: rgba(46,158,91,0.12); color: #16a34a;' : 'background: rgba(197,160,89,0.14); color: #9a7418;'; ?>">
+                                            <?php echo $isPaidFee ? 'PAID' : ($paidFee > 0 ? 'PARTIAL' : 'UNPAID'); ?>
+                                        </span>
+                                    <?php endif; ?>
                                 </td>
 
                                 <td style="padding: 10px 12px; text-align: center; white-space: nowrap;">
@@ -457,6 +467,11 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
                                             <?php if ($isAdmin && $st === 'Confirmed'): ?>
                                             <a class="dropdown-item" href="javascript:void(0)" data-id="<?php echo (int)$req['event_id']; ?>" onclick="completeCertRequest(this)" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: #2563eb; border-radius: 4px;">
                                                 <i class="fa-solid fa-box-open"></i> Mark as Released
+                                            </a>
+                                            <?php endif; ?>
+                                            <?php if ($isAdmin && $fee > 0 && !$isPaidFee): ?>
+                                            <a class="dropdown-item" href="javascript:void(0)" data-id="<?php echo (int)$req['event_id']; ?>" data-title="<?php echo htmlspecialchars($req['title'], ENT_QUOTES, 'UTF-8'); ?>" data-balance="<?php echo number_format(max(0, $fee - $paidFee), 2, '.', ''); ?>" onclick="openCertPaymentModal(this)" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: #16a34a; border-radius: 4px;">
+                                                <i class="fa-solid fa-peso-sign"></i> Record Payment
                                             </a>
                                             <?php endif; ?>
                                             <?php if ($isAdmin):
@@ -890,6 +905,53 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
     <input type="hidden" name="id" id="cert-complete-id-input">
 </form>
 
+<?php if ($isAdmin): ?>
+<div class="modal-overlay" id="cert-payment-modal" style="z-index: 10000;">
+    <div class="modal" style="max-width: 420px; width: 92%; padding: 22px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <h3 style="font-size: 15px; font-weight: 700; color: var(--text); margin: 0;">Record Certificate Fee</h3>
+            <button type="button" onclick="closeCertPaymentModal()" style="border: none; background: transparent; color: var(--text2); font-size: 18px; cursor: pointer;">&times;</button>
+        </div>
+        <p id="cert-pay-title-label" style="font-size: 12px; color: var(--text2); margin: 0 0 14px;"></p>
+        <form method="POST" action="dashboard.php?section=request_certificate" style="display: flex; flex-direction: column; gap: 10px;">
+            <input type="hidden" name="form_section" value="review_request">
+            <input type="hidden" name="redirect_section" value="request_certificate">
+            <input type="hidden" name="action" value="record_payment">
+            <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+            <input type="hidden" name="id" id="cert-pay-id-input">
+            <div>
+                <label style="font-size: 11px; font-weight: 700; color: var(--text2); display: block; margin-bottom: 4px;">Amount (₱)</label>
+                <input type="number" step="0.01" min="0.01" name="amount" id="cert-pay-amount-input" required style="width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg2); color: var(--text); box-sizing: border-box;">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: var(--text2); display: block; margin-bottom: 4px;">Method</label>
+                    <select name="payment_method" style="width: 100%; height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg2); color: var(--text);">
+                        <option value="Cash">Cash</option>
+                        <option value="GCash">GCash</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Maya">Maya</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: var(--text2); display: block; margin-bottom: 4px;">Date</label>
+                    <input type="date" name="date_received" value="<?php echo date('Y-m-d'); ?>" required style="width: 100%; height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg2); color: var(--text); box-sizing: border-box;">
+                </div>
+            </div>
+            <div>
+                <label style="font-size: 11px; font-weight: 700; color: var(--text2); display: block; margin-bottom: 4px;">OR / Reference # <span style="font-weight: 400;">(optional)</span></label>
+                <input type="text" name="donor_ref_id" maxlength="100" placeholder="e.g. OR-2026-001" style="width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg2); color: var(--text); box-sizing: border-box;">
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 6px;">
+                <button type="button" class="btn btn-gray" onclick="closeCertPaymentModal()" style="flex: 1; border-radius: 6px;">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="flex: 1; border-radius: 6px;">Save Payment</button>
+            </div>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 let certSelectedPrice = <?php echo (float)($certVariants[0]['price'] ?? 200.00); ?>;
 let certSelectedName = '<?php echo addslashes($certVariants[0]['name'] ?? 'Baptismal Certificate'); ?>';
@@ -1190,8 +1252,27 @@ function completeCertRequest(el) {
     }
 }
 
+function openCertPaymentModal(el) {
+    if (!el) return;
+    const idInp = document.getElementById('cert-pay-id-input');
+    const amtInp = document.getElementById('cert-pay-amount-input');
+    const lbl = document.getElementById('cert-pay-title-label');
+    if (idInp) idInp.value = el.getAttribute('data-id') || '';
+    if (amtInp) amtInp.value = el.getAttribute('data-balance') || '';
+    if (lbl) lbl.textContent = el.getAttribute('data-title') || '';
+    const m = document.getElementById('cert-payment-modal');
+    if (m) { m.style.display = 'flex'; m.classList.add('open'); }
+}
+
+function closeCertPaymentModal() {
+    const m = document.getElementById('cert-payment-modal');
+    if (m) { m.style.display = 'none'; m.classList.remove('open'); }
+}
+
 window.approveCertRequest = approveCertRequest;
 window.completeCertRequest = completeCertRequest;
+window.openCertPaymentModal = openCertPaymentModal;
+window.closeCertPaymentModal = closeCertPaymentModal;
 window.openCertApplicantChat = openCertApplicantChat;
 window.cancelCertRequest = cancelCertRequest;
 window.closeCertCancelModal = closeCertCancelModal;

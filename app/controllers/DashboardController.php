@@ -640,6 +640,7 @@ class DashboardController extends BaseController
 
                 $resReq = $this->eventM->getPendingRequests($chapelFilter, $page, $limit, $reqFilters);
                 $data['pending_requests'] = $resReq['records'];
+                $data['event_paid_map'] = $this->eventM->getPaidAmountsMap(array_column($data['pending_requests'], 'event_id'));
                 $data['limit'] = $limit;
                 $data['total_pages'] = $resReq['pages'] ?? 1;
                 $data['current_page'] = $resReq['page'] ?? 1;

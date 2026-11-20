@@ -38,20 +38,20 @@ $defaultTab = $_GET['tab'] ?? ($isGuest ? 'catalog' : ($totalReqs > 0 ? 'request
             </div>
             <div>
                 <h1 class="page-title" style="font-family: var(--font-family, 'Inter', sans-serif); font-size: var(--font-page-title, 20px); font-weight: 700; color: var(--text); margin: 0; line-height: 1.2;">
-                    <?php echo $isGuest ? 'Sacramental &amp; Liturgical Services' : 'Parish Services &amp; Requests'; ?>
+                    <?php echo $isGuest ? 'Sacramental &amp; Liturgical Services' : 'Book a Service &amp; My Requests'; ?>
                 </h1>
                 <p class="page-subtitle" style="font-size: var(--font-page-subtitle, 14px); color: var(--text2); margin: 3px 0 0 0;">
-                    <?php echo $isGuest ? 'Browse ecclesiastical rites, offerings, and request sacramental dates' : 'Track and view your requests for baptisms, weddings, blessings, and Masses'; ?>
+                    <?php echo $isGuest ? 'Browse ecclesiastical rites, offerings, and request sacramental dates' : 'Browse available rites and track your baptisms, weddings, blessings, and Mass requests'; ?>
                 </p>
             </div>
         </div>
 
-        <!-- Controls: Services Menu vs My Requests tabs + "+ Request Service" Button -->
+        <!-- Controls: Browse Services vs My Requests tabs + "+ Request Service" Button -->
         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <div class="service-view-tabs" style="display: inline-flex; background: var(--surface); padding: 3px; border-radius: 8px; border: 1px solid var(--border); gap: 2px;">
                 <button type="button" class="btn-tab-service <?php echo ($defaultTab === 'catalog') ? 'active' : ''; ?>" id="tab-btn-catalog" onclick="switchServiceViewTab('catalog')" style="border: none; background: <?php echo ($defaultTab === 'catalog') ? 'var(--accent-soft, rgba(201,168,76,0.15))' : 'transparent'; ?>; color: <?php echo ($defaultTab === 'catalog') ? 'var(--accent)' : 'var(--text2)'; ?>; padding: 6px 14px; font-size: 12px; font-weight: 600; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s ease;">
                     <i class="fa-solid fa-layer-group"></i>
-                    <span>Services Menu</span>
+                    <span>Browse Services</span>
                 </button>
                 <button type="button" class="btn-tab-service <?php echo ($defaultTab === 'requests') ? 'active' : ''; ?>" id="tab-btn-requests" onclick="switchServiceViewTab('requests')" style="border: none; background: <?php echo ($defaultTab === 'requests') ? 'var(--accent-soft, rgba(201,168,76,0.15))' : 'transparent'; ?>; color: <?php echo ($defaultTab === 'requests') ? 'var(--accent)' : 'var(--text2)'; ?>; padding: 6px 14px; font-size: 12px; font-weight: 600; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s ease;">
                     <i class="fa-solid fa-clock-rotate-left"></i>

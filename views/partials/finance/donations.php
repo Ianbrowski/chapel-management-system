@@ -199,8 +199,8 @@ $voidedCount = count($voided_donations ?? []);
                     <select name="don_timeframe" onchange="this.form.submit()" 
                             style="height: 32px !important; min-width: 140px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); color: var(--text);">
                         <option value="">All Timeframes</option>
-                        <option value="recently_added" <?php echo (($_GET['don_timeframe'] ?? '') === 'recently_added') ? 'selected' : ''; ?>>⚡ Recently Added (30 Days)</option>
-                        <option value="recently_added_7" <?php echo (($_GET['don_timeframe'] ?? '') === 'recently_added_7') ? 'selected' : ''; ?>>⚡ Recently Added (7 Days)</option>
+                        <option value="recently_added" <?php echo (($_GET['don_timeframe'] ?? '') === 'recently_added') ? 'selected' : ''; ?>>Recently Added (30 Days)</option>
+                        <option value="recently_added_7" <?php echo (($_GET['don_timeframe'] ?? '') === 'recently_added_7') ? 'selected' : ''; ?>>Recently Added (7 Days)</option>
                     </select>
 
                     <select name="don_method" onchange="this.form.submit()" 

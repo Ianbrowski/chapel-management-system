@@ -143,8 +143,8 @@ $canCreate = in_array($role, ['Admin', 'Cathedral Admin', 'Chapel Admin']);
                 <!-- Timeframe Filter Dropdown (This Week, Next Week, etc.) -->
                 <select name="timeframe" onchange="this.form.submit()" style="height: 32px !important; font-size: 12px; font-weight: 500; min-width: 110px; max-width: 155px;" title="Filter by timeframe">
                     <option value="">All Dates</option>
-                    <option value="recently_added" <?php echo ($curTimeframe === 'recently_added') ? 'selected' : ''; ?>>⚡ Recently Added (30 Days)</option>
-                    <option value="recently_added_7" <?php echo ($curTimeframe === 'recently_added_7') ? 'selected' : ''; ?>>⚡ Recently Added (7 Days)</option>
+                    <option value="recently_added" <?php echo ($curTimeframe === 'recently_added') ? 'selected' : ''; ?>>Recently Added (30 Days)</option>
+                    <option value="recently_added_7" <?php echo ($curTimeframe === 'recently_added_7') ? 'selected' : ''; ?>>Recently Added (7 Days)</option>
                     <option value="this_week" <?php echo ($curTimeframe === 'this_week') ? 'selected' : ''; ?>>This Week</option>
                     <option value="next_week" <?php echo ($curTimeframe === 'next_week') ? 'selected' : ''; ?>>Next Week</option>
                     <option value="this_month" <?php echo ($curTimeframe === 'this_month') ? 'selected' : ''; ?>>This Month</option>

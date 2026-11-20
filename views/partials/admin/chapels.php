@@ -93,7 +93,7 @@ $inactiveChapels = $totalChapels - $activeChapels;
                 All (<?php echo $totalChapels; ?>)
             </button>
             <button type="button" class="chapel-status-pill" onclick="setChapelStatusFilter('recent', this)" style="border: 1px solid transparent; background: transparent; color: var(--text2); font-size: 11.5px; font-weight: 600; padding: 4px 14px; border-radius: 999px; cursor: pointer; transition: all 0.15s ease;" title="Recently registered chapel locations">
-                ⚡ Recently Added
+                Recently Added
             </button>
             <button type="button" class="chapel-status-pill" onclick="setChapelStatusFilter('active', this)" style="border: 1px solid transparent; background: transparent; color: var(--text2); font-size: 11.5px; font-weight: 600; padding: 4px 14px; border-radius: 999px; cursor: pointer; transition: all 0.15s ease;">
                 Active (<?php echo $activeChapels; ?>)

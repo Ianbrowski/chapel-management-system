@@ -94,7 +94,7 @@ $dot_colors = [
                     All (<?php echo $totalPosts; ?>)
                 </button>
                 <button type="button" class="tab-btn" data-status-filter="recent" onclick="setBulletinStatusFilter('recent', this)" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: var(--text2);" title="Announcements published in the last 30 days">
-                    ⚡ Recently Added
+                    Recently Added
                 </button>
                 <button type="button" class="tab-btn" data-status-filter="active" onclick="setBulletinStatusFilter('active', this)" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: var(--text2);">
                     Active (<?php echo $activePosts; ?>)

@@ -176,15 +176,15 @@ $tp = (int)($total_pages ?? 1);
                 <!-- Timeframe / Recently Added Filter Dropdown -->
                 <select name="timeframe" onchange="this.form.submit()" style="padding: 0 10px; font-size: 12px; height: 34px; border-radius: 8px; background: var(--bg2); border: 1px solid var(--border); color: var(--text); cursor: pointer; min-width: 130px; outline: none;" title="Filter requests by submission timeframe">
                     <option value="">All Request Dates</option>
-                    <option value="recently_added" <?php echo ($curTimeframe === 'recently_added') ? 'selected' : ''; ?>>⚡ Recently Added (30 Days)</option>
-                    <option value="recently_added_7" <?php echo ($curTimeframe === 'recently_added_7') ? 'selected' : ''; ?>>⚡ Recently Added (7 Days)</option>
+                    <option value="recently_added" <?php echo ($curTimeframe === 'recently_added') ? 'selected' : ''; ?>>Recently Added (30 Days)</option>
+                    <option value="recently_added_7" <?php echo ($curTimeframe === 'recently_added_7') ? 'selected' : ''; ?>>Recently Added (7 Days)</option>
                 </select>
 
                 <!-- Sort Dropdown (Event Date & Recently Submitted) -->
                 <select name="sort" onchange="this.form.submit()" style="padding: 0 10px; font-size: 12px; height: 34px; border-radius: 8px; background: var(--bg2); border: 1px solid var(--border); color: var(--text); cursor: pointer; min-width: 140px; outline: none;" title="Sort order">
-                    <option value="date_asc" <?php echo ($curSort === 'date_asc') ? 'selected' : ''; ?>>📅 Event Date (Soonest)</option>
-                    <option value="date_desc" <?php echo ($curSort === 'date_desc') ? 'selected' : ''; ?>>📅 Event Date (Latest)</option>
-                    <option value="recently_added" <?php echo ($curSort === 'recently_added' || $curSort === 'created_desc') ? 'selected' : ''; ?>>⚡ Recently Submitted</option>
+                    <option value="date_asc" <?php echo ($curSort === 'date_asc') ? 'selected' : ''; ?>>Event Date (Soonest)</option>
+                    <option value="date_desc" <?php echo ($curSort === 'date_desc') ? 'selected' : ''; ?>>Event Date (Latest)</option>
+                    <option value="recently_added" <?php echo ($curSort === 'recently_added' || $curSort === 'created_desc') ? 'selected' : ''; ?>>Recently Submitted</option>
                 </select>
 
                 <!-- Search Input with Clear '×' Button -->

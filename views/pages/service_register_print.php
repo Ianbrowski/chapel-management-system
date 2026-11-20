@@ -60,42 +60,63 @@ if ($mode === 'prefill') {
     $pFrom = $from . ' 00:00:00';
     $pTo   = $to . ' 23:59:59';
     
-    $evSql = "SELECT e.event_id, e.title, e.event_type, e.start_time, e.end_time, e.details, 
-                     COALESCE(u.full_name, 'Parish Priest') as celebrant,
-                     c.chapel_name
+    $evSql = "SELECT e.event_id, e.title, e.event_type, e.start_time, e.status, e.service_id,
+                     COALESCE(NULLIF(u.full_name, ''), u.user, NULLIF(e.pastor_assigned, ''), 'Parish Priest') as celebrant,
+                     COALESCE(c.chapel_name, NULLIF(e.chapel_location, ''), 'Main Cathedral') as chapel_name
               FROM events e
               LEFT JOIN users u ON e.pastor_id = u.id
               LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
-              WHERE e.start_time BETWEEN ? AND ? AND e.is_archived = 0";
+              WHERE e.start_time BETWEEN ? AND ?
+                AND e.is_archived = 0
+                AND e.status IN ('Confirmed', 'Completed')
+                AND COALESCE(e.event_type, '') != 'Ecclesiastical Certificates'
+                AND COALESCE(e.event_type, '') NOT LIKE '%Certificate%'
+                AND (e.service_id IS NULL OR e.service_id != 8)";
     if ($cathedralOnly) {
         $evSql .= " AND (e.chapel_id IS NULL OR e.chapel_id = 0)";
     } elseif ($chapelId !== null) {
         $evSql .= " AND e.chapel_id = " . (int)$chapelId;
     }
     $evSql .= " ORDER BY e.start_time ASC";
-    
+
+    $evRows = [];
     $stmt = $conn->prepare($evSql);
     if ($stmt) {
         $stmt->bind_param('ss', $pFrom, $pTo);
         $stmt->execute();
         $res = $stmt->get_result();
         while ($r = $res->fetch_assoc()) {
-            $dt = new DateTime($r['start_time']);
-            $records[] = [
-                'date' => $dt->format('Y-m-d'),
-                'time' => $dt->format('h:i A'),
-                'service' => $r['event_type'] ?: $r['title'],
-                'recipients' => $r['details'] ?: 'General Congregation',
-                'attendance' => '',
-                'communicants' => '',
-                'offerings' => '',
-                'pledges' => '',
-                'receipts' => '',
-                'celebrant' => $r['celebrant'],
-                'remarks' => $r['chapel_name'] ? "Venue: {$r['chapel_name']}" : ''
-            ];
+            $evRows[] = $r;
         }
         $stmt->close();
+    }
+
+    // Fetch recorded offerings/payments for matching events from non-voided donations
+    $paidMap = [];
+    if (!empty($evRows)) {
+        require_once __DIR__ . '/../../app/models/Event.php';
+        $evModelTmp = new Event($conn);
+        $paidMap = $evModelTmp->getPaidAmountsMap(array_column($evRows, 'event_id'));
+    }
+
+    foreach ($evRows as $r) {
+        $eid = (int)$r['event_id'];
+        $paidAmt = (float)($paidMap[$eid] ?? 0.0);
+        $dt = new DateTime($r['start_time']);
+        $records[] = [
+            'date' => $dt->format('Y-m-d'),
+            'time' => $dt->format('h:i A'),
+            'sort_ts' => $dt->getTimestamp(),
+            'service' => $r['event_type'] ?: ($r['title'] ?: 'Parish Service'),
+            'recipients' => $r['title'] ?: 'General Congregation',
+            'attendance' => '',
+            'communicants' => '',
+            'offerings' => $paidAmt > 0 ? ('₱' . number_format($paidAmt, 2)) : '',
+            'pledges' => '',
+            'receipts' => $paidAmt > 0 ? ('EV-' . str_pad((string)$eid, 4, '0', STR_PAD_LEFT)) : '',
+            'celebrant' => $r['celebrant'],
+            'remarks' => ($r['chapel_name'] ? "Venue: {$r['chapel_name']}" : '') . ($r['status'] === 'Completed' ? ' (Completed)' : '')
+        ];
     }
 
     // 2. Sacramental Records (Baptisms, Weddings, Funerals, Confirmations)
@@ -124,6 +145,7 @@ if ($mode === 'prefill') {
             $records[] = [
                 'date' => $s['event_date'],
                 'time' => '—',
+                'sort_ts' => strtotime($s['event_date'] . ' 23:59:59') ?: 0,
                 'service' => $s['record_type'] . ' Sacrament',
                 'recipients' => $recip ?: '—',
                 'attendance' => '',
@@ -138,9 +160,13 @@ if ($mode === 'prefill') {
         $stmt2->close();
     }
 
-    // Sort combined by date
+    // Sort combined chronologically by date and time
     usort($records, function($a, $b) {
-        return strcmp($a['date'], $b['date']);
+        $cmp = strcmp($a['date'], $b['date']);
+        if ($cmp !== 0) {
+            return $cmp;
+        }
+        return ($a['sort_ts'] ?? 0) <=> ($b['sort_ts'] ?? 0);
     });
 }
 ?>
@@ -518,6 +544,9 @@ if ($mode === 'prefill') {
                     </button>
                 </div>
                 <form method="GET" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <?php if (isset($_GET['chapel_id']) && $_GET['chapel_id'] !== ''): ?>
+                        <input type="hidden" name="chapel_id" value="<?php echo htmlspecialchars((string)$_GET['chapel_id'], ENT_QUOTES, 'UTF-8'); ?>">
+                    <?php endif; ?>
                     <label style="font-size: 11px;">Mode:</label>
                     <select name="mode" onchange="this.form.submit()" style="padding: 4px 8px; border-radius: 4px; background: #0f172a; color: #fff; border: 1px solid rgba(255,255,255,0.2); font-size: 11px;">
                         <option value="prefill" <?php echo $mode === 'prefill' ? 'selected' : ''; ?>>Pre-filled with System Events</option>

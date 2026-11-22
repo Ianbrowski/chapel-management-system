@@ -162,28 +162,48 @@ if (!function_exists('render_event_type_options')) {
             $html .= '<option value="">' . htmlspecialchars($emptyLabel) . '</option>';
         }
 
+        if ($mode === 'event_schedule') {
+            $coreScheduleGroups = [
+                'Sacraments' => [
+                    ['value' => 'Baptism',      'label' => 'Baptism'],
+                    ['value' => 'Confirmation', 'label' => 'Confirmation'],
+                    ['value' => 'Wedding',      'label' => 'Wedding (Holy Matrimony)'],
+                ],
+                'Masses &amp; Other Church Events' => [
+                    ['value' => 'Mass',    'label' => 'General Mass'],
+                    ['value' => 'Funeral', 'label' => 'Funeral / Burial Mass'],
+                    ['value' => 'Other',   'label' => 'Other (Fiesta, Blessings &amp; Parish Events)'],
+                ],
+            ];
+            $coreValues = ['baptism', 'confirmation', 'wedding', 'mass', 'funeral', 'other'];
+
+            foreach ($coreScheduleGroups as $groupLabel => $opts) {
+                $html .= '<optgroup label="' . $groupLabel . '">';
+                foreach ($opts as $opt) {
+                    $sel = (strcasecmp($selected, $opt['value']) === 0) ? ' selected' : '';
+                    $html .= '<option value="' . htmlspecialchars($opt['value']) . '"' . $sel . '>' . $opt['label'] . '</option>';
+                }
+                $html .= '</optgroup>';
+            }
+
+            // Hidden legacy options so editing older catalog/historical rows still binds cleanly
+            foreach (['Wedding (Holy Matrimony)', 'Burial Mass', 'Thanksgiving Mass', 'Requiem Mass', 'Blessings', 'Fiesta'] as $legacyOpt) {
+                if (!in_array(strtolower($legacyOpt), $coreValues, true)) {
+                    $selLeg = (strcasecmp($selected, $legacyOpt) === 0) ? ' selected' : '';
+                    $html .= '<option value="' . htmlspecialchars($legacyOpt) . '"' . $selLeg . ' style="display:none;">' . htmlspecialchars($legacyOpt) . '</option>';
+                }
+            }
+            return $html;
+        }
+
         if (!empty($catList)) {
             foreach ($catList as $cat) {
                 if (strtolower($cat['code'] ?? '') === 'certificates' || strtolower($cat['name'] ?? '') === 'certificates') continue;
                 $html .= '<optgroup label="' . htmlspecialchars($cat['name']) . '">';
-                $hasWedding = false;
-                $hasFuneral = false;
                 foreach ($cat['services'] as $srv) {
                     $sName = $srv['name'];
-                    if (strcasecmp($sName, 'Wedding') === 0 || strcasecmp($sName, 'Wedding (Holy Matrimony)') === 0) $hasWedding = true;
-                    if (strcasecmp($sName, 'Funeral') === 0 || strcasecmp($sName, 'Burial Mass') === 0) $hasFuneral = true;
                     $sel = (strcasecmp($selected, $sName) === 0) ? ' selected' : '';
                     $html .= '<option value="' . htmlspecialchars($sName) . '" data-service-id="' . (int)($srv['id'] ?? 0) . '" data-service-code="' . htmlspecialchars($srv['code'] ?? '') . '"' . $sel . '>' . htmlspecialchars($sName) . '</option>';
-                }
-                if ($mode === 'event_schedule') {
-                    if (stripos($cat['name'], 'sacrament') !== false && !$hasWedding) {
-                        $selWed = (strcasecmp($selected, 'Wedding') === 0) ? ' selected' : '';
-                        $html .= '<option value="Wedding"' . $selWed . ' style="display:none;">Wedding</option>';
-                    }
-                    if (stripos($cat['name'], 'liturgical') !== false && !$hasFuneral) {
-                        $selFun = (strcasecmp($selected, 'Funeral') === 0) ? ' selected' : '';
-                        $html .= '<option value="Funeral"' . $selFun . ' style="display:none;">Funeral</option>';
-                    }
                 }
                 $html .= '</optgroup>';
             }

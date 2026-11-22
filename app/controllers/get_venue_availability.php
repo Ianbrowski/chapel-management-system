@@ -14,6 +14,7 @@ $datetime       = trim($_GET['datetime'] ?? '');
 $eventType      = trim($_GET['event_type'] ?? 'Other');
 $excludeId      = isset($_GET['exclude_id']) && (int)$_GET['exclude_id'] > 0 ? (int)$_GET['exclude_id'] : null;
 $customDuration = isset($_GET['custom_duration']) && (int)$_GET['custom_duration'] > 0 ? (int)$_GET['custom_duration'] : null;
+$locationType   = in_array($_GET['location_type'] ?? '', ['Church', 'Outside'], true) ? $_GET['location_type'] : 'Church';
 
 $role = $_SESSION['role'] ?? 'Staff';
 $sessionChapelId = $_SESSION['chapel_id'] ?? null;
@@ -22,9 +23,9 @@ $requestedVenueId = ($venue === '' || $venue === '0' || $venue === 'null') ? nul
 
 $eventM = new Event($conn);
 if ($venue === '') {
-    $response = $eventM->getVenueAvailability($datetime, $eventType, $excludeId, $customDuration);
+    $response = $eventM->getVenueAvailability($datetime, $eventType, $excludeId, $customDuration, $locationType);
 } else {
-    $response = $eventM->checkVenueConflict($requestedVenueId, $datetime, $eventType, $excludeId, $customDuration);
+    $response = $eventM->checkVenueConflict($requestedVenueId, $datetime, $eventType, $excludeId, $customDuration, $locationType);
 }
 
 header('Content-Type: application/json');

@@ -64,6 +64,7 @@ class EventController extends BaseController {
             ? (int)$_POST['custom_duration'] : null;
         $phone = $_POST['requester_phone'] ?? null;
         $email = $_POST['requester_email'] ?? null;
+        $locationType = in_array($_POST['location_type'] ?? '', ['Church', 'Outside'], true) ? $_POST['location_type'] : 'Church';
 
         // Permission check
         $canManage = ($scope === 'cathedral') ? $this->permissions['can_cathedral_sched'] : $this->permissions['can_chapel_sched'];
@@ -95,7 +96,7 @@ class EventController extends BaseController {
                 
                 $this->conn->begin_transaction();
                 // Conflict Check
-                $conflict = $this->eventModel->checkConflict($start, $pastor, $loc, $type, null, $customDuration);
+                $conflict = $this->eventModel->checkConflict($start, $pastor, $loc, $type, null, $customDuration, null, $locationType);
                 if ($conflict['conflict']) {
                     $this->conn->rollback();
                     $this->flash('error', "Schedule conflict detected ({$conflict['type']}): {$conflict['details']}. Please choose a different time.");
@@ -105,7 +106,7 @@ class EventController extends BaseController {
                 $reqSource = $_POST['requester_source'] ?? 'office';
                 $requestedBy = ($reqSource === 'walkin') ? null : $this->userId;
 
-                $createdEventId = $this->eventModel->create($title, $type, $start, $loc, $pastor, $status, $scope, $customDuration, $phone, $email, $requestedBy);
+                $createdEventId = $this->eventModel->create($title, $type, $start, $loc, $pastor, $status, $scope, $customDuration, $phone, $email, $requestedBy, $locationType);
                 if ($createdEventId) {
                     $this->conn->commit();
                     AuditLogger::logFromSession(
@@ -184,14 +185,14 @@ class EventController extends BaseController {
 
                 $this->conn->begin_transaction();
                 // Conflict Check (exclude self)
-                $conflict = $this->eventModel->checkConflict($start, $pastor, $loc, $type, $id, $customDuration);
+                $conflict = $this->eventModel->checkConflict($start, $pastor, $loc, $type, $id, $customDuration, null, $locationType);
                 if ($conflict['conflict']) {
                     $this->conn->rollback();
                     $this->flash('error', "Schedule conflict detected ({$conflict['type']}): {$conflict['details']}. Please choose a different time.");
                     break;
                 }
 
-                if ($this->eventModel->update($id, $title, $type, $start, $loc, $pastor, $status, $scope, $customDuration, $phone, $email)) {
+                if ($this->eventModel->update($id, $title, $type, $start, $loc, $pastor, $status, $scope, $customDuration, $phone, $email, $locationType)) {
                     $this->conn->commit();
                                         AuditLogger::logFromSession(
                         $this->conn,
@@ -479,7 +480,7 @@ class EventController extends BaseController {
         $this->conn->begin_transaction();
         // Conflict Check: Certificates and shared Mass Intentions bypass altar exclusivity
         if (!$isCertSection && $type !== 'Ecclesiastical Certificates') {
-            $conflict = $this->eventModel->checkConflict($start, $pastor, $loc, $type, null, $customDuration, $serviceId);
+            $conflict = $this->eventModel->checkConflict($start, $pastor, $loc, $type, null, $customDuration, $serviceId, $locationType);
             if ($conflict['conflict']) {
                 $this->conn->rollback();
                 $this->flash('error', "Schedule conflict detected ({$conflict['type']}): {$conflict['details']}. Please choose a different time.");
@@ -613,7 +614,7 @@ class EventController extends BaseController {
             $recServiceId = isset($record['service_id']) && (int)$record['service_id'] > 0 ? (int)$record['service_id'] : null;
             $isCertRecord = ($recType === 'Ecclesiastical Certificates' || stripos($recType, 'Certificate') !== false || $recServiceId === 8);
             if (!$isCertRecord) {
-                $conflict = $this->eventModel->checkConflict($record['start_time'], $pastor, $record['chapel_id'], $recType, $id, $record['custom_duration'], $recServiceId);
+                $conflict = $this->eventModel->checkConflict($record['start_time'], $pastor, $record['chapel_id'], $recType, $id, $record['custom_duration'], $recServiceId, $record['location_type'] ?? 'Church');
                 if ($conflict['conflict']) {
                     $this->conn->rollback();
                     $this->flash('error', "Schedule conflict detected during approval ({$conflict['type']}): {$conflict['details']}.");

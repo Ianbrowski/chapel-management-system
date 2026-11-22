@@ -1352,6 +1352,8 @@ function handleVariantChange(selectEl) {
     }
     
     recalculateServiceFees();
+    if (typeof syncRequestSlots === 'function') syncRequestSlots();
+    if (typeof onFormChange === 'function') onFormChange('request');
     
     if (isCert) {
         syncCertificateTitle();
@@ -1521,7 +1523,8 @@ async function syncRequestSlots() {
     if (!dateVal) return;
 
     const selType = (typeSelect ? typeSelect.value : '').toLowerCase();
-    const isNonExclusiveIntention = selType.includes('thanksgiving') || selType.includes('requiem') || selType.includes('intention');
+    const locTypeVal = (document.getElementById('field-location-type')?.value || 'Church').toLowerCase();
+    const isNonExclusiveIntention = selType.includes('thanksgiving') || selType.includes('requiem') || selType.includes('intention') || locTypeVal === 'outside';
     const venueVal = venueSelect ? venueSelect.value : '0';
     
     if (syncIndicator) {

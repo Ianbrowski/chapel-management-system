@@ -631,6 +631,7 @@ function openChapelHubModal(chapel) {
                         <span id="active-slot-pill-edit-modal" style="font-size: 10.5px; font-weight: 700; color: var(--accent); background: rgba(201,168,76,0.12); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(201,168,76,0.3);">Morning Slot (09:00 AM)</span>
                     </div>
 
+                    <input type="hidden" name="location_type" id="field-location-type-edit-modal" value="Church">
                     <div class="form-group" style="margin: 0;">
                         <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); margin-bottom: 6px; display: block;">
                             Event Date <span style="color: #ef4444;">*</span>

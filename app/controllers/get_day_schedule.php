@@ -46,6 +46,7 @@ $sql = "SELECT event_id, title, start_time, event_type, status, custom_duration
           AND COALESCE(event_type, '') NOT LIKE '%Thanksgiving%'
           AND COALESCE(event_type, '') NOT LIKE '%Requiem%'
           AND COALESCE(event_type, '') NOT LIKE '%Intention%'
+          AND COALESCE(location_type, 'Church') != 'Outside'
           AND (service_id IS NULL OR service_id NOT IN (4, 7, 8))";
 
 $params = [];

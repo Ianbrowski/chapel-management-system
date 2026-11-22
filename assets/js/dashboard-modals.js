@@ -221,6 +221,11 @@ function openEditEventModal(input) {
     const venueInput = document.getElementById('field-venue-edit-modal');
     if (venueInput) venueInput.value = venueValue;
 
+    const locTypeInput = document.getElementById('field-location-type-edit-modal');
+    if (locTypeInput) {
+        locTypeInput.value = (String(ev.location_type || '').toLowerCase() === 'outside') ? 'Outside' : 'Church';
+    }
+
     // Status
     const statusInput = document.getElementById('edit-event-status');
     const evStatus = ev.status || 'Pending';

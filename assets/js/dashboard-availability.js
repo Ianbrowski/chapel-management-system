@@ -67,9 +67,15 @@ function onFormChange(scope) {
         const dt = new Date(datetime);
         const hr = dt.getHours();
 
-        // Show timeline and synchronize slot availability
+        // Show timeline and synchronize slot availability (skip sanctuary lock indicator for Outside events)
+        const locTypeEl = document.getElementById('field-location-type-' + scope) || (scope === 'request' ? document.getElementById('field-location-type') : null);
+        const isOutsideLoc = locTypeEl && String(locTypeEl.value || '').toLowerCase() === 'outside';
         if (scope !== 'cathedral' && scope !== 'chapel') {
-            renderAvailabilityTimeline(venue, datetime, scope, type, customDur);
+            if (isOutsideLoc && timeline) {
+                timeline.style.display = 'none';
+            } else {
+                renderAvailabilityTimeline(venue, datetime, scope, type, customDur);
+            }
         }
 
         if (hr < 6 || hr >= 21) {
@@ -574,12 +580,16 @@ function checkVenueAvailability(venue, datetime, scope, eventType = 'Other', cus
     if (scope === 'edit-modal') excludeId = document.getElementById('edit-event-id')?.value || '';
     if (scope === 'approve') excludeId = document.getElementById('approve-req-id')?.value || '';
 
+    const locTypeEl = document.getElementById('field-location-type-' + scope) || (scope === 'request' ? document.getElementById('field-location-type') : null);
+    const locationType = locTypeEl ? (locTypeEl.value || 'Church') : 'Church';
+
     const params = new URLSearchParams({
         venue:           venue,
         datetime:        datetime,
         event_type:      eventType,
         exclude_id:      excludeId,
-        custom_duration: customDuration || 0
+        custom_duration: customDuration || 0,
+        location_type:   locationType
     });
 
     fetch(getApiUrl(`app/controllers/get_venue_availability.php?${params}`), {

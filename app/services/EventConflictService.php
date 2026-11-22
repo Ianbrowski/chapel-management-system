@@ -52,9 +52,10 @@ class EventConflictService
 
     /**
      * Checks for venue AND pastor time-overlap conflicts.
-     * Returns an array with conflict status and details.
+     * Ignores Cancelled / Rejected events.
+     * Skips church venue conflict when location_type is 'Outside' (while keeping priest check).
      */
-    public function checkConflict(string $startTime, $pastorId, $chapelId, string $eventType = 'Other', $excludeId = null, ?int $customDuration = null, ?int $serviceId = null): array
+    public function checkConflict(string $startTime, $pastorId, $chapelId, string $eventType = 'Other', $excludeId = null, ?int $customDuration = null, ?int $serviceId = null, ?string $locationType = null): array
     {
         // Certificates and shared Mass Intentions do not exclusively occupy the church altar
         if ($this->isNonExclusiveService($eventType, $serviceId)) {
@@ -66,15 +67,18 @@ class EventConflictService
             return $window['error'];
         }
 
-        $venueConflict = $this->hasVenueConflict($chapelId, $window['date'], $window['start'], $window['end'], $excludeId);
-        if ($venueConflict) {
-            return [
-                'conflict' => true,
-                'type' => 'Venue',
-                'details' => $this->formatConflictDetails($venueConflict),
-                'status' => $venueConflict['status'] ?? null,
-                'event_id' => (int)($venueConflict['event_id'] ?? 0),
-            ];
+        $isOutside = ($locationType !== null && strcasecmp(trim($locationType), 'Outside') === 0);
+        if (!$isOutside) {
+            $venueConflict = $this->hasVenueConflict($chapelId, $window['date'], $window['start'], $window['end'], $excludeId);
+            if ($venueConflict) {
+                return [
+                    'conflict' => true,
+                    'type' => 'Venue',
+                    'details' => $this->formatConflictDetails($venueConflict),
+                    'status' => $venueConflict['status'] ?? null,
+                    'event_id' => (int)($venueConflict['event_id'] ?? 0),
+                ];
+            }
         }
 
         if ($pastorId) {
@@ -98,9 +102,10 @@ class EventConflictService
         return ['conflict' => false];
     }
 
-    public function checkVenueOnly($chapelId, string $startTime, string $eventType = 'Other', $excludeId = null, ?int $customDuration = null, ?int $serviceId = null): array
+    public function checkVenueOnly($chapelId, string $startTime, string $eventType = 'Other', $excludeId = null, ?int $customDuration = null, ?int $serviceId = null, ?string $locationType = null): array
     {
-        if ($this->isNonExclusiveService($eventType, $serviceId)) {
+        if ($this->isNonExclusiveService($eventType, $serviceId)
+            || ($locationType !== null && strcasecmp(trim($locationType), 'Outside') === 0)) {
             return ['conflict' => false];
         }
 
@@ -218,7 +223,7 @@ class EventConflictService
             $sql .= "chapel_id = ?";
         }
 
-        $sql .= " AND start_time >= DATE_SUB(?, INTERVAL 1 DAY) AND start_time <= DATE_ADD(?, INTERVAL 1 DAY) AND status NOT IN ('Cancelled', 'Rejected') AND is_archived = 0 AND COALESCE(event_type, '') != 'Ecclesiastical Certificates' AND COALESCE(event_type, '') NOT LIKE '%Certificate%' AND (service_id IS NULL OR service_id NOT IN (4, 7, 8)) FOR UPDATE";
+        $sql .= " AND start_time >= DATE_SUB(?, INTERVAL 1 DAY) AND start_time <= DATE_ADD(?, INTERVAL 1 DAY) AND status NOT IN ('Cancelled', 'Rejected') AND is_archived = 0 AND COALESCE(event_type, '') != 'Ecclesiastical Certificates' AND COALESCE(event_type, '') NOT LIKE '%Certificate%' AND COALESCE(location_type, 'Church') != 'Outside' AND (service_id IS NULL OR service_id NOT IN (4, 7, 8)) FOR UPDATE";
 
         $stmt = $this->conn->prepare($sql);
         $fullStart = date('Y-m-d H:i:s', $newStartTs);

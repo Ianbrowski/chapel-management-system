@@ -93,7 +93,7 @@ class Event
         return 'Other';
     }
 
-    public function create($title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $customDuration = null, $phone = null, $email = null, $requestedBy = null)
+    public function create($title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $customDuration = null, $phone = null, $email = null, $requestedBy = null, $locationType = 'Church')
     {
         $title = mb_substr(trim((string)$title), 0, 100);
         $eventType = $this->normalizeEventTypeEnum((string)$eventType);
@@ -104,17 +104,18 @@ class Event
         $chapelId = ($chapelId && (int)$chapelId > 0) ? (int)$chapelId : null;
         $pastorId = ($pastorId !== null && (int)$pastorId > 0) ? (int)$pastorId : null;
         $reqById = ($requestedBy !== null && (int)$requestedBy > 0) ? (int)$requestedBy : null;
+        $locType = (strcasecmp(trim((string)$locationType), 'Outside') === 0) ? 'Outside' : 'Church';
 
         if ($status === 'Confirmed') {
-            $sql = "INSERT INTO events (title, event_type, start_time, chapel_id, pastor_id, status, event_scope, custom_duration, approved_at, requester_phone, requester_email, requested_by) VALUES (?,?,?,?,?,?,?,?, NOW(), ?, ?, ?)";
+            $sql = "INSERT INTO events (title, event_type, start_time, chapel_id, pastor_id, status, event_scope, custom_duration, approved_at, requester_phone, requester_email, requested_by, location_type) VALUES (?,?,?,?,?,?,?,?, NOW(), ?, ?, ?, ?)";
         } else {
-            $sql = "INSERT INTO events (title, event_type, start_time, chapel_id, pastor_id, status, event_scope, custom_duration, approved_at, requester_phone, requester_email, requested_by) VALUES (?,?,?,?,?,?,?,?, NULL, ?, ?, ?)";
+            $sql = "INSERT INTO events (title, event_type, start_time, chapel_id, pastor_id, status, event_scope, custom_duration, approved_at, requester_phone, requester_email, requested_by, location_type) VALUES (?,?,?,?,?,?,?,?, NULL, ?, ?, ?, ?)";
         }
         $s = $this->conn->prepare($sql);
         if (!$s) {
             return false;
         }
-        $s->bind_param('sssiississi', $title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $cd, $phone, $email, $reqById);
+        $s->bind_param('sssiississis', $title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $cd, $phone, $email, $reqById, $locType);
         $res = $s->execute();
         if (!$res) {
             $_SESSION['db_error'] = $s->error;
@@ -127,7 +128,7 @@ class Event
         return $res ? $eid : false;
     }
 
-    public function update($id, $title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $customDuration = null, $phone = null, $email = null)
+    public function update($id, $title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $customDuration = null, $phone = null, $email = null, $locationType = 'Church')
     {
         // If status is updated to confirmed and approved_at is null, set it to now
         $check = $this->conn->prepare("SELECT approved_at FROM events WHERE event_id=?");
@@ -152,13 +153,14 @@ class Event
         $cd = ($customDuration !== null && (int)$customDuration > 0) ? (int)$customDuration : null;
         $chapelId = ($chapelId && (int)$chapelId > 0) ? (int)$chapelId : null;
         $pastorId = ($pastorId !== null && (int)$pastorId > 0) ? (int)$pastorId : null;
+        $locType = (strcasecmp(trim((string)$locationType), 'Outside') === 0) ? 'Outside' : 'Church';
 
-        $sql = "UPDATE events SET title=?, event_type=?, start_time=?, chapel_id=?, pastor_id=?, status=?, event_scope=?, custom_duration=?, requester_phone=?, requester_email=? $approved_sql WHERE event_id=?";
+        $sql = "UPDATE events SET title=?, event_type=?, start_time=?, chapel_id=?, pastor_id=?, status=?, event_scope=?, custom_duration=?, requester_phone=?, requester_email=?, location_type=? $approved_sql WHERE event_id=?";
         $s = $this->conn->prepare($sql);
         if (!$s) {
             return false;
         }
-        $s->bind_param('sssiississi', $title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $cd, $phone, $email, $id);
+        $s->bind_param('sssiississisi', $title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $cd, $phone, $email, $locType, $id);
         $res = $s->execute();
         if ($res) {
             $this->syncEventDisplayFields($id, $chapelId, $pastorId);
@@ -362,7 +364,7 @@ class Event
      *
      * @param int|null $customDuration Total duration override (minutes) for the NEW event
      */
-    public function checkConflict($startTime, $pastorId, $chapelId, $eventType = 'Other', $excludeId = null, $customDuration = null, ?int $serviceId = null)
+    public function checkConflict($startTime, $pastorId, $chapelId, $eventType = 'Other', $excludeId = null, $customDuration = null, ?int $serviceId = null, ?string $locationType = null)
     {
         return $this->conflicts->checkConflict(
             (string) $startTime,
@@ -371,7 +373,8 @@ class Event
             (string) $eventType,
             $excludeId,
             $customDuration !== null ? (int) $customDuration : null,
-            $serviceId
+            $serviceId,
+            $locationType
         );
     }
 
@@ -1438,36 +1441,58 @@ class Event
      *
      * @param int|null $customDuration Total duration override for the NEW event (minutes)
      */
+    /**
+     * Maps any service/event type label to the 6 canonical clergy authorization keys
+     * ('Mass', 'Wedding', 'Baptism', 'Funeral', 'Confirmation', 'Other') so rites like
+     * Blessings, House Blessing, Fiesta, Communion, or custom services connect to priests.
+     */
+    public static function resolveCanonicalRiteTypes(string $eventType): array
+    {
+        $raw = trim($eventType);
+        $types = $raw !== '' ? [$raw] : [];
+        $lower = strtolower($raw);
+
+        if (strpos($lower, 'wedding') !== false || strpos($lower, 'matrimony') !== false || strpos($lower, 'nuptial') !== false) {
+            $types[] = 'Wedding';
+        } elseif (strpos($lower, 'baptism') !== false || strpos($lower, 'christening') !== false) {
+            $types[] = 'Baptism';
+        } elseif (strpos($lower, 'funeral') !== false || strpos($lower, 'burial') !== false || strpos($lower, 'requiem') !== false || strpos($lower, 'wake') !== false) {
+            $types[] = 'Funeral';
+        } elseif (strpos($lower, 'confirmation') !== false || strpos($lower, 'chrismation') !== false) {
+            $types[] = 'Confirmation';
+        } elseif (strpos($lower, 'fiesta') !== false || strpos($lower, 'feast') !== false || strpos($lower, 'patron') !== false) {
+            $types[] = 'Mass';
+            $types[] = 'Other';
+        } elseif (strpos($lower, 'mass') !== false || strpos($lower, 'communion') !== false || strpos($lower, 'thanksgiving') !== false || strpos($lower, 'intention') !== false || strpos($lower, 'novena') !== false || strpos($lower, 'eucharist') !== false) {
+            $types[] = 'Mass';
+        } elseif (strpos($lower, 'blessing') !== false || strpos($lower, 'anointing') !== false || strpos($lower, 'pastoral') !== false || strpos($lower, 'house') !== false || strpos($lower, 'car') !== false || strpos($lower, 'other') !== false) {
+            $types[] = 'Other';
+        } else {
+            // Default fallback for custom parish services/events so they still surface general pastoral clergy
+            $types[] = 'Other';
+        }
+
+        return array_values(array_unique($types));
+    }
+
     public function getAvailablePriests($eventType, $dateTime, $excludeId = null, $customDuration = null, $chapelId = null)
     {
         $pastors = [];
+        $matchTypes = self::resolveCanonicalRiteTypes((string)$eventType);
+        $placeholders = implode(',', array_fill(0, count($matchTypes), '?'));
+        $bindTypes = str_repeat('s', count($matchTypes));
 
-        $canonicalType = $eventType;
-        $lower = strtolower($eventType);
-        if (strpos($lower, 'wedding') !== false || strpos($lower, 'matrimony') !== false) {
-            $canonicalType = 'Wedding';
-        } elseif (strpos($lower, 'baptism') !== false || strpos($lower, 'christening') !== false) {
-            $canonicalType = 'Baptism';
-        } elseif (strpos($lower, 'funeral') !== false || strpos($lower, 'burial') !== false || strpos($lower, 'requiem') !== false) {
-            $canonicalType = 'Funeral';
-        } elseif (strpos($lower, 'confirmation') !== false) {
-            $canonicalType = 'Confirmation';
-        } elseif (strpos($lower, 'mass') !== false) {
-            $canonicalType = 'Mass';
-        }
-
-        // 1. Get pastors (including admins) that support this event type
-        // We also pull chapel_coverage to filter by location
+        // 1. Get priests authorized for any matching canonical or exact event type
         $sql = "SELECT u.id, u.user, u.full_name, u.chapel_coverage, u.duty_start_time, u.duty_end_time
                 FROM users u
                 INNER JOIN pastor_event_types pet ON pet.pastor_id = u.id
                 WHERE u.role = 'Priest'
-                AND (pet.event_type = ? OR pet.event_type = ?)
+                AND pet.event_type IN ({$placeholders})
                 GROUP BY u.id, u.user, u.full_name, u.chapel_coverage, u.duty_start_time, u.duty_end_time
                 ORDER BY u.user ASC";
 
         if ($stmt = $this->conn->prepare($sql)) {
-            $stmt->bind_param('ss', $eventType, $canonicalType);
+            $stmt->bind_param($bindTypes, ...$matchTypes);
             $stmt->execute();
             $res = $stmt->get_result();
 
@@ -1566,7 +1591,7 @@ class Event
      *
      * @param int|null $customDuration Total duration override for the NEW event (minutes)
      */
-    public function getVenueAvailability($dateTime, $eventType = 'Other', $excludeId = null, $customDuration = null)
+    public function getVenueAvailability($dateTime, $eventType = 'Other', $excludeId = null, $customDuration = null, ?string $locationType = null)
     {
         $venues = [];
 
@@ -1586,7 +1611,7 @@ class Event
                     $newEndTs   = $newStartTs + ($this->getEventDuration($eventType, $customDuration) * 60);
                     $dateStr    = date('Y-m-d', $newStartTs);
 
-                    $conflictCheck = $this->conflicts->checkVenueOnly($v['id'], $dateTime, $eventType, $excludeId, $customDuration);
+                    $conflictCheck = $this->conflicts->checkVenueOnly($v['id'], $dateTime, $eventType, $excludeId, $customDuration, null, $locationType);
                     if ($conflictCheck['conflict'] && $conflictCheck['type'] === 'Venue') {
                         $available = false;
                         $conflict  = $conflictCheck['details'];
@@ -1611,7 +1636,7 @@ class Event
      *
      * @param int|null $customDuration Total duration override for the NEW event (minutes)
      */
-    public function checkVenueConflict($venue, $dateTime, $eventType = 'Other', $excludeId = null, $customDuration = null)
+    public function checkVenueConflict($venue, $dateTime, $eventType = 'Other', $excludeId = null, $customDuration = null, ?string $locationType = null)
     {
         $response = ['available' => true, 'conflict' => null];
 
@@ -1620,7 +1645,7 @@ class Event
             $newEndTs   = $newStartTs + ($this->getEventDuration($eventType, $customDuration) * 60);
             $dateStr    = date('Y-m-d', $newStartTs);
 
-            $conflictCheck = $this->conflicts->checkVenueOnly($venue, $dateTime, $eventType, $excludeId, $customDuration);
+            $conflictCheck = $this->conflicts->checkVenueOnly($venue, $dateTime, $eventType, $excludeId, $customDuration, null, $locationType);
             if ($conflictCheck['conflict'] && $conflictCheck['type'] === 'Venue') {
                 $response['available']       = false;
                 $response['conflict']        = $conflictCheck['details'];

@@ -283,6 +283,24 @@ foreach ($foreignKeys as [$table, $name, $col, $refTable, $refCol, $onDelete, $o
     }
 }
 
+// Step 0b: Ensure HTTPS Email API & Webhook columns exist on parish_contact_info (Render SMTP workaround)
+$emailColsToEnsure = [
+    'email_provider'       => 'VARCHAR(30) NULL',
+    'email_api_key'        => 'VARCHAR(255) NULL',
+    'email_webhook_url'    => 'VARCHAR(500) NULL',
+    'email_webhook_secret' => 'VARCHAR(255) NULL',
+];
+foreach ($emailColsToEnsure as $colName => $colDef) {
+    if (!columnExists($conn, 'parish_contact_info', $colName)) {
+        if ($dryRun) {
+            echo "[DRY] ALTER TABLE parish_contact_info ADD COLUMN {$colName} {$colDef}\n";
+        } elseif (@$conn->query("ALTER TABLE parish_contact_info ADD COLUMN {$colName} {$colDef}")) {
+            $existingColumns['parish_contact_info.' . $colName] = true;
+            echo "[COL OK] Added parish_contact_info.{$colName}\n";
+        }
+    }
+}
+
 echo "=== SUMMARY ===\n";
 echo "INDEXES: added={$idxAdded} skipped={$idxSkipped} failed={$idxFailed}\n";
 echo "FOREIGN_KEYS: added={$fkAdded} skipped={$fkSkipped} failed={$fkFailed}\n";

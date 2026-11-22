@@ -79,7 +79,7 @@ $pass = $localConfig['pass'] ?? (getenv('DB_PASS') !== false ? getenv('DB_PASS')
 $db   = $localConfig['db']   ?? getenv('DB_NAME') ?: 'cathedral';
 
 // Mail Configuration
-// Intentionally do not ship fallback SMTP credentials in source control.
+// Intentionally do not ship fallback SMTP / Webhook secrets in source control.
 $smtpHost     = getenv('SMTP_HOST') ?: ($localConfig['smtp_host'] ?? '');
 $smtpUser     = getenv('SMTP_USER') ?: ($localConfig['smtp_user'] ?? '');
 $smtpPass     = getenv('SMTP_PASS');
@@ -90,6 +90,23 @@ $smtpSecure   = getenv('SMTP_SECURE') ?: ($localConfig['smtp_secure'] ?? 'tls');
 $smtpPort     = (int) (getenv('SMTP_PORT') ?: ($localConfig['smtp_port'] ?? 587));
 $smtpFromName = getenv('SMTP_FROM_NAME') ?: ($localConfig['smtp_from_name'] ?? 'IFI Cathedral System');
 $smtpEnabled  = !empty($smtpHost) && !empty($smtpUser) && !empty($smtpPass);
+
+// HTTPS Email Transports (API Providers: brevo, resend, sendgrid; or Google Apps Script Webhook)
+// Standard HTTPS port 443 works reliably on Render Free tier where SMTP ports are blocked.
+$emailProvider = strtolower(trim((string)(getenv('EMAIL_PROVIDER') ?: ($localConfig['email_provider'] ?? ''))));
+$emailApiKey   = getenv('EMAIL_API_KEY');
+if ($emailApiKey === false) {
+    $emailApiKey = $localConfig['email_api_key'] ?? '';
+}
+$emailFromEmail = getenv('EMAIL_FROM_EMAIL') ?: ($localConfig['email_from_email'] ?? '');
+$emailFromName  = getenv('EMAIL_FROM_NAME') ?: ($localConfig['email_from_name'] ?? $smtpFromName);
+$emailApiBaseUrl = getenv('EMAIL_API_BASE_URL') ?: ($localConfig['email_api_base_url'] ?? '');
+
+$emailWebhookUrl = getenv('EMAIL_WEBHOOK_URL') ?: ($localConfig['email_webhook_url'] ?? '');
+$emailWebhookSecret = getenv('EMAIL_WEBHOOK_SECRET');
+if ($emailWebhookSecret === false) {
+    $emailWebhookSecret = $localConfig['email_webhook_secret'] ?? '';
+}
 
 // SMS Configuration
 $smsProvider   = getenv('SMS_PROVIDER') ?: ($localConfig['sms_provider'] ?? 'mock');

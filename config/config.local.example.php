@@ -11,6 +11,12 @@ return [
     'smtp_secure' => 'tls',
     'smtp_port' => 587,
     'smtp_from_name' => 'IFI Cathedral System',
+    'email_provider' => '', // 'brevo', 'resend', 'sendgrid', 'webhook', or 'smtp'
+    'email_api_key' => '',
+    'email_from_email' => '',
+    'email_from_name' => 'IFI Cathedral System',
+    'email_webhook_url' => '',
+    'email_webhook_secret' => '',
     'timezone' => 'Asia/Manila',
     'sms_provider' => 'mock',
     'sms_api_key' => '',

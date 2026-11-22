@@ -737,26 +737,154 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
     <!-- TAB 5: GLOBAL EMAIL SETTINGS                                     -->
     <!-- ───────────────────────────────────────────────────────────────── -->
     <div class="parish-tab-pane <?php echo $active_tab === 'email' ? 'active' : ''; ?>" id="pi-tab-email">
+        <?php
+            $envProvider          = strtolower(trim((string)(getenv('EMAIL_PROVIDER') ?: ($GLOBALS['emailProvider'] ?? ''))));
+            $envApiKeySet         = !empty(getenv('EMAIL_API_KEY')) || !empty($GLOBALS['emailApiKey']);
+            $envWebhookConfigured = !empty(getenv('EMAIL_WEBHOOK_URL')) || !empty($GLOBALS['emailWebhookUrl']);
+            $envFromEmail         = trim((string)(getenv('EMAIL_FROM_EMAIL') ?: ($GLOBALS['emailFromEmail'] ?? '')));
+
+            $savedProvider   = strtolower(trim((string)($contact_info['email_provider'] ?? '')));
+            $hasDbApiKey     = !empty($contact_info['email_api_key']);
+            $savedWebhookUrl = trim((string)($contact_info['email_webhook_url'] ?? ''));
+            $hasDbSecret     = !empty($contact_info['email_webhook_secret']);
+
+            $effectiveProvider = $savedProvider !== '' ? $savedProvider : $envProvider;
+            $effectiveApiReady = ($hasDbApiKey || $envApiKeySet) && in_array($effectiveProvider, ['', 'brevo', 'resend', 'sendgrid'], true);
+            $webhookReady      = $savedWebhookUrl !== '' || $envWebhookConfigured;
+
+            if ($effectiveApiReady && ($effectiveProvider !== '' || $hasDbApiKey || $envApiKeySet)) {
+                $modeLabel = 'HTTPS API (' . strtoupper($effectiveProvider ?: 'AUTO') . ') Active';
+                $modeOk = true;
+            } elseif ($webhookReady) {
+                $modeLabel = 'HTTPS Webhook Active';
+                $modeOk = true;
+            } else {
+                $modeLabel = 'SMTP Fallback Mode';
+                $modeOk = false;
+            }
+        ?>
         <div class="parish-card">
             <div class="parish-card-header">
                 <div>
-                    <div class="parish-card-title"><i class="fa-solid fa-envelope-circle-check"></i> Cathedral Master Outgoing Mail Server (SMTP)</div>
-                    <div class="parish-card-desc">Global SMTP configuration used for system alerts, registration confirmations, and chapel mail fallback</div>
+                    <div class="parish-card-title"><i class="fa-solid fa-envelope-circle-check"></i> Cathedral Outgoing Mail (HTTPS API, Webhook &amp; SMTP)</div>
+                    <div class="parish-card-desc">Use an HTTPS Email API (Brevo / Resend / SendGrid) or Google Apps Script Webhook for Render Free tier, with SMTP fallback</div>
                 </div>
+                <span class="badge" style="padding: 4px 10px; font-size: 11px; border-radius: 999px; <?php echo $modeOk ? 'background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.3);' : 'background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3);'; ?>">
+                    <?php echo htmlspecialchars($modeLabel); ?>
+                </span>
             </div>
 
-            <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 12px;">
-                <i class="fa-solid fa-circle-info text-accent" style="font-size: 18px; margin-top: 2px;"></i>
-                <div style="font-size: 12.5px; color: var(--text2); line-height: 1.5;">
-                    These SMTP credentials act as the master mail server for all Cathedral-wide communications. If an individual chapel has not defined its own unique mail server, the system automatically falls back to these settings.
+            <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; display: flex; align-items: flex-start; gap: 12px;">
+                <i class="fa-solid fa-cloud-arrow-up text-accent" style="font-size: 18px; margin-top: 2px;"></i>
+                <div style="font-size: 12.5px; color: var(--text2); line-height: 1.55;">
+                    <strong>Render Cloud Hosting Note:</strong> Render Free web services block outbound SMTP ports (<code>25</code>, <code>465</code>, <code>587</code>). Configuring <strong>Option A (Brevo / Resend / SendGrid API)</strong> or <strong>Option B (Google Apps Script Webhook)</strong> sends emails over standard HTTPS (port <code>443</code>) reliably on Render.
+                    <?php if ($envApiKeySet && !$hasDbApiKey): ?>
+                        <div style="margin-top: 6px; color: #10b981; font-weight: 600;">
+                            <i class="fa-solid fa-circle-check"></i> Active from Render environment variables (<code>EMAIL_PROVIDER</code> / <code>EMAIL_API_KEY</code><?php echo $envFromEmail ? ' / <code>EMAIL_FROM_EMAIL</code>' : ''; ?>).
+                        </div>
+                    <?php elseif ($envWebhookConfigured && $savedWebhookUrl === ''): ?>
+                        <div style="margin-top: 6px; color: #10b981; font-weight: 600;">
+                            <i class="fa-solid fa-circle-check"></i> Active from environment variable <code>EMAIL_WEBHOOK_URL</code>.
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
             
             <form method="POST">
                 <input type="hidden" name="form_section" value="parish_info">
                 <input type="hidden" name="action" value="update_email_settings">
+                <input type="hidden" name="redirect_tab" value="email">
                 <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
 
+                <!-- Section A: HTTPS Email API (Brevo / Resend / SendGrid) -->
+                <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+                    <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 12px;">
+                        <i class="fa-solid fa-paper-plane"></i> Option A: HTTPS Email API (Brevo / Resend / SendGrid — Recommended for Render)
+                    </div>
+                    <div class="parish-grid-2">
+                        <div class="parish-form-group" style="margin-bottom: 0;">
+                            <label><i class="fa-solid fa-sliders"></i> Email Transport / Provider</label>
+                            <select name="email_provider">
+                                <option value="" <?php echo $savedProvider === '' ? 'selected' : ''; ?>>Auto (Env / API Key → Webhook → SMTP)</option>
+                                <option value="brevo" <?php echo $savedProvider === 'brevo' ? 'selected' : ''; ?>>Brevo API (Allows verified Gmail sender)</option>
+                                <option value="resend" <?php echo $savedProvider === 'resend' ? 'selected' : ''; ?>>Resend API (Domain or onboarding@resend.dev)</option>
+                                <option value="sendgrid" <?php echo $savedProvider === 'sendgrid' ? 'selected' : ''; ?>>SendGrid v3 API</option>
+                                <option value="webhook" <?php echo $savedProvider === 'webhook' ? 'selected' : ''; ?>>Google Apps Script Webhook Only</option>
+                                <option value="smtp" <?php echo $savedProvider === 'smtp' ? 'selected' : ''; ?>>Direct SMTP Only (Local / Paid Server)</option>
+                            </select>
+                            <small style="color: var(--text2); font-size: 11px;">Also configurable via Render env vars: <code>EMAIL_PROVIDER</code>, <code>EMAIL_API_KEY</code>, <code>EMAIL_FROM_EMAIL</code>.</small>
+                        </div>
+                        <div class="parish-form-group" style="margin-bottom: 0;">
+                            <label><i class="fa-solid fa-key"></i> Email API Key</label>
+                            <input type="password" name="email_api_key" placeholder="<?php echo $hasDbApiKey ? 'API key saved — leave empty to retain' : 'xkeysib-... (Brevo) / re_... (Resend) / SG.... (SendGrid)'; ?>">
+                            <small style="color: var(--text2); font-size: 11px;">Make sure <strong>Sender / Reply-To Email</strong> below is filled with your verified sender email (e.g. your Gmail for Brevo).</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section B: Google Apps Script HTTPS Webhook -->
+                <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 18px;">
+                    <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                        <span><i class="fa-solid fa-bolt"></i> Option B: Google Apps Script Webhook (Free Gmail HTTPS Relay)</span>
+                    </div>
+                    <div class="parish-grid-2">
+                        <div class="parish-form-group" style="margin-bottom: 0;">
+                            <label><i class="fa-solid fa-link"></i> Webhook Web App URL (HTTPS)</label>
+                            <input type="url" name="email_webhook_url" value="<?php echo htmlspecialchars($savedWebhookUrl); ?>" placeholder="https://script.google.com/macros/s/.../exec">
+                            <small style="color: var(--text2); font-size: 11px;">Overrides/supplements <code>EMAIL_WEBHOOK_URL</code> env var when filled.</small>
+                        </div>
+                        <div class="parish-form-group" style="margin-bottom: 0;">
+                            <label><i class="fa-solid fa-shield-halved"></i> Webhook Secret Token <small style="font-weight: 400; text-transform: none;">(Optional)</small></label>
+                            <input type="password" name="email_webhook_secret" placeholder="<?php echo $hasDbSecret ? 'Secret saved — leave empty to keep existing' : 'Optional shared secret matching Apps Script'; ?>">
+                        </div>
+                    </div>
+
+                    <details style="margin-top: 12px; font-size: 12px; color: var(--text2);">
+                        <summary style="cursor: pointer; font-weight: 600; color: var(--text); user-select: none;">
+                            <i class="fa-solid fa-code mr-1"></i> View Google Apps Script Code (paste into script.google.com)
+                        </summary>
+                        <div style="margin-top: 10px; position: relative;">
+                            <button type="button" class="btn btn-ghost btn-sm" onclick="copyAppsScriptCode(this)" style="position: absolute; top: 8px; right: 8px; font-size: 11px; padding: 4px 10px; z-index: 2;">
+                                <i class="fa-regular fa-copy"></i> Copy Code
+                            </button>
+                            <pre id="gas-email-snippet" style="margin: 0; padding: 12px 14px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; font-family: monospace; font-size: 11.5px; line-height: 1.45; overflow-x: auto; color: var(--text);">function doPost(e) {
+  try {
+    var data = JSON.parse((e &amp;&amp; e.postData &amp;&amp; e.postData.contents) || "{}");
+    var secret = ""; // Optional: match Webhook Secret Token above
+    if (secret &amp;&amp; data.secret !== secret) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "Unauthorized" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (!data.to || !data.subject) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "Missing recipient or subject" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    MailApp.sendEmail({
+      to: data.to,
+      subject: data.subject,
+      htmlBody: data.html || "",
+      body: data.text || "",
+      name: data.from_name || "IFI Cathedral System",
+      replyTo: data.reply_to || ""
+    });
+    return ContentService.createTextOutput(JSON.stringify({ ok: true, message: "Sent" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}</pre>
+                            <div style="margin-top: 6px; font-size: 11px;">
+                                Deploy in Google Apps Script as <strong>Web app</strong> → <strong>Execute as: Me</strong> → <strong>Who has access: Anyone</strong>, then paste the <code>/exec</code> URL above.
+                            </div>
+                        </div>
+                    </details>
+                </div>
+
+                <!-- Section C: Sender Identity + Traditional SMTP Settings -->
+                <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); margin-bottom: 10px;">
+                    <i class="fa-solid fa-server"></i> Sender Identity &amp; Direct SMTP Fallback (Local / Paid Server)
+                </div>
                 <div class="parish-grid-2">
                     <div>
                         <div class="parish-form-group">
@@ -791,8 +919,8 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
                                 <input type="text" name="from_name" value="<?php echo htmlspecialchars($contact_info['from_name'] ?? ''); ?>" placeholder="e.g. IFI Cathedral Office">
                             </div>
                             <div class="parish-form-group">
-                                <label><i class="fa-solid fa-envelope"></i> Sender "From" Email</label>
-                                <input type="email" name="from_email" value="<?php echo htmlspecialchars($contact_info['from_email'] ?? ''); ?>" placeholder="e.g. office@cathedral.org">
+                                <label><i class="fa-solid fa-envelope"></i> Sender / Reply-To Email</label>
+                                <input type="email" name="from_email" value="<?php echo htmlspecialchars($contact_info['from_email'] ?? $envFromEmail); ?>" placeholder="e.g. office@cathedral.org">
                             </div>
                         </div>
                     </div>
@@ -803,6 +931,29 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
                         <i class="fa-solid fa-check mr-1"></i> Save Global Email Settings
                     </button>
                 </div>
+            </form>
+        </div>
+
+        <!-- Live Email Delivery Tester -->
+        <div class="parish-card" style="margin-top: 16px;">
+            <div class="parish-card-header">
+                <div>
+                    <div class="parish-card-title"><i class="fa-solid fa-paper-plane"></i> Send Test Email</div>
+                    <div class="parish-card-desc">Verify outgoing email delivery from this server (uses configured Email API, HTTPS Webhook, or SMTP)</div>
+                </div>
+            </div>
+            <form method="POST" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;">
+                <input type="hidden" name="form_section" value="parish_info">
+                <input type="hidden" name="action" value="send_test_email">
+                <input type="hidden" name="redirect_tab" value="email">
+                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                <div class="parish-form-group" style="flex: 1 1 280px; margin: 0;">
+                    <label><i class="fa-solid fa-at"></i> Recipient Email Address</label>
+                    <input type="email" name="test_email" required placeholder="e.g. parishioner@gmail.com" value="<?php echo htmlspecialchars($contact_info['email'] ?? ''); ?>">
+                </div>
+                <button type="submit" class="btn btn-primary" style="height: 38px; padding: 0 20px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-paper-plane"></i> Send Test Email
+                </button>
             </form>
         </div>
     </div>
@@ -1097,5 +1248,25 @@ function openLeaderModal(id, name='', title='', type='parish_priest', subtitle='
 
 function closePIModal(type) {
     document.getElementById(`pi-modal-${type}`).classList.remove('open');
+}
+
+function copyAppsScriptCode(btn) {
+    const pre = document.getElementById('gas-email-snippet');
+    if (!pre) return;
+    const text = pre.textContent || '';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
+            setTimeout(() => { btn.innerHTML = orig; }, 1800);
+        });
+    } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+    }
 }
 </script>

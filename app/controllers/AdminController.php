@@ -514,20 +514,64 @@ class AdminController extends BaseController {
                 break;
             
             case 'update_email_settings':
+                $webhookUrl = trim((string)($_POST['email_webhook_url'] ?? ''));
+                if ($webhookUrl !== '' && !filter_var($webhookUrl, FILTER_VALIDATE_URL)) {
+                    $this->flash('error', 'Please enter a valid Email Webhook URL (or leave it empty).');
+                    break;
+                }
+                if ($webhookUrl !== '' && stripos($webhookUrl, 'https://') !== 0) {
+                    $this->flash('error', 'Email Webhook URL must begin with https:// (e.g. https://script.google.com/macros/s/.../exec).');
+                    break;
+                }
+                $emailProvider = strtolower(trim((string)($_POST['email_provider'] ?? '')));
+                if (!in_array($emailProvider, ['', 'brevo', 'resend', 'sendgrid', 'webhook', 'smtp'], true)) {
+                    $emailProvider = '';
+                }
                 $data = [
-                    'smtp_host' => $_POST['smtp_host'] ?? '',
-                    'smtp_port' => (int)($_POST['smtp_port'] ?? 0),
-                    'smtp_user' => $_POST['smtp_user'] ?? '',
-                    'smtp_pass' => $_POST['smtp_pass'] ?? '',
-                    'smtp_secure' => $_POST['smtp_secure'] ?? 'tls',
-                    'from_email' => $_POST['from_email'] ?? '',
-                    'from_name' => $_POST['from_name'] ?? ''
+                    'smtp_host'            => trim((string)($_POST['smtp_host'] ?? '')),
+                    'smtp_port'            => (int)($_POST['smtp_port'] ?? 0),
+                    'smtp_user'            => trim((string)($_POST['smtp_user'] ?? '')),
+                    'smtp_pass'            => (string)($_POST['smtp_pass'] ?? ''),
+                    'smtp_secure'          => $_POST['smtp_secure'] ?? 'tls',
+                    'from_email'           => trim((string)($_POST['from_email'] ?? '')),
+                    'from_name'            => trim((string)($_POST['from_name'] ?? '')),
+                    'email_provider'       => $emailProvider,
+                    'email_api_key'        => (string)($_POST['email_api_key'] ?? ''),
+                    'email_webhook_url'    => $webhookUrl,
+                    'email_webhook_secret' => (string)($_POST['email_webhook_secret'] ?? ''),
                 ];
                 if ($this->parishModel->updateEmailSettings($data)) {
                     AuditLogger::logFromSession($this->conn, 'updated', 'System', 'Global Email Settings updated', null, null);
                     $this->flash('success', 'Cathedral email settings updated.');
                 } else {
                     $this->flash('error', 'Failed to update email settings.');
+                }
+                break;
+
+            case 'send_test_email':
+                $testEmail = trim((string)($_POST['test_email'] ?? ''));
+                if ($testEmail === '' || !filter_var($testEmail, FILTER_VALIDATE_EMAIL)) {
+                    $this->flash('error', 'Please enter a valid recipient email address for the test.');
+                    break;
+                }
+                require_once __DIR__ . '/../mail/mailer.php';
+                $sentAt = date('F j, Y \a\t g:i:s A');
+                $testSubject = 'IFI Cathedral System — Email Delivery Test';
+                $testBody = '<div style="font-family:Arial,sans-serif;padding:20px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">'
+                    . '<h2 style="margin:0 0 10px;color:#1e293b;">Email Delivery Test Successful</h2>'
+                    . '<p style="margin:0 0 8px;color:#334155;">This message confirms that outgoing email delivery from your IFI Cathedral Management System is working properly.</p>'
+                    . '<p style="margin:0;font-size:12px;color:#64748b;">Sent on: ' . htmlspecialchars($sentAt, ENT_QUOTES, 'UTF-8') . ' (Asia/Manila)</p>'
+                    . '</div>';
+                $sent = sendChurchEmail($testEmail, 'Test Recipient', $testSubject, $testBody, null);
+                $transport = $GLOBALS['lastMailTransport'] ?? '';
+                $errDetail = $GLOBALS['lastMailError'] ?? '';
+                if ($sent) {
+                    $via = $transport !== '' ? " via {$transport}" : '';
+                    AuditLogger::logFromSession($this->conn, 'updated', 'System', "Sent test email to {$testEmail}{$via}");
+                    $this->flash('success', "Test email sent successfully to {$testEmail}{$via}.");
+                } else {
+                    $reason = $errDetail !== '' ? " ({$errDetail})" : '';
+                    $this->flash('error', "Test email failed for {$testEmail}{$reason}.");
                 }
                 break;
 
@@ -653,7 +697,8 @@ AuditLogger::logFromSession($this->conn, 'deleted', 'Records', "Deleted mass sch
                 }
                 break;
         }
-        $this->redirect('dashboard.php?section=parish_info&tab=' . ($_GET['tab'] ?? 'contact'));
+        $redirectTab = preg_replace('/[^a-z0-9_-]/i', '', (string)($_POST['redirect_tab'] ?? ($_GET['tab'] ?? 'contact'))) ?: 'contact';
+        $this->redirect('dashboard.php?section=parish_info&tab=' . $redirectTab);
     }
 
     /**

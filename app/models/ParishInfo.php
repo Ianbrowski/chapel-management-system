@@ -7,26 +7,55 @@ class ParishInfo {
         $this->conn = $conn;
     }
 
+    private function ensureEmailWebhookColumns(): void {
+        $cols = [
+            'email_provider'       => 'VARCHAR(30) NULL',
+            'email_api_key'        => 'VARCHAR(255) NULL',
+            'email_webhook_url'    => 'VARCHAR(500) NULL',
+            'email_webhook_secret' => 'VARCHAR(255) NULL',
+        ];
+        foreach ($cols as $colName => $colDef) {
+            $colRes = $this->conn->query("SHOW COLUMNS FROM parish_contact_info LIKE '{$colName}'");
+            if ($colRes && $colRes->num_rows === 0) {
+                @$this->conn->query("ALTER TABLE parish_contact_info ADD COLUMN {$colName} {$colDef}");
+            }
+        }
+    }
+
     public function updateEmailSettings($data) {
+        $this->ensureEmailWebhookColumns();
+
+        $webhookUrl = trim((string)($data['email_webhook_url'] ?? ''));
+        $emailProvider = strtolower(trim((string)($data['email_provider'] ?? '')));
         $stmt = $this->conn->prepare("UPDATE parish_contact_info SET 
             smtp_host=?, smtp_port=?, smtp_user=?, smtp_secure=?, 
-            from_email=?, from_name=? 
+            from_email=?, from_name=?, email_webhook_url=?, email_provider=? 
             WHERE info_id = (SELECT info_id FROM (SELECT info_id FROM parish_contact_info ORDER BY info_id DESC LIMIT 1) as t)");
         
         if (!$stmt) return false;
-        $stmt->bind_param("sissss", 
+        $stmt->bind_param("sissssss", 
             $data['smtp_host'], $data['smtp_port'], $data['smtp_user'], 
-            $data['smtp_secure'], $data['from_email'], $data['from_name']);
+            $data['smtp_secure'], $data['from_email'], $data['from_name'], $webhookUrl, $emailProvider);
         
         $res = $stmt->execute();
         $stmt->close();
 
-        // Handle password separately if provided
-        if (!empty($data['smtp_pass'])) {
-            $stmt = $this->conn->prepare("UPDATE parish_contact_info SET smtp_pass=? WHERE info_id = (SELECT info_id FROM (SELECT info_id FROM parish_contact_info ORDER BY info_id DESC LIMIT 1) as t)");
-            $stmt->bind_param("s", $data['smtp_pass']);
-            $stmt->execute();
-            $stmt->close();
+        // Update optional secrets only when non-empty so existing saved secrets are retained
+        $optionalSecrets = [
+            'smtp_pass'            => $data['smtp_pass'] ?? '',
+            'email_api_key'        => $data['email_api_key'] ?? '',
+            'email_webhook_secret' => $data['email_webhook_secret'] ?? '',
+        ];
+        foreach ($optionalSecrets as $col => $val) {
+            $val = trim((string)$val);
+            if ($val !== '') {
+                $stmt = $this->conn->prepare("UPDATE parish_contact_info SET {$col}=? WHERE info_id = (SELECT info_id FROM (SELECT info_id FROM parish_contact_info ORDER BY info_id DESC LIMIT 1) as t)");
+                if ($stmt) {
+                    $stmt->bind_param("s", $val);
+                    $stmt->execute();
+                    $stmt->close();
+                }
+            }
         }
 
         return $res;

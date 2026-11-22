@@ -50,7 +50,7 @@ class SmsService
         $event = self::fetchEvent($conn, $eventId);
         if (!$event || empty($event['requester_phone'])) return false;
 
-        $name = $event['requester_name'] ?: 'Valued Member';
+        $name = self::resolveSmsRecipientName($event);
         $title = $event['title'];
         $date = date('M d, Y @ h:i A', strtotime($event['start_time']));
         
@@ -67,7 +67,7 @@ class SmsService
         $event = self::fetchEvent($conn, $eventId);
         if (!$event || empty($event['requester_phone'])) return false;
 
-        $name = $event['requester_name'] ?: 'Requester';
+        $name = self::resolveSmsRecipientName($event);
         $title = $event['title'];
         $reasonText = $reason ? " Reason: {$reason}" : "";
 
@@ -128,11 +128,29 @@ class SmsService
         return self::send($inq['phone'], $msg);
     }
 
+    private static function resolveSmsRecipientName(array $event): string
+    {
+        $staffRoles = ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff'];
+        $isStaffEncoded = in_array((string)($event['role'] ?? ''), $staffRoles, true);
+
+        if (!empty($event['requester_name'])) {
+            return trim((string)$event['requester_name']);
+        }
+        if (!empty($event['cert_person_name'])) {
+            return trim((string)$event['cert_person_name']);
+        }
+        if (!$isStaffEncoded && !empty($event['account_name'])) {
+            return trim((string)$event['account_name']);
+        }
+        return 'Parishioner';
+    }
+
     private static function fetchEvent(mysqli $conn, int $eventId): ?array
     {
         $stmt = $conn->prepare(
-            "SELECT e.title, e.start_time, e.requester_phone,
-                    COALESCE(u.full_name, u.user) AS requester_name
+            "SELECT e.*,
+                    u.role,
+                    COALESCE(NULLIF(u.full_name, ''), u.user) AS account_name
              FROM events e
              LEFT JOIN users u ON u.id = e.requested_by
              WHERE e.event_id = ? LIMIT 1"

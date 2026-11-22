@@ -301,6 +301,60 @@ foreach ($emailColsToEnsure as $colName => $colDef) {
     }
 }
 
+// Step 0c: Widen events.event_type & events.title and ensure certificate/requester metadata columns exist
+$rEventsMeta = $conn->query(
+    "SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE, CHARACTER_MAXIMUM_LENGTH
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'events' AND COLUMN_NAME IN ('event_type', 'title')"
+);
+if ($rEventsMeta) {
+    while ($metaRow = $rEventsMeta->fetch_assoc()) {
+        $col = (string)$metaRow['COLUMN_NAME'];
+        $dataType = strtolower((string)$metaRow['DATA_TYPE']);
+        $maxLen = (int)($metaRow['CHARACTER_MAXIMUM_LENGTH'] ?? 0);
+        if ($col === 'event_type' && $dataType !== 'varchar') {
+            if ($dryRun) {
+                echo "[DRY] ALTER TABLE events MODIFY COLUMN event_type VARCHAR(100) NULL DEFAULT 'Other'\n";
+            } elseif (@$conn->query("ALTER TABLE events MODIFY COLUMN event_type VARCHAR(100) NULL DEFAULT 'Other'")) {
+                echo "[COL OK] Widened events.event_type from {$metaRow['COLUMN_TYPE']} to VARCHAR(100)\n";
+            } else {
+                echo "[COL ERR] events.event_type widen failed: {$conn->error}\n";
+            }
+        }
+        if ($col === 'title' && $maxLen > 0 && $maxLen < 200) {
+            if ($dryRun) {
+                echo "[DRY] ALTER TABLE events MODIFY COLUMN title VARCHAR(200) NULL\n";
+            } elseif (@$conn->query("ALTER TABLE events MODIFY COLUMN title VARCHAR(200) NULL")) {
+                echo "[COL OK] Widened events.title from VARCHAR({$maxLen}) to VARCHAR(200)\n";
+            } else {
+                echo "[COL ERR] events.title widen failed: {$conn->error}\n";
+            }
+        }
+    }
+    $rEventsMeta->free();
+}
+
+$eventMetaColsToEnsure = [
+    'requester_name'   => 'VARCHAR(150) NULL',
+    'cert_person_name' => 'VARCHAR(150) NULL',
+    'cert_year'        => 'VARCHAR(10) NULL',
+    'cert_purpose'     => 'VARCHAR(120) NULL',
+    'cert_copies'      => 'INT NOT NULL DEFAULT 1',
+    'linked_record_id' => 'INT NULL',
+];
+foreach ($eventMetaColsToEnsure as $colName => $colDef) {
+    if (!columnExists($conn, 'events', $colName)) {
+        if ($dryRun) {
+            echo "[DRY] ALTER TABLE events ADD COLUMN {$colName} {$colDef}\n";
+        } elseif (@$conn->query("ALTER TABLE events ADD COLUMN {$colName} {$colDef}")) {
+            $existingColumns['events.' . $colName] = true;
+            echo "[COL OK] Added events.{$colName}\n";
+        } else {
+            echo "[COL ERR] events.{$colName} add failed: {$conn->error}\n";
+        }
+    }
+}
+
 echo "=== SUMMARY ===\n";
 echo "INDEXES: added={$idxAdded} skipped={$idxSkipped} failed={$idxFailed}\n";
 echo "FOREIGN_KEYS: added={$fkAdded} skipped={$fkSkipped} failed={$fkFailed}\n";

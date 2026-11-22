@@ -75,9 +75,58 @@ class Event
     // CORE CRUD
     // ──────────────────────────────────────────────────────────────────────────
 
+    private static array $eventsSchemaCache = [];
+
+    private function getEventsSchema(): array
+    {
+        $key = spl_object_id($this->conn);
+        if (isset(self::$eventsSchemaCache[$key])) {
+            return self::$eventsSchemaCache[$key];
+        }
+
+        $schema = [
+            'extended_event_type' => false,
+            'title_max_len'       => 100,
+            'cols'                => [],
+        ];
+
+        $res = @$this->conn->query("SHOW COLUMNS FROM events");
+        if ($res) {
+            while ($col = $res->fetch_assoc()) {
+                $field = (string)($col['Field'] ?? '');
+                $type  = strtolower((string)($col['Type'] ?? ''));
+                $schema['cols'][$field] = true;
+                if ($field === 'event_type' && strpos($type, 'varchar') !== false) {
+                    $schema['extended_event_type'] = true;
+                } elseif ($field === 'title' && preg_match('/varchar\((\d+)\)/i', $type, $m)) {
+                    $schema['title_max_len'] = max(100, (int)$m[1]);
+                }
+            }
+            $res->free();
+        }
+
+        self::$eventsSchemaCache[$key] = $schema;
+        return $schema;
+    }
+
+    private function getTitleMaxLength(): int
+    {
+        $schema = $this->getEventsSchema();
+        return (int)($schema['title_max_len'] ?? 100);
+    }
+
     private function normalizeEventTypeEnum(string $eventType): string
     {
-        $lower = strtolower(trim($eventType));
+        $trimmed = trim($eventType);
+        $lower = strtolower($trimmed);
+        $extended = !empty($this->getEventsSchema()['extended_event_type']);
+
+        if (strpos($lower, 'certificate') !== false) {
+            return $extended ? 'Ecclesiastical Certificates' : 'Other';
+        }
+        if (strpos($lower, 'confirmation') !== false || strpos($lower, 'kumpil') !== false) {
+            return $extended ? 'Confirmation' : 'Other';
+        }
         if (strpos($lower, 'wedding') !== false || strpos($lower, 'matrimony') !== false) {
             return 'Wedding';
         }
@@ -87,15 +136,73 @@ class Event
         if (strpos($lower, 'funeral') !== false || strpos($lower, 'burial') !== false) {
             return 'Funeral';
         }
-        if (strpos($lower, 'mass') !== false || strpos($lower, 'requiem') !== false || strpos($lower, 'thanksgiving') !== false) {
+        if ($lower === 'mass') {
             return 'Mass';
+        }
+        if (strpos($lower, 'mass') !== false || strpos($lower, 'requiem') !== false || strpos($lower, 'thanksgiving') !== false) {
+            return $extended && $trimmed !== '' ? mb_substr($trimmed, 0, 100) : 'Mass';
+        }
+        if ($extended && $trimmed !== '') {
+            return mb_substr($trimmed, 0, 100);
         }
         return 'Other';
     }
 
-    public function create($title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $customDuration = null, $phone = null, $email = null, $requestedBy = null, $locationType = 'Church')
+    private function persistEventMetadata(int $eventId, array $meta): void
     {
-        $title = mb_substr(trim((string)$title), 0, 100);
+        if ($eventId <= 0 || empty($meta)) {
+            return;
+        }
+        $cols = $this->getEventsSchema()['cols'] ?? [];
+        $updates = [];
+        $types = '';
+        $params = [];
+
+        $stringCols = [
+            'requester_name'   => 150,
+            'cert_person_name' => 150,
+            'cert_year'        => 10,
+            'cert_purpose'     => 120,
+        ];
+        foreach ($stringCols as $col => $maxLen) {
+            if (!empty($cols[$col]) && array_key_exists($col, $meta)) {
+                $val = $meta[$col] !== null ? trim((string)$meta[$col]) : '';
+                $updates[] = "{$col} = ?";
+                $types .= 's';
+                $params[] = ($val !== '') ? mb_substr($val, 0, $maxLen) : null;
+            }
+        }
+        if (!empty($cols['cert_copies']) && array_key_exists('cert_copies', $meta)) {
+            $copies = max(1, (int)$meta['cert_copies']);
+            $updates[] = "cert_copies = ?";
+            $types .= 'i';
+            $params[] = $copies;
+        }
+        if (!empty($cols['linked_record_id']) && array_key_exists('linked_record_id', $meta)) {
+            $recId = (int)$meta['linked_record_id'];
+            $updates[] = "linked_record_id = ?";
+            $types .= 'i';
+            $params[] = ($recId > 0) ? $recId : null;
+        }
+
+        if (empty($updates)) {
+            return;
+        }
+        $sql = "UPDATE events SET " . implode(', ', $updates) . " WHERE event_id = ?";
+        $types .= 'i';
+        $params[] = $eventId;
+
+        $stmt = $this->conn->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
+
+    public function create($title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $customDuration = null, $phone = null, $email = null, $requestedBy = null, $locationType = 'Church', array $meta = [])
+    {
+        $title = mb_substr(trim((string)$title), 0, $this->getTitleMaxLength());
         $eventType = $this->normalizeEventTypeEnum((string)$eventType);
         $scope = mb_substr(trim((string)$scope), 0, 20);
         $phone = $phone !== null ? mb_substr(trim((string)$phone), 0, 30) : null;
@@ -122,7 +229,8 @@ class Event
         }
         $eid = (int)$this->conn->insert_id;
         if ($res) {
-            $this->syncEventDisplayFields((int)$this->conn->insert_id, $chapelId, $pastorId);
+            $this->persistEventMetadata($eid, $meta);
+            $this->syncEventDisplayFields($eid, $chapelId, $pastorId);
         }
         $s->close();
         return $res ? $eid : false;
@@ -145,7 +253,7 @@ class Event
             $approved_sql = ", approved_at=NOW()";
         }
 
-        $title = mb_substr(trim((string)$title), 0, 100);
+        $title = mb_substr(trim((string)$title), 0, $this->getTitleMaxLength());
         $eventType = $this->normalizeEventTypeEnum((string)$eventType);
         $scope = mb_substr(trim((string)$scope), 0, 20);
         $phone = $phone !== null ? mb_substr(trim((string)$phone), 0, 30) : null;
@@ -160,7 +268,7 @@ class Event
         if (!$s) {
             return false;
         }
-        $s->bind_param('sssiississisi', $title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $cd, $phone, $email, $locType, $id);
+        $s->bind_param('sssiississsi', $title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $cd, $phone, $email, $locType, $id);
         $res = $s->execute();
         if ($res) {
             $this->syncEventDisplayFields($id, $chapelId, $pastorId);
@@ -227,9 +335,9 @@ class Event
         return $row ?: null;
     }
 
-    public function requestEvent($title, $eventType, $startTime, $chapelId, $scope, $reqBy, $requesterEmail = null, $status = 'Pending', $pastorId = null, $customDuration = null, $requesterPhone = null, $serviceId = null, $variantId = null, $serviceFee = 0.00, $addonsFee = 0.00, $totalFee = 0.00, $locationType = 'Church')
+    public function requestEvent($title, $eventType, $startTime, $chapelId, $scope, $reqBy, $requesterEmail = null, $status = 'Pending', $pastorId = null, $customDuration = null, $requesterPhone = null, $serviceId = null, $variantId = null, $serviceFee = 0.00, $addonsFee = 0.00, $totalFee = 0.00, $locationType = 'Church', array $meta = [])
     {
-        $title = mb_substr(trim((string)$title), 0, 100);
+        $title = mb_substr(trim((string)$title), 0, $this->getTitleMaxLength());
         $eventType = $this->normalizeEventTypeEnum((string)$eventType);
         $scope = mb_substr(trim((string)$scope), 0, 20);
         $requesterPhone = $requesterPhone !== null ? mb_substr(trim((string)$requesterPhone), 0, 30) : null;
@@ -247,13 +355,14 @@ class Event
         if (!$s) {
             return false;
         }
-        $s->bind_param('ssiisssissidddssss', $title, $eventType, $sId, $vId, $startTime, $chapelId, $status, $scope, $reqBy, $requesterEmail, $pastorId, $cd, $serviceFee, $addonsFee, $totalFee, $locType, $approvedAt, $requesterPhone);
+        $s->bind_param('ssiisissisiidddsss', $title, $eventType, $sId, $vId, $startTime, $chapelId, $status, $scope, $reqBy, $requesterEmail, $pastorId, $cd, $serviceFee, $addonsFee, $totalFee, $locType, $approvedAt, $requesterPhone);
         $res = $s->execute();
         $eid = (int)$this->conn->insert_id;
         if (!$res) {
             $_SESSION['db_error'] = $s->error;
         }
         if ($res) {
+            $this->persistEventMetadata($eid, $meta);
             $this->syncEventDisplayFields($eid, $chapelId, $pastorId);
         }
         $s->close();
@@ -801,12 +910,13 @@ class Event
             SELECT 
                 COUNT(*) as total,
                 SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending,
-                SUM(CASE WHEN status = 'Confirmed' THEN 1 ELSE 0 END) as confirmed
+                SUM(CASE WHEN status = 'Confirmed' THEN 1 ELSE 0 END) as confirmed,
+                SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as completed
             FROM events
             WHERE $where
         ");
         if (!$stmt) {
-            return ['total' => 0, 'pending' => 0, 'confirmed' => 0];
+            return ['total' => 0, 'pending' => 0, 'confirmed' => 0, 'completed' => 0];
         }
         if (!empty($params)) {
             $stmt->bind_param($types, ...$params);
@@ -818,6 +928,7 @@ class Event
             'total'     => (int)($res['total'] ?? 0),
             'pending'   => (int)($res['pending'] ?? 0),
             'confirmed' => (int)($res['confirmed'] ?? 0),
+            'completed' => (int)($res['completed'] ?? 0),
         ];
     }
 
@@ -1319,9 +1430,20 @@ class Event
         }
 
         if (!empty($filters['search'])) {
-            $q        = '%' . $filters['search'] . '%';
-            $where[]  = '(e.title LIKE ? OR u.full_name LIKE ? OR c.chapel_name LIKE ? OR e.chapel_location LIKE ?)';
-            for ($i = 0; $i < 4; $i++) { $params[] = $q; $types .= 's'; }
+            $q         = '%' . $filters['search'] . '%';
+            $eventCols = $this->getEventsSchema()['cols'] ?? [];
+            $searchOr  = ['e.title LIKE ?', 'u.full_name LIKE ?', 'c.chapel_name LIKE ?', 'e.chapel_location LIKE ?'];
+            if (!empty($eventCols['cert_person_name'])) {
+                $searchOr[] = 'e.cert_person_name LIKE ?';
+            }
+            if (!empty($eventCols['requester_name'])) {
+                $searchOr[] = 'e.requester_name LIKE ?';
+            }
+            $where[] = '(' . implode(' OR ', $searchOr) . ')';
+            for ($i = 0, $n = count($searchOr); $i < $n; $i++) {
+                $params[] = $q;
+                $types .= 's';
+            }
         }
 
         if (!empty($filters['timeframe'])) {

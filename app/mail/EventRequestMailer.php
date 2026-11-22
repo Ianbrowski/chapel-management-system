@@ -18,31 +18,19 @@ class EventRequestMailer
     {
         $event = self::fetchEvent($conn, $eventId);
         if (!$event) return false;
-        
-        // Priority: 1. Guest Email (requester_email) 2. Registered User Email
-        $to = null;
-        if (!empty($event['requester_email'])) {
-            $to = trim($event['requester_email']);
-        } elseif (!empty($event['user_email'])) {
-            // Send to any registered user who requested it, regardless of role
-            // unless they are Admin/Cathedral Admin (optional exclusion)
-            if (!in_array($event['role'], ['Admin', 'Cathedral Admin'])) {
-                $to = trim($event['user_email']);
-            }
-        }
 
+        $recipient = self::resolveRecipient($event);
+        $to = $recipient['email'];
         if (empty($to) || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
             return false;
         }
 
-        // Priority for Name: 1. Event Column (not existing yet) 2. Registered User Name 3. Fallback
-        $rawName = $event['requester_name'] ?? 'Requester';
-        // HTML-safe versions for the email body only
+        $rawName  = $recipient['name'];
         $name     = htmlspecialchars($rawName, ENT_QUOTES, 'UTF-8');
-        $title    = htmlspecialchars($event['title'], ENT_QUOTES, 'UTF-8');
-        $type     = htmlspecialchars($event['event_type'], ENT_QUOTES, 'UTF-8');
-        $date     = date('F d, Y \a\t h:i A', strtotime($event['start_time']));
-        $location = htmlspecialchars($event['chapel_location'] ?: 'To be confirmed', ENT_QUOTES, 'UTF-8');
+        $title    = htmlspecialchars((string)($event['title'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $type     = htmlspecialchars((string)($event['event_type'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $date     = date('F d, Y \a\t h:i A', strtotime((string)$event['start_time']));
+        $location = htmlspecialchars((string)($event['chapel_location'] ?: 'To be confirmed'), ENT_QUOTES, 'UTF-8');
         $pastor   = $pastorAssigned ? htmlspecialchars($pastorAssigned, ENT_QUOTES, 'UTF-8') : 'To be assigned';
 
         $subject = "✅ Event Request Approved — {$title}";
@@ -84,37 +72,35 @@ class EventRequestMailer
         $event = self::fetchEvent($conn, $eventId);
         if (!$event) return false;
 
-        // Priority: 1. Guest Email (requester_email) 2. Registered User Email
-        $to = null;
-        if (!empty($event['requester_email'])) {
-            $to = trim($event['requester_email']);
-        } elseif (!empty($event['user_email'])) {
-            if (!in_array($event['role'], ['Admin', 'Cathedral Admin'])) {
-                $to = trim($event['user_email']);
-            }
-        }
-
+        $recipient = self::resolveRecipient($event);
+        $to = $recipient['email'];
         if (empty($to) || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
             return false;
         }
 
-        // Raw name for PHPMailer SMTP header
-        $rawName = $event['requester_name'] ?? 'Requester';
-        // HTML-safe versions for body
-        $name   = htmlspecialchars($rawName, ENT_QUOTES, 'UTF-8');
-        $title  = htmlspecialchars($event['title'], ENT_QUOTES, 'UTF-8');
-        $type   = htmlspecialchars($event['event_type'], ENT_QUOTES, 'UTF-8');
-        $date   = date('F d, Y \a\t h:i A', strtotime($event['start_time']));
-        $reason = $rejectionNote ? htmlspecialchars($rejectionNote, ENT_QUOTES, 'UTF-8') : 'No reason provided.';
+        $isCert = self::isCertificateEvent($event);
+        $rawName = $recipient['name'];
+        $name    = htmlspecialchars($rawName, ENT_QUOTES, 'UTF-8');
+        $title   = htmlspecialchars((string)($event['title'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $type    = htmlspecialchars($isCert ? 'Ecclesiastical Certificate' : (string)($event['event_type'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $date    = $isCert
+            ? date('F d, Y', strtotime((string)$event['start_time']))
+            : date('F d, Y \a\t h:i A', strtotime((string)$event['start_time']));
+        $reason  = $rejectionNote ? htmlspecialchars($rejectionNote, ENT_QUOTES, 'UTF-8') : 'No reason provided.';
 
-        $subject = "❌ Event Request Not Approved — {$title}";
-        $body    = self::wrap("Event Request Not Approved", <<<HTML
+        $heading   = $isCert ? 'Certificate Application Not Approved' : 'Event Request Not Approved';
+        $subject   = "❌ {$heading} — {$title}";
+        $itemLabel = $isCert ? 'Document' : 'Event';
+        $dateLabel = $isCert ? 'Target Pickup Date' : 'Requested Date';
+        $noun      = $isCert ? 'certificate application' : 'event request';
+
+        $body = self::wrap($heading, <<<HTML
             <p>Dear <strong>{$name}</strong>,</p>
-            <p>We regret to inform you that your event request has been <strong style="color:#b91c1c;">declined</strong>.</p>
+            <p>We regret to inform you that your {$noun} has been <strong style="color:#b91c1c;">declined</strong>.</p>
 
             <table style="width:100%;border-collapse:collapse;margin:20px 0;">
                 <tr style="background:#f8fafc;">
-                    <td style="padding:10px 14px;font-weight:600;color:#64748b;width:35%;">Event</td>
+                    <td style="padding:10px 14px;font-weight:600;color:#64748b;width:35%;">{$itemLabel}</td>
                     <td style="padding:10px 14px;">{$title}</td>
                 </tr>
                 <tr>
@@ -122,7 +108,7 @@ class EventRequestMailer
                     <td style="padding:10px 14px;">{$type}</td>
                 </tr>
                 <tr style="background:#f8fafc;">
-                    <td style="padding:10px 14px;font-weight:600;color:#64748b;">Requested Date</td>
+                    <td style="padding:10px 14px;font-weight:600;color:#64748b;">{$dateLabel}</td>
                     <td style="padding:10px 14px;">{$date}</td>
                 </tr>
             </table>
@@ -132,7 +118,7 @@ class EventRequestMailer
                 <p style="margin:6px 0 0;color:#7f1d1d;">{$reason}</p>
             </div>
 
-            <p>You are welcome to submit a new request with an adjusted date or details.
+            <p>You are welcome to submit a new request with updated details.
                Contact the parish office if you need further assistance.</p>
         HTML);
 
@@ -144,46 +130,75 @@ class EventRequestMailer
         $event = self::fetchEvent($conn, $eventId);
         if (!$event) return false;
 
-        $to = null;
-        if (!empty($event['requester_email'])) {
-            $to = trim($event['requester_email']);
-        } elseif (!empty($event['user_email'])) {
-            $to = trim($event['user_email']);
-        }
-
+        $recipient = self::resolveRecipient($event);
+        $to = $recipient['email'];
         if (empty($to) || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
             return false;
         }
 
-        $rawName = $event['requester_name'] ?? 'Requester';
+        $isCert = self::isCertificateEvent($event);
+        $rawName = $recipient['name'];
         $name    = htmlspecialchars($rawName, ENT_QUOTES, 'UTF-8');
-        $title   = htmlspecialchars($event['title'], ENT_QUOTES, 'UTF-8');
-        $type    = htmlspecialchars($event['event_type'], ENT_QUOTES, 'UTF-8');
-        $date    = date('F d, Y \a\t h:i A', strtotime($event['start_time']));
+        $title   = htmlspecialchars((string)($event['title'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $type    = htmlspecialchars($isCert ? 'Ecclesiastical Certificate' : (string)($event['event_type'] ?? ''), ENT_QUOTES, 'UTF-8');
 
-        $subject = "📩 Event Request Received — {$title}";
-        $body    = self::wrap("Event Request Received", <<<HTML
-            <p>Dear <strong>{$name}</strong>,</p>
-            <p>We have received your event request and it has been added to our review queue.</p>
+        if ($isCert) {
+            $pickupDate = date('F d, Y', strtotime((string)$event['start_time']));
+            $purposeRow = '';
+            if (!empty($event['cert_purpose'])) {
+                $purposeSafe = htmlspecialchars((string)$event['cert_purpose'], ENT_QUOTES, 'UTF-8');
+                $purposeRow = "<tr><td style=\"padding:10px 14px;font-weight:600;color:#64748b;\">Purpose</td><td style=\"padding:10px 14px;\">{$purposeSafe}</td></tr>";
+            }
+            $subject = "📄 Certificate Application Received — {$title}";
+            $body    = self::wrap("Certificate Application Received", <<<HTML
+                <p>Dear <strong>{$name}</strong>,</p>
+                <p>We have received your certificate application and queued it for archival verification and preparation.</p>
 
-            <table style="width:100%;border-collapse:collapse;margin:20px 0;">
-                <tr style="background:#f8fafc;">
-                    <td style="padding:10px 14px;font-weight:600;color:#64748b;width:35%;">Event</td>
-                    <td style="padding:10px 14px;">{$title}</td>
-                </tr>
-                <tr>
-                    <td style="padding:10px 14px;font-weight:600;color:#64748b;">Type</td>
-                    <td style="padding:10px 14px;">{$type}</td>
-                </tr>
-                <tr style="background:#f8fafc;">
-                    <td style="padding:10px 14px;font-weight:600;color:#64748b;">Date &amp; Time</td>
-                    <td style="padding:10px 14px;">{$date}</td>
-                </tr>
-            </table>
+                <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+                    <tr style="background:#f8fafc;">
+                        <td style="padding:10px 14px;font-weight:600;color:#64748b;width:35%;">Document</td>
+                        <td style="padding:10px 14px;">{$title}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px 14px;font-weight:600;color:#64748b;">Type</td>
+                        <td style="padding:10px 14px;">{$type}</td>
+                    </tr>
+                    {$purposeRow}
+                    <tr style="background:#f8fafc;">
+                        <td style="padding:10px 14px;font-weight:600;color:#64748b;">Target Pickup Date</td>
+                        <td style="padding:10px 14px;">{$pickupDate}</td>
+                    </tr>
+                </table>
 
-            <p>A Cathedral Admin will review your request shortly. You will receive an email notification once a decision has been made.</p>
-            <p>Thank you and God bless!</p>
-        HTML);
+                <p>The Parish Office will verify the record and send another email once your certificate is ready for pickup.</p>
+                <p>Thank you and God bless!</p>
+            HTML);
+        } else {
+            $date    = date('F d, Y \a\t h:i A', strtotime((string)$event['start_time']));
+            $subject = "📩 Event Request Received — {$title}";
+            $body    = self::wrap("Event Request Received", <<<HTML
+                <p>Dear <strong>{$name}</strong>,</p>
+                <p>We have received your event request and it has been added to our review queue.</p>
+
+                <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+                    <tr style="background:#f8fafc;">
+                        <td style="padding:10px 14px;font-weight:600;color:#64748b;width:35%;">Event</td>
+                        <td style="padding:10px 14px;">{$title}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px 14px;font-weight:600;color:#64748b;">Type</td>
+                        <td style="padding:10px 14px;">{$type}</td>
+                    </tr>
+                    <tr style="background:#f8fafc;">
+                        <td style="padding:10px 14px;font-weight:600;color:#64748b;">Date &amp; Time</td>
+                        <td style="padding:10px 14px;">{$date}</td>
+                    </tr>
+                </table>
+
+                <p>A Cathedral Admin will review your request shortly. You will receive an email notification once a decision has been made.</p>
+                <p>Thank you and God bless!</p>
+            HTML);
+        }
 
         return self::send($to, $rawName, $subject, $body, $event['chapel_id'] ?? null);
     }
@@ -191,13 +206,50 @@ class EventRequestMailer
 
     // ── Private ──────────────────────────────────────────────────────────────
 
+    private static function isCertificateEvent(array $event): bool
+    {
+        return ((int)($event['service_id'] ?? 0) === 8)
+            || strcasecmp((string)($event['event_type'] ?? ''), 'Ecclesiastical Certificates') === 0
+            || stripos((string)($event['title'] ?? ''), 'Certificate') !== false;
+    }
+
+    private static function resolveRecipient(array $event): array
+    {
+        $staffRoles = ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff'];
+        $isStaffEncoded = in_array((string)($event['role'] ?? ''), $staffRoles, true);
+
+        $email = null;
+        if (!empty($event['requester_email'])) {
+            $email = trim((string)$event['requester_email']);
+        } elseif (!$isStaffEncoded && !empty($event['user_email'])) {
+            $email = trim((string)$event['user_email']);
+        }
+
+        $name = '';
+        if (!empty($event['requester_name'])) {
+            $name = trim((string)$event['requester_name']);
+        } elseif (!empty($event['cert_person_name'])) {
+            $name = trim((string)$event['cert_person_name']);
+        } elseif (!$isStaffEncoded && !empty($event['account_name'])) {
+            $name = trim((string)$event['account_name']);
+        }
+        if ($name === '') {
+            $name = 'Parishioner';
+        }
+
+        return [
+            'email'            => $email,
+            'name'             => $name,
+            'is_staff_encoded' => $isStaffEncoded,
+        ];
+    }
+
     private static function fetchEvent(mysqli $conn, int $eventId): ?array
     {
         $stmt = $conn->prepare(
-            "SELECT e.event_id, e.title, e.event_type, e.start_time,
-                    e.chapel_location, e.requester_email, e.chapel_id,
+            "SELECT e.*,
                     u.email AS user_email, u.role,
-                    COALESCE(u.full_name, u.user) AS requester_name
+                    COALESCE(NULLIF(u.full_name, ''), u.user) AS account_name
              FROM events e
              LEFT JOIN users u ON u.id = e.requested_by
              WHERE e.event_id = ? LIMIT 1"

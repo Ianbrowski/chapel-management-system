@@ -4,6 +4,7 @@ require_once __DIR__ . '/../models/Event.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/AuditLogger.php';
 require_once __DIR__ . '/../mail/EventRequestMailer.php';
+require_once __DIR__ . '/../mail/DocumentReadyMailer.php';
 require_once __DIR__ . '/../services/SmsService.php';
 
 /**
@@ -326,7 +327,8 @@ class EventController extends BaseController {
                     $existing['event_scope'] ?? $existing['scope'] ?? 'cathedral',
                     $existing['custom_duration'] ?? null,
                     $existing['requester_phone'] ?? null,
-                    $existing['requester_email'] ?? null
+                    $existing['requester_email'] ?? null,
+                    $existing['location_type'] ?? 'Church'
                 )) {
                     AuditLogger::logFromSession(
                         $this->conn,
@@ -409,7 +411,8 @@ class EventController extends BaseController {
                 $event['event_scope'] ?? $event['scope'] ?? 'cathedral',
                 $event['custom_duration'] ?? null,
                 $event['requester_phone'] ?? null,
-                $event['requester_email'] ?? null
+                $event['requester_email'] ?? null,
+                $event['location_type'] ?? 'Church'
             )) {
                 AuditLogger::logFromSession($this->conn, 'updated', 'Event Requests', "Cancelled request ID: {$reqId} - {$event['title']}", $event, array_merge($event, ['status' => 'Cancelled']));
                 $this->flash('success', 'Request cancelled.');
@@ -430,9 +433,12 @@ class EventController extends BaseController {
             $this->redirect($redirectUrl);
         }
         
-        // Personnel Isolation: Staff/Chapel Admins default to their branch but can request cross-branch
+        // Personnel Isolation: Staff/Chapel Admins default to their branch; walk-in/portal certs stay scoped to their branch
         if (!in_array($this->role, ['Admin', 'Cathedral Admin'])) {
-            if ($loc === null || $loc == 0) {
+            if ($isCertSection && !empty($this->permissions['can_approve_events']) && !empty($this->chapelId)) {
+                $loc = (int)$this->chapelId;
+                $scope = 'chapel';
+            } elseif ($loc === null || $loc == 0) {
                 // Requesting at Cathedral — Allowed for all
                 $scope = 'cathedral';
             } elseif ((int)$loc !== (int)$this->chapelId) {
@@ -476,6 +482,17 @@ class EventController extends BaseController {
         $variantId = isset($_POST['variant_id']) && (int)$_POST['variant_id'] > 0 ? (int)$_POST['variant_id'] : null;
         $selectedAddons = isset($_POST['addons']) && is_array($_POST['addons']) ? $_POST['addons'] : [];
         $locationType = in_array($_POST['location_type'] ?? '', ['Church', 'Outside']) ? $_POST['location_type'] : 'Church';
+
+        $requestMeta = [
+            'requester_name' => trim((string)($_POST['requester_name'] ?? '')),
+        ];
+        if ($isCertSection) {
+            $requestMeta['cert_person_name'] = trim((string)($_POST['cert_person_name'] ?? ''));
+            $requestMeta['cert_year']        = trim((string)($_POST['cert_year'] ?? ''));
+            $requestMeta['cert_purpose']     = trim((string)($_POST['cert_purpose'] ?? ''));
+            $requestMeta['cert_copies']      = max(1, (int)($_POST['certificate_copies'] ?? 1));
+            $requestMeta['linked_record_id'] = !empty($_POST['linked_record_id']) ? (int)$_POST['linked_record_id'] : null;
+        }
 
         $this->conn->begin_transaction();
         // Conflict Check: Certificates and shared Mass Intentions bypass altar exclusivity
@@ -521,7 +538,7 @@ class EventController extends BaseController {
             }
         }
 
-        $eventId = $this->eventModel->requestEvent($title, $type, $start, $loc, $scope, $this->userId, $email, $status, $pastor, $customDuration, $phone, $serviceId, $variantId, $serviceFee, $addonsFee, $totalFee, $locationType);
+        $eventId = $this->eventModel->requestEvent($title, $type, $start, $loc, $scope, $this->userId, $email, $status, $pastor, $customDuration, $phone, $serviceId, $variantId, $serviceFee, $addonsFee, $totalFee, $locationType, $requestMeta);
         if ($eventId) {
             foreach ($verifiedAddons as $ad) {
                 $this->eventModel->addRequestAddon((int)$eventId, (int)$ad['addon_id'], $ad['addon_name'], (float)$ad['unit_price'], (int)$ad['quantity'], (float)$ad['subtotal']);
@@ -562,11 +579,15 @@ class EventController extends BaseController {
                 if ($this->userId > 0) {
                     require_once __DIR__ . '/../models/SystemNotification.php';
                     $sysNotif = new SystemNotification($this->conn);
+                    $notifTitle = $isCertSection ? "Certificate Request Submitted" : "Event Request Submitted";
+                    $notifBody = $isCertSection
+                        ? "Your certificate application \"{$title}\" has been received and is pending archive verification."
+                        : "Your request for \"{$title}\" has been submitted successfully and is pending review by the Cathedral parish administration.";
                     $sysNotif->create(
                         $this->userId,
-                        "Event Request Submitted",
-                        "Your request for \"{$title}\" has been submitted successfully and is pending review by the Cathedral parish administration.",
-                        'event_submitted',
+                        $notifTitle,
+                        $notifBody,
+                        $isCertSection ? 'cert_submitted' : 'event_submitted',
                         (int)$eventId
                     );
                 }
@@ -631,8 +652,8 @@ class EventController extends BaseController {
 
             $notifSummary = $this->sendConfirmedNotifications((int)$id, $pastor, true);
 
-            AuditLogger::logFromSession($this->conn, 'approved', 'Event Requests', "Approved request ID: {$id}");
-            $this->flash('success', 'Request approved. ' . $notifSummary);
+            AuditLogger::logFromSession($this->conn, 'approved', $isCertRecord ? 'Certificates' : 'Event Requests', ($isCertRecord ? "Marked certificate ready ID: {$id}" : "Approved request ID: {$id}"));
+            $this->flash('success', ($isCertRecord ? 'Certificate marked as ready. ' : 'Request approved. ') . $notifSummary);
         } elseif ($action === 'reject') {
             if (!$this->eventModel->rejectRequest($id, $note)) {
                 $this->flash('error', 'Failed to reject request.');
@@ -642,6 +663,11 @@ class EventController extends BaseController {
             $event = $this->eventModel->getById($id);
             $mailSent = false;
             $smsSent = false;
+            $isCertRecord = $event && (
+                ((int)($event['service_id'] ?? 0) === 8)
+                || strcasecmp((string)($event['event_type'] ?? ''), 'Ecclesiastical Certificates') === 0
+                || stripos((string)($event['title'] ?? ''), 'Certificate') !== false
+            );
             if ($event) {
                 $mailSent = EventRequestMailer::sendRejected($this->conn, $id, $note);
                 if (!empty($event['requester_phone'])) {
@@ -653,20 +679,34 @@ class EventController extends BaseController {
                 if ($reqUserId > 0) {
                     require_once __DIR__ . '/../models/SystemNotification.php';
                     $sysNotif = new SystemNotification($this->conn);
-                    $eventTitle = $event['title'] ?: $event['event_type'];
+                    $eventTitle = $event['title'] ?: ($isCertRecord ? 'Certificate Request' : $event['event_type']);
                     $reasonText = !empty($note) ? " Reason: {$note}" : " Please contact the parish office for details.";
                     $sysNotif->create(
                         $reqUserId,
-                        "Event Request Update",
-                        "Your request for \"{$eventTitle}\" could not be approved at this time.{$reasonText}",
-                        'event_rejected',
+                        $isCertRecord ? "Certificate Application Update" : "Event Request Update",
+                        $isCertRecord
+                            ? "Your certificate application for \"{$eventTitle}\" could not be processed at this time.{$reasonText}"
+                            : "Your request for \"{$eventTitle}\" could not be approved at this time.{$reasonText}",
+                        $isCertRecord ? 'cert_rejected' : 'event_rejected',
                         (int)$id
                     );
                 }
             }
 
-            AuditLogger::logFromSession($this->conn, 'rejected', 'Event Requests', "Rejected request ID: {$id}");
-            $this->flash('success', 'Request rejected. ' . $this->formatEventNotificationSummary($event, $mailSent, $smsSent));
+            AuditLogger::logFromSession($this->conn, 'rejected', $isCertRecord ? 'Certificates' : 'Event Requests', "Rejected request ID: {$id}");
+            $this->flash('success', ($isCertRecord ? 'Certificate request declined. ' : 'Request rejected. ') . $this->formatEventNotificationSummary($event, $mailSent, $smsSent));
+        } elseif ($action === 'resend_pickup_notice') {
+            $recType = (string)($record['event_type'] ?? '');
+            $recServiceId = isset($record['service_id']) && (int)$record['service_id'] > 0 ? (int)$record['service_id'] : null;
+            $isCertRecord = ($recType === 'Ecclesiastical Certificates' || stripos($recType, 'Certificate') !== false || $recServiceId === 8);
+            if (!$isCertRecord || ($record['status'] ?? '') !== 'Confirmed') {
+                $this->flash('error', 'Only Ready / Confirmed certificates can have a pickup notice re-sent.');
+                $this->redirect($redirectUrl);
+            }
+
+            $notifSummary = $this->sendConfirmedNotifications((int)$id, $pastor, false);
+            AuditLogger::logFromSession($this->conn, 'updated', 'Certificates', "Re-sent pickup notification for certificate ID: {$id}");
+            $this->flash('success', 'Pickup notification re-sent. ' . $notifSummary);
         } elseif ($action === 'complete') {
             if (!$this->eventModel->completeRequest($id)) {
                 $this->flash('error', 'Only Ready / Confirmed requests can be marked as completed or released.');
@@ -674,7 +714,9 @@ class EventController extends BaseController {
             }
 
             $event = $this->eventModel->getById($id);
-            $isCertRecord = ((int)($event['service_id'] ?? 0) === 8) || stripos((string)($event['title'] ?? ''), 'Certificate') !== false;
+            $isCertRecord = ((int)($event['service_id'] ?? 0) === 8)
+                || strcasecmp((string)($event['event_type'] ?? ''), 'Ecclesiastical Certificates') === 0
+                || stripos((string)($event['title'] ?? ''), 'Certificate') !== false;
             if ($event) {
                 $reqUserId = (int)($event['requested_by'] ?? 0);
                 if ($reqUserId > 0) {
@@ -685,7 +727,38 @@ class EventController extends BaseController {
                     $notifBody = $isCertRecord
                         ? "Your certificate request \"{$evTitle}\" has been marked as released."
                         : "Your scheduled event \"{$evTitle}\" has been marked as completed.";
-                    $sysNotif->create($reqUserId, $notifTitle, $notifBody, 'event_completed', (int)$id);
+                    $sysNotif->create($reqUserId, $notifTitle, $notifBody, $isCertRecord ? 'cert_released' : 'event_completed', (int)$id);
+                }
+
+                // Log formal issuance to certificate_issuances if linked to an archival sacramental record
+                $linkedRecId = (int)($event['linked_record_id'] ?? 0);
+                if ($isCertRecord && $linkedRecId > 0) {
+                    $chkRec = $this->conn->prepare("SELECT record_id, person_name FROM sacramental_records WHERE record_id = ? LIMIT 1");
+                    if ($chkRec) {
+                        $chkRec->bind_param('i', $linkedRecId);
+                        $chkRec->execute();
+                        $recRow = $chkRec->get_result()->fetch_assoc();
+                        $chkRec->close();
+                        if ($recRow) {
+                            require_once __DIR__ . '/../services/SacramentalCertificateService.php';
+                            $certSvc = new SacramentalCertificateService($this->conn);
+                            $issuedTo = trim((string)($event['cert_person_name'] ?? ''))
+                                ?: trim((string)($event['requester_name'] ?? ''))
+                                ?: trim((string)($recRow['person_name'] ?? ''))
+                                ?: ($event['title'] ?: 'Parishioner');
+                            $purpose = trim((string)($event['cert_purpose'] ?? '')) ?: ('Certificate Request #' . $id);
+                            $connRef = $this->conn;
+                            $certSvc->logCertificateIssuance(
+                                $linkedRecId,
+                                $issuedTo,
+                                $purpose,
+                                (int)$this->userId,
+                                static function (int $recordId, string $act, int $uid, $old, $new) use ($connRef): void {
+                                    AuditLogger::logFromSession($connRef, 'created', 'Sacramental Certificates', "Issued certificate for record ID {$recordId}: " . ($new['cert_no'] ?? ''), $old, $new);
+                                }
+                            );
+                        }
+                    }
                 }
             }
 
@@ -709,18 +782,25 @@ class EventController extends BaseController {
                 $this->redirect($redirectUrl);
             }
 
-            $isCertRecord = ((int)($record['service_id'] ?? 0) === 8) || stripos((string)($record['title'] ?? ''), 'Certificate') !== false;
+            $isCertRecord = ((int)($record['service_id'] ?? 0) === 8)
+                || strcasecmp((string)($record['event_type'] ?? ''), 'Ecclesiastical Certificates') === 0
+                || stripos((string)($record['title'] ?? ''), 'Certificate') !== false;
             $padId = str_pad((string)$id, 4, '0', STR_PAD_LEFT);
             $refId = ($isCertRecord ? 'REQ-' : 'EV-') . $padId;
 
-            $donorName = 'Parishioner';
-            if (!empty($record['requested_by'])) {
+            $donorName = trim((string)($record['requester_name'] ?? ''))
+                ?: trim((string)($record['cert_person_name'] ?? ''));
+            if ($donorName === '' && !empty($record['requested_by'])) {
                 $reqUser = $this->userModel->getById((int)$record['requested_by']);
-                if (is_array($reqUser)) {
-                    $donorName = (string)($reqUser['full_name'] ?: ($reqUser['user'] ?: 'Parishioner'));
+                if (is_array($reqUser) && !in_array((string)($reqUser['role'] ?? ''), ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff'], true)) {
+                    $donorName = (string)($reqUser['full_name'] ?: ($reqUser['user'] ?: ''));
                 }
-            } elseif (!empty($record['requester_email'])) {
+            }
+            if ($donorName === '' && !empty($record['requester_email'])) {
                 $donorName = (string)$record['requester_email'];
+            }
+            if ($donorName === '') {
+                $donorName = 'Parishioner';
             }
             $donorName = mb_substr(trim($donorName), 0, 100);
             $purposePrefix = $isCertRecord ? 'Certificate Fee: ' : 'Service Fee: ';
@@ -749,7 +829,7 @@ class EventController extends BaseController {
                         (int)$record['requested_by'],
                         "Payment Recorded",
                         "Payment of PHP " . number_format($amount, 2) . " ({$method}) for \"{$evTitle}\" ({$refId}) has been recorded.",
-                        'payment_recorded',
+                        $isCertRecord ? 'cert_payment_recorded' : 'payment_recorded',
                         (int)$id
                     );
                 }
@@ -865,25 +945,73 @@ class EventController extends BaseController {
         $mailSent = false;
         $smsSent = false;
         if ($event) {
-            $mailSent = EventRequestMailer::sendApproved($this->conn, $eventId, $pastorName);
-            if (!empty($event['requester_phone'])) {
-                $smsSent = SmsService::sendEventApproved($this->conn, $eventId, $pastorName);
-            }
-
+            $isCertRecord = ((int)($event['service_id'] ?? 0) === 8)
+                || strcasecmp((string)($event['event_type'] ?? ''), 'Ecclesiastical Certificates') === 0
+                || stripos((string)($event['title'] ?? ''), 'Certificate') !== false;
             $reqUserId = (int)($event['requested_by'] ?? 0);
-            if ($notifyInApp && $reqUserId > 0) {
-                require_once __DIR__ . '/../models/SystemNotification.php';
-                $sysNotif = new SystemNotification($this->conn);
-                $celebrantText = !empty($pastorName) ? " Celebrant: Rev. {$pastorName}." : "";
-                $eventTitle = $event['title'] ?: $event['event_type'];
-                $dateText = !empty($event['start_time']) ? date('M j, Y', strtotime($event['start_time'])) : 'Scheduled Date';
-                $sysNotif->create(
-                    $reqUserId,
-                    "Event Request Approved",
-                    "Great news! Your request for \"{$eventTitle}\" has been approved for {$dateText}.{$celebrantText}",
-                    'event_approved',
-                    $eventId
-                );
+            $dateText = !empty($event['start_time']) ? date('M j, Y', strtotime($event['start_time'])) : 'Scheduled Date';
+
+            if ($isCertRecord) {
+                $docLabel = trim((string)($event['title'] ?: 'Ecclesiastical Certificate'));
+                $pickupDateFmt = !empty($event['start_time'])
+                    ? date('F d, Y (Tue–Sun office hours)', strtotime($event['start_time']))
+                    : 'During Parish Office Hours (Tue–Sun, 8:00 AM – 5:00 PM)';
+
+                $toEmail = trim((string)($event['requester_email'] ?? ''));
+                $recipientName = trim((string)($event['requester_name'] ?? ''))
+                    ?: trim((string)($event['cert_person_name'] ?? ''))
+                    ?: 'Parishioner';
+                if ($reqUserId > 0) {
+                    $reqUser = $this->userModel->getById($reqUserId);
+                    if (is_array($reqUser)) {
+                        $uRole = (string)($reqUser['role'] ?? '');
+                        if (!in_array($uRole, ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff'], true)) {
+                            if ($recipientName === 'Parishioner') {
+                                $recipientName = trim((string)($reqUser['full_name'] ?: $reqUser['user'] ?: 'Parishioner'));
+                            }
+                            if ($toEmail === '') {
+                                $toEmail = trim((string)($reqUser['email'] ?? ''));
+                            }
+                        }
+                    }
+                }
+
+                if ($toEmail !== '' && filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+                    $mailSent = DocumentReadyMailer::sendPickupNotification($toEmail, $recipientName, $docLabel, $pickupDateFmt);
+                }
+                if (!empty($event['requester_phone'])) {
+                    $smsSent = SmsService::sendPickupNotice((string)$event['requester_phone'], $recipientName, $docLabel);
+                }
+                if ($notifyInApp && $reqUserId > 0) {
+                    require_once __DIR__ . '/../models/SystemNotification.php';
+                    $sysNotif = new SystemNotification($this->conn);
+                    $sysNotif->create(
+                        $reqUserId,
+                        "Certificate Ready for Pickup",
+                        "Your requested \"{$docLabel}\" is ready for pickup at the Parish Office (Target date: {$dateText}). Please bring a valid ID.",
+                        'cert_ready',
+                        $eventId
+                    );
+                }
+            } else {
+                $mailSent = EventRequestMailer::sendApproved($this->conn, $eventId, $pastorName);
+                if (!empty($event['requester_phone'])) {
+                    $smsSent = SmsService::sendEventApproved($this->conn, $eventId, $pastorName);
+                }
+
+                if ($notifyInApp && $reqUserId > 0) {
+                    require_once __DIR__ . '/../models/SystemNotification.php';
+                    $sysNotif = new SystemNotification($this->conn);
+                    $celebrantText = !empty($pastorName) ? " Celebrant: Rev. {$pastorName}." : "";
+                    $eventTitle = $event['title'] ?: $event['event_type'];
+                    $sysNotif->create(
+                        $reqUserId,
+                        "Event Request Approved",
+                        "Great news! Your request for \"{$eventTitle}\" has been approved for {$dateText}.{$celebrantText}",
+                        'event_approved',
+                        $eventId
+                    );
+                }
             }
         }
 

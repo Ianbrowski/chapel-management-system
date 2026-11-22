@@ -63,7 +63,7 @@ $certCounts       = $cert_counts ?? [];
 $totalCertCount   = $certCounts['total'] ?? count($cert_requests);
 $pendingCertCount  = $certCounts['pending'] ?? count(array_filter($cert_requests, fn($r) => ($r['status'] ?? '') === 'Pending'));
 $readyCertCount    = $certCounts['confirmed'] ?? count(array_filter($cert_requests, fn($r) => ($r['status'] ?? '') === 'Confirmed'));
-$releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] ?? '') === 'Completed'));
+$releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_requests, fn($r) => ($r['status'] ?? '') === 'Completed'));
 ?>
 
 <link rel="stylesheet" href="assets/css/workspace.css?v=2.5">
@@ -395,15 +395,21 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
                                                 <?php echo htmlspecialchars($pTitle); ?>
                                             </div>
                                             <div style="font-size: 10.5px; color: var(--text2); font-family: var(--font-mono, monospace); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                                #REQ-<?php echo str_pad((string)$req['event_id'], 4, '0', STR_PAD_LEFT); ?> &bull; Parish Archives
+                                                #REQ-<?php echo str_pad((string)$req['event_id'], 4, '0', STR_PAD_LEFT); ?> &bull; <?php echo htmlspecialchars(!empty($req['chapel_location']) ? $req['chapel_location'] : 'Cathedral Parish Office'); ?>
                                             </div>
                                         </div>
                                     </div>
                                 </td>
 
                                 <td style="padding: 10px 14px;">
+                                    <?php
+                                        $rawCertType = trim((string)($req['event_type'] ?? ''));
+                                        $displayCertCategory = ($rawCertType !== '' && $rawCertType !== 'Other')
+                                            ? $rawCertType
+                                            : 'Ecclesiastical Certificate';
+                                    ?>
                                     <div style="font-size: 11.5px; color: var(--text); font-weight: 500;">
-                                        <?php echo htmlspecialchars($req['event_type'] ?? 'Ecclesiastical Certificate'); ?>
+                                        <?php echo htmlspecialchars($displayCertCategory); ?>
                                     </div>
                                     <div style="font-size: 10.5px; color: var(--text2); margin-top: 1px;">
                                         Pickup Window: Tue&ndash;Sun
@@ -471,6 +477,9 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
                                             </a>
                                             <?php endif; ?>
                                             <?php if ($isAdmin && $st === 'Confirmed'): ?>
+                                            <a class="dropdown-item" href="javascript:void(0)" data-id="<?php echo (int)$req['event_id']; ?>" onclick="resendCertPickupNotice(this)" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: #b45309; border-radius: 4px;">
+                                                <i class="fa-solid fa-paper-plane"></i> Resend Pickup Notice
+                                            </a>
                                             <a class="dropdown-item" href="javascript:void(0)" data-id="<?php echo (int)$req['event_id']; ?>" onclick="completeCertRequest(this)" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: #2563eb; border-radius: 4px;">
                                                 <i class="fa-solid fa-box-open"></i> Mark as Released
                                             </a>
@@ -481,11 +490,15 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
                                             </a>
                                             <?php endif; ?>
                                             <?php if ($isAdmin):
-                                                $searchPerson = preg_replace('/^[^:]+:\s*/', '', (string)$pTitle);
-                                                $searchPerson = trim(preg_replace('/\s*-\s*.*$/', '', $searchPerson));
-                                                $searchPerson = trim(preg_replace('/\s*\(\d{4}\)$/', '', $searchPerson));
+                                                $searchPerson = trim((string)($req['cert_person_name'] ?? ''));
+                                                if ($searchPerson === '') {
+                                                    $searchPerson = preg_replace('/^[^:]+:\s*/', '', (string)$pTitle);
+                                                    $searchPerson = trim(preg_replace('/\s*-\s*.*$/', '', $searchPerson));
+                                                    $searchPerson = trim(preg_replace('/\s*\(\d{4}\)$/', '', $searchPerson));
+                                                }
+                                                $recordsSection = (!empty($req['chapel_id']) && (int)$req['chapel_id'] > 0) ? 'records_chapel' : 'records_cathedral';
                                             ?>
-                                            <a class="dropdown-item" href="dashboard.php?section=records_cathedral&amp;search=<?php echo urlencode($searchPerson); ?>" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); border-radius: 4px;">
+                                            <a class="dropdown-item" href="dashboard.php?section=<?php echo $recordsSection; ?>&amp;search=<?php echo urlencode($searchPerson); ?>" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); border-radius: 4px;">
                                                 <i class="fa-solid fa-folder-open" style="color: var(--accent);"></i> Find in Records
                                             </a>
                                             <?php endif; ?>
@@ -648,13 +661,25 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
                     <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
                     <input type="hidden" name="service_id" value="<?php echo $certServiceId; ?>">
                     <input type="hidden" name="variant_id" id="cert-field-variant-id" value="<?php echo $certVariants[0]['id'] ?? 19; ?>">
+<?php
+    $isGlobalAdminCert = in_array($role, ['Admin', 'Cathedral Admin'], true);
+    $userChapelCert = (int)($_SESSION['chapel_id'] ?? ($chapel_id ?? 0));
+    $certChapelsList = $chapels ?? [];
+    $isLockedBranchCert = (!$isGlobalAdminCert && $isAdmin && $userChapelCert > 0);
+    $defaultCertChapelId = ($isLockedBranchCert || (!$isGlobalAdminCert && $userChapelCert > 0)) ? $userChapelCert : 0;
+?>
                     <input type="hidden" name="event_type" value="Ecclesiastical Certificates">
-                    <input type="hidden" name="chapel_id" value="0">
-                    <input type="hidden" name="event_scope" value="cathedral">
+                    <?php if ($isLockedBranchCert): ?>
+                    <input type="hidden" name="chapel_id" id="cert-field-chapel-id" value="<?php echo $userChapelCert; ?>">
+                    <input type="hidden" name="event_scope" id="cert-field-scope" value="chapel">
+                    <?php else: ?>
+                    <input type="hidden" name="event_scope" id="cert-field-scope" value="<?php echo $defaultCertChapelId > 0 ? 'chapel' : 'cathedral'; ?>">
+                    <?php endif; ?>
                     <input type="hidden" name="custom_duration" value="0">
                     <input type="hidden" name="location_type" value="Church">
                     <input type="hidden" name="start_time" id="cert-field-datetime" value="<?php echo date('Y-m-d', strtotime('+2 days')) . 'T08:00'; ?>">
                     <input type="hidden" name="title" id="cert-field-title" value="Baptismal Certificate Request">
+                    <input type="hidden" name="linked_record_id" id="cert-linked-record-id" value="">
 
                     <!-- 1. Document & Record Section -->
                     <div>
@@ -696,7 +721,7 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
                                 </label>
                                 <input type="text" id="cert-person-name" name="cert_person_name" required maxlength="80" autocomplete="off"
                                        placeholder="e.g. Juan dela Cruz (Full name as recorded in archives)" 
-                                       oninput="this.value = this.value.replace(/[^a-zA-ZñÑ\s\.\-']/g, ''); syncCertDynamicTitle();<?php echo $isAdmin ? ' handleCertRecordNameInput();' : ''; ?>"
+                                       oninput="this.value = this.value.replace(/[^a-zA-ZñÑ\s\.\-']/g, ''); const lr = document.getElementById('cert-linked-record-id'); if (lr) lr.value = ''; syncCertDynamicTitle();<?php echo $isAdmin ? ' handleCertRecordNameInput();' : ''; ?>"
                                        <?php if ($isAdmin): ?>
                                        onfocus="if (this.value.trim().length > 0) handleCertRecordNameInput();"
                                        onkeydown="handleCertSuggestionKeydown(event, 'cert-record-suggestions')"
@@ -773,12 +798,41 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
                             </div>
                         </div>
 
-                        <div>
-                            <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text2); display: block; margin-bottom: 4px;">
-                                Email Address <span style="font-weight: 400; color: var(--text2);">(Optional)</span>
-                            </label>
-                            <input type="email" name="requester_email" maxlength="100" placeholder="e.g. juan@email.com" 
-                                   style="padding: 6px 12px; height: 36px; font-size: 12px; box-sizing: border-box; width: 100%; border-radius: 6px; border: 1px solid var(--border); background: #FFFFFF; color: var(--text);">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                            <div>
+                                <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text2); display: block; margin-bottom: 4px;">
+                                    Email Address <span style="font-weight: 400; color: var(--text2);">(Optional)</span>
+                                </label>
+                                <input type="email" name="requester_email" maxlength="100" placeholder="e.g. juan@email.com" 
+                                       style="padding: 6px 12px; height: 36px; font-size: 12px; box-sizing: border-box; width: 100%; border-radius: 6px; border: 1px solid var(--border); background: #FFFFFF; color: var(--text);">
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text2); display: block; margin-bottom: 4px;">
+                                    Issuing / Pickup Office
+                                </label>
+                                <?php if ($isLockedBranchCert):
+                                    $lockedChapelName = 'Assigned Chapel Office';
+                                    foreach ($certChapelsList as $cc) {
+                                        if ((int)$cc['chapel_id'] === $userChapelCert) {
+                                            $lockedChapelName = $cc['chapel_name'];
+                                            break;
+                                        }
+                                    }
+                                ?>
+                                <input type="text" readonly value="<?php echo htmlspecialchars($lockedChapelName); ?>"
+                                       style="padding: 6px 12px; height: 36px; font-size: 12px; box-sizing: border-box; width: 100%; border-radius: 6px; border: 1px solid var(--border); background: #f8fafc; color: var(--text2); font-weight: 600;">
+                                <?php else: ?>
+                                <select name="chapel_id" id="cert-chapel-selector" onchange="onCertChapelChange(this)"
+                                        style="padding: 6px 12px; height: 36px; font-size: 12px; box-sizing: border-box; width: 100%; border-radius: 6px; border: 1px solid var(--border); background: #FFFFFF; color: var(--text); font-weight: 500;">
+                                    <option value="0" <?php echo $defaultCertChapelId === 0 ? 'selected' : ''; ?>>Cathedral Parish Office (Main)</option>
+                                    <?php foreach ($certChapelsList as $cc): ?>
+                                        <option value="<?php echo (int)$cc['chapel_id']; ?>" <?php echo $defaultCertChapelId === (int)$cc['chapel_id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($cc['chapel_name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
 
@@ -923,6 +977,14 @@ $releasedCertCount = count(array_filter($cert_requests, fn($r) => ($r['status'] 
     <input type="hidden" name="id" id="cert-complete-id-input">
 </form>
 
+<form id="cert-resend-form" method="POST" action="dashboard.php?section=request_certificate" style="display: none;">
+    <input type="hidden" name="form_section" value="review_request">
+    <input type="hidden" name="redirect_section" value="request_certificate">
+    <input type="hidden" name="action" value="resend_pickup_notice">
+    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+    <input type="hidden" name="id" id="cert-resend-id-input">
+</form>
+
 <?php if ($isAdmin): ?>
 <div class="modal-overlay" id="cert-payment-modal" style="z-index: 10000;">
     <div class="modal" style="max-width: 420px; width: 92%; padding: 22px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg);">
@@ -1044,6 +1106,10 @@ function openCertConfirmModal() {
     const pickupVal = document.getElementById('cert-pickup-date-input')?.value || '';
     const copies = Math.max(1, parseInt(document.getElementById('cert-copies-input')?.value || '1', 10));
     const totalText = document.getElementById('cert-summary-total-fee')?.textContent || 'PHP 200.00';
+    const chapelSel = document.getElementById('cert-chapel-selector');
+    const releasingOffice = (chapelSel && chapelSel.options && chapelSel.selectedIndex >= 0)
+        ? chapelSel.options[chapelSel.selectedIndex].text.trim()
+        : (document.querySelector('#cert-application-form input[readonly]')?.value?.trim() || 'Cathedral Parish Office');
     
     let pickupFormatted = pickupVal;
     try {
@@ -1087,7 +1153,7 @@ function openCertConfirmModal() {
 
             <div style="border-top:1px solid #E5E5E5; padding-top:10px; margin-top:10px;">
                 <div style="font-size:10.5px; color:#737373; font-weight:600; margin-bottom:4px;">Releasing Location</div>
-                <div style="font-size:12px; color:#111111;">IFI Cathedral Parish Office &bull; Tuesday to Sunday, 8am&ndash;5pm</div>
+                <div style="font-size:12px; color:#111111;">${escapeHtml(releasingOffice)} &bull; Tuesday to Sunday, 8am&ndash;5pm</div>
             </div>
 
             <div style="background:#F6F6F6; border:1px solid #E5E5E5; border-radius:6px; padding:8px 10px; margin-top:10px;">
@@ -1177,15 +1243,15 @@ function viewCertDetails(req) {
             </div>
             <div style="background: #F6F6F6; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
                 <div style="font-size: 10px; text-transform: uppercase; color: var(--text2); font-weight: 700; margin-bottom: 2px;"><i class="fa-solid fa-building-columns" style="color:var(--text); margin-right:4px;"></i> Releasing Office</div>
-                <div style="font-size: 12px; color: var(--text); font-weight: 600;">IFI Cathedral Parish Office</div>
+                <div style="font-size: 12px; color: var(--text); font-weight: 600;">${escapeHtml(req.chapel_location || 'IFI Cathedral Parish Office')}</div>
             </div>
             <div style="background: #F6F6F6; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
-                <div style="font-size: 10px; text-transform: uppercase; color: var(--text2); font-weight: 700; margin-bottom: 2px;"><i class="fa-solid fa-id-card-clip" style="color:var(--text); margin-right:4px;"></i> Processing Section</div>
-                <div style="font-size: 12px; color: var(--text); font-weight: 600;">Archives &amp; Records</div>
+                <div style="font-size: 10px; text-transform: uppercase; color: var(--text2); font-weight: 700; margin-bottom: 2px;"><i class="fa-solid fa-id-card-clip" style="color:var(--text); margin-right:4px;"></i> Details</div>
+                <div style="font-size: 12px; color: var(--text); font-weight: 600;">${escapeHtml(req.cert_purpose || 'Archives & Records')}${parseInt(req.cert_copies || '1', 10) > 1 ? ` (${parseInt(req.cert_copies, 10)} copies)` : ''}</div>
             </div>
             <div style="background: #F6F6F6; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
                 <div style="font-size: 10px; text-transform: uppercase; color: var(--text2); font-weight: 700; margin-bottom: 2px;"><i class="fa-solid fa-receipt" style="color:var(--text); margin-right:4px;"></i> Recorded Total Fee</div>
-                <div style="font-size: 12px; color: #111111; font-weight: 700;">PHP ${parseFloat(req.total_fee || 200).toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                <div style="font-size: 12px; color: #111111; font-weight: 700;">PHP ${parseFloat(req.total_fee || 200).toLocaleString('en-US', {minimumFractionDigits: 2})}${parseInt(req.linked_record_id || '0', 10) > 0 ? ' <span style="font-size:10px;color:#15803d;font-weight:600;">&bull; Archive Linked</span>' : ''}</div>
             </div>
         </div>
 
@@ -1287,6 +1353,24 @@ function completeCertRequest(el) {
     }
 }
 
+function resendCertPickupNotice(el) {
+    const id = el ? el.getAttribute('data-id') : '';
+    if (!id) return;
+    const input = document.getElementById('cert-resend-id-input');
+    const form = document.getElementById('cert-resend-form');
+    if (input && form) {
+        input.value = id;
+        form.submit();
+    }
+}
+
+function onCertChapelChange(sel) {
+    const scopeEl = document.getElementById('cert-field-scope');
+    if (scopeEl && sel) {
+        scopeEl.value = (parseInt(sel.value || '0', 10) > 0) ? 'chapel' : 'cathedral';
+    }
+}
+
 function openCertPaymentModal(el) {
     if (!el) return;
     const idInp = document.getElementById('cert-pay-id-input');
@@ -1306,6 +1390,8 @@ function closeCertPaymentModal() {
 
 window.approveCertRequest = approveCertRequest;
 window.completeCertRequest = completeCertRequest;
+window.resendCertPickupNotice = resendCertPickupNotice;
+window.onCertChapelChange = onCertChapelChange;
 window.openCertPaymentModal = openCertPaymentModal;
 window.closeCertPaymentModal = closeCertPaymentModal;
 window.openCertApplicantChat = openCertApplicantChat;
@@ -1691,9 +1777,10 @@ function renderCertRecordSuggestions(suggestions, query) {
         }
         if (rec.chapel_name) meta.push(rec.chapel_name);
         return '<button type="button" class="cert-suggestion-item" '
+            + 'data-record-id="' + escapeCertHtml(String(rec.record_id || '')) + '" '
             + 'data-name="' + escapeCertHtml(rec.person_name || '') + '" '
             + 'data-year="' + escapeCertHtml(rec.year || '') + '" '
-            + 'onclick="selectCertRecordSuggestion(this.dataset.name, this.dataset.year)" '
+            + 'onclick="selectCertRecordSuggestion(this.dataset.name, this.dataset.year, this.dataset.recordId)" '
             + 'onmouseenter="this.style.background=\'#F4F4F5\'" onmouseleave="this.style.background=\'#FFFFFF\'" '
             + 'style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; padding: 8px 12px; border: none; border-bottom: 1px solid #f4f4f5; background: #FFFFFF; cursor: pointer; font-family: inherit;">'
             + '<div style="min-width: 0; flex: 1;">'
@@ -1709,14 +1796,18 @@ function renderCertRecordSuggestions(suggestions, query) {
     box.style.display = 'block';
 }
 
-function selectCertRecordSuggestion(personName, year) {
+function selectCertRecordSuggestion(personName, year, recordId) {
     const nameInput = document.getElementById('cert-person-name');
     const yearInput = document.getElementById('cert-year-input');
+    const linkedInput = document.getElementById('cert-linked-record-id');
     if (nameInput && personName) {
         nameInput.value = personName;
     }
     if (yearInput && year) {
         yearInput.value = year;
+    }
+    if (linkedInput) {
+        linkedInput.value = recordId ? String(recordId) : '';
     }
     if (typeof syncCertDynamicTitle === 'function') {
         syncCertDynamicTitle();

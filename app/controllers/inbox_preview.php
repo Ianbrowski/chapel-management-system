@@ -158,9 +158,13 @@ try {
         $items = [];
         foreach ($notifications as $n) {
             $type = strtolower($n['type'] ?? 'event');
+            $isCertNotif = (strpos($type, 'cert') !== false);
             $icon = 'fa-bell';
             $iconClass = 'inbox-icon-event';
-            if (strpos($type, 'sacrament') !== false || strpos($type, 'baptism') !== false) {
+            if ($isCertNotif) {
+                $icon = 'fa-file-invoice';
+                $iconClass = 'inbox-icon-cert';
+            } elseif (strpos($type, 'sacrament') !== false || strpos($type, 'baptism') !== false) {
                 $icon = 'fa-hands-praying';
                 $iconClass = 'inbox-icon-sacrament';
             } elseif (strpos($type, 'approved') !== false) {
@@ -173,6 +177,10 @@ try {
 
             $isUnread = empty($n['is_read']);
             $refId = !empty($n['reference_id']) ? (int)$n['reference_id'] : 0;
+            $targetSection = $isCertNotif ? 'request_certificate' : 'events';
+            $targetUrl = $isCertNotif
+                ? 'dashboard.php?section=request_certificate'
+                : ($refId > 0 ? ('dashboard.php?section=events&event_id=' . $refId) : 'dashboard.php?section=events');
             $items[] = [
                 'id'             => (int)$n['id'],
                 'reference_id'   => $refId,
@@ -189,8 +197,8 @@ try {
                 'time_ago'       => formatRelativeTime($n['created_at'] ?? ''),
                 'icon'           => $icon,
                 'icon_class'     => $iconClass,
-                'target_section' => 'events',
-                'target_url'     => $refId > 0 ? ('dashboard.php?section=events&event_id=' . $refId) : 'dashboard.php?section=events'
+                'target_section' => $targetSection,
+                'target_url'     => $targetUrl
             ];
         }
 

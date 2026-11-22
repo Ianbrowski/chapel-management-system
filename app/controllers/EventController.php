@@ -105,9 +105,10 @@ class EventController extends BaseController {
                 $reqSource = $_POST['requester_source'] ?? 'office';
                 $requestedBy = ($reqSource === 'walkin') ? null : $this->userId;
 
-                if ($this->eventModel->create($title, $type, $start, $loc, $pastor, $status, $scope, $customDuration, $phone, $email, $requestedBy)) {
+                $createdEventId = $this->eventModel->create($title, $type, $start, $loc, $pastor, $status, $scope, $customDuration, $phone, $email, $requestedBy);
+                if ($createdEventId) {
                     $this->conn->commit();
-                                        AuditLogger::logFromSession(
+                    AuditLogger::logFromSession(
                         $this->conn,
                         'created',
                         'Events',
@@ -126,7 +127,14 @@ class EventController extends BaseController {
                             'requester_email' => $email
                         ]
                     );
-                    $this->flash('success', 'Event created.');
+                    $notifMsg = '';
+                    if ($status === 'Confirmed' && (trim((string)$email) !== '' || trim((string)$phone) !== '')) {
+                        $notifSummary = $this->sendConfirmedNotifications((int)$createdEventId, $pastor, false);
+                        if ($notifSummary !== '') {
+                            $notifMsg = ' ' . $notifSummary;
+                        }
+                    }
+                    $this->flash('success', 'Event created.' . $notifMsg);
                 } else {
                     $this->conn->rollback();
                     $error = $_SESSION['db_error'] ?? $this->conn->error;
@@ -204,7 +212,15 @@ class EventController extends BaseController {
                             'requester_email' => $email
                         ]
                     );
-                    $this->flash('success', 'Event updated.');
+                    $notifMsg = '';
+                    if ($existing['status'] !== 'Confirmed' && $status === 'Confirmed'
+                        && (trim((string)$email) !== '' || trim((string)$phone) !== '' || !empty($existing['requested_by']))) {
+                        $notifSummary = $this->sendConfirmedNotifications((int)$id, $pastor, true);
+                        if ($notifSummary !== '') {
+                            $notifMsg = ' ' . $notifSummary;
+                        }
+                    }
+                    $this->flash('success', 'Event updated.' . $notifMsg);
                 } else {
                     $this->conn->rollback();
                     $this->flash('error', 'Failed to update event.');
@@ -536,7 +552,8 @@ class EventController extends BaseController {
                 ]
             );
             
-            // Automated Acknowledgment (only for pending requests)
+            // Automated Acknowledgment or Confirmation Notifications
+            $notifMsg = '';
             if ($status === 'Pending') {
                 EventRequestMailer::sendAcknowledgment($this->conn, (int)$eventId);
 
@@ -552,9 +569,14 @@ class EventController extends BaseController {
                         (int)$eventId
                     );
                 }
+            } elseif ($status === 'Confirmed' && (trim((string)$email) !== '' || trim((string)$phone) !== '')) {
+                $notifSummary = $this->sendConfirmedNotifications((int)$eventId, $pastor, false);
+                if ($notifSummary !== '') {
+                    $notifMsg = ' ' . $notifSummary;
+                }
             }
 
-            $msg = ($status === 'Confirmed') ? 'Event created and confirmed.' : ($isCertSection ? 'Certificate application submitted successfully. The Parish Office will review and prepare your documents for pickup.' : 'Event request submitted.');
+            $msg = ($status === 'Confirmed') ? ('Event created and confirmed.' . $notifMsg) : ($isCertSection ? 'Certificate application submitted successfully. The Parish Office will review and prepare your documents for pickup.' : 'Event request submitted.');
             $this->flash('success', $msg);
         } else {
             $this->conn->rollback();
@@ -606,43 +628,10 @@ class EventController extends BaseController {
             }
             $this->conn->commit();
 
-            $pastorName = '';
-            if (!empty($pastor)) {
-                $pastorRow = $this->userModel->getById($pastor);
-                if (is_array($pastorRow)) {
-                    $pastorName = (string)($pastorRow['full_name'] ?? $pastorRow['user'] ?? '');
-                }
-            }
-
-            $event = $this->eventModel->getById($id);
-            $mailSent = false;
-            $smsSent = false;
-            if ($event) {
-                $mailSent = EventRequestMailer::sendApproved($this->conn, $id, $pastorName);
-                if (!empty($event['requester_phone'])) {
-                    $smsSent = SmsService::sendEventApproved($this->conn, $id, $pastorName);
-                }
-
-                // Member-specific in-app notification
-                $reqUserId = (int)($event['requested_by'] ?? 0);
-                if ($reqUserId > 0) {
-                    require_once __DIR__ . '/../models/SystemNotification.php';
-                    $sysNotif = new SystemNotification($this->conn);
-                    $celebrantText = !empty($pastorName) ? " Celebrant: Rev. {$pastorName}." : "";
-                    $eventTitle = $event['title'] ?: $event['event_type'];
-                    $dateText = !empty($event['start_time']) ? date('M j, Y', strtotime($event['start_time'])) : 'Scheduled Date';
-                    $sysNotif->create(
-                        $reqUserId,
-                        "Event Request Approved",
-                        "Great news! Your request for \"{$eventTitle}\" has been approved for {$dateText}.{$celebrantText}",
-                        'event_approved',
-                        (int)$id
-                    );
-                }
-            }
+            $notifSummary = $this->sendConfirmedNotifications((int)$id, $pastor, true);
 
             AuditLogger::logFromSession($this->conn, 'approved', 'Event Requests', "Approved request ID: {$id}");
-            $this->flash('success', 'Request approved. ' . $this->formatEventNotificationSummary($event, $mailSent, $smsSent));
+            $this->flash('success', 'Request approved. ' . $notifSummary);
         } elseif ($action === 'reject') {
             if (!$this->eventModel->rejectRequest($id, $note)) {
                 $this->flash('error', 'Failed to reject request.');
@@ -859,6 +848,45 @@ class EventController extends BaseController {
             $this->flash('error', 'Invalid status value provided.');
         }
         $this->redirect('dashboard.php?section=schedule_audit');
+    }
+
+    private function sendConfirmedNotifications(int $eventId, ?int $pastorId, bool $notifyInApp = true): string
+    {
+        $pastorName = '';
+        if (!empty($pastorId)) {
+            $pastorRow = $this->userModel->getById($pastorId);
+            if (is_array($pastorRow)) {
+                $pastorName = (string)($pastorRow['full_name'] ?? $pastorRow['user'] ?? '');
+            }
+        }
+
+        $event = $this->eventModel->getById($eventId);
+        $mailSent = false;
+        $smsSent = false;
+        if ($event) {
+            $mailSent = EventRequestMailer::sendApproved($this->conn, $eventId, $pastorName);
+            if (!empty($event['requester_phone'])) {
+                $smsSent = SmsService::sendEventApproved($this->conn, $eventId, $pastorName);
+            }
+
+            $reqUserId = (int)($event['requested_by'] ?? 0);
+            if ($notifyInApp && $reqUserId > 0) {
+                require_once __DIR__ . '/../models/SystemNotification.php';
+                $sysNotif = new SystemNotification($this->conn);
+                $celebrantText = !empty($pastorName) ? " Celebrant: Rev. {$pastorName}." : "";
+                $eventTitle = $event['title'] ?: $event['event_type'];
+                $dateText = !empty($event['start_time']) ? date('M j, Y', strtotime($event['start_time'])) : 'Scheduled Date';
+                $sysNotif->create(
+                    $reqUserId,
+                    "Event Request Approved",
+                    "Great news! Your request for \"{$eventTitle}\" has been approved for {$dateText}.{$celebrantText}",
+                    'event_approved',
+                    $eventId
+                );
+            }
+        }
+
+        return $this->formatEventNotificationSummary($event, $mailSent, $smsSent);
     }
 
     private function formatEventNotificationSummary(?array $event, bool $mailSent, bool $smsSent): string

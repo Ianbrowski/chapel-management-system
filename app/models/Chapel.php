@@ -96,43 +96,55 @@ class Chapel {
         try {
             $themeColor = preg_match('/^#[0-9a-fA-F]{6}$/', $themeColor) ? $themeColor : '#4f46e5';
             
+            $s_host   = $smtp['host'] ?? null;
+            $s_port   = isset($smtp['port']) ? (int)$smtp['port'] : null;
+            $s_user   = $smtp['user'] ?? null;
+            $s_pass   = isset($smtp['pass']) ? trim((string)$smtp['pass']) : '';
+            $hasPass  = ($s_pass !== '');
+            $s_secure = $smtp['secure'] ?? 'tls';
+            $s_from_e = $smtp['from_email'] ?? null;
+            $s_from_n = $smtp['from_name'] ?? null;
+
             $sql = "UPDATE chapels SET 
                     chapel_name=?, location=?, patron_saint=?, seating_capacity=?, 
                     coordinator_name=?, coordinator_phone=?, status=?, 
                     sunday_service_time=?, theme_color=?,
-                    smtp_host=?, smtp_port=?, smtp_user=?, smtp_pass=?, smtp_secure=?, from_email=?, from_name=?";
-            
+                    smtp_host=?, smtp_port=?, smtp_user=?";
+            if ($hasPass) {
+                $sql .= ", smtp_pass=?";
+            }
+            $sql .= ", smtp_secure=?, from_email=?, from_name=?";
+
             if ($imagePath !== null) {
                 $sql .= ", chapel_image=?";
             }
             $sql .= " WHERE chapel_id=?";
-            
+
             $s = $this->conn->prepare($sql);
             if (!$s) {
                 throw new Exception($this->conn->error);
             }
 
-            $s_host   = $smtp['host'] ?? null;
-            $s_port   = isset($smtp['port']) ? (int)$smtp['port'] : null;
-            $s_user   = $smtp['user'] ?? null;
-            $s_pass   = $smtp['pass'] ?? null;
-            $s_secure = $smtp['secure'] ?? 'tls';
-            $s_from_e = $smtp['from_email'] ?? null;
-            $s_from_n = $smtp['from_name'] ?? null;
-            
-            if ($imagePath !== null) {
-                $s->bind_param('sssisssssssissssi', 
-                    $name, $location, $patron, $capacity, $coord, $phone, $status, 
-                    $sundayServiceTime, $themeColor,
-                    $s_host, $s_port, $s_user, $s_pass, $s_secure, $s_from_e, $s_from_n,
-                    $imagePath, $id);
-            } else {
-                $s->bind_param('sssisssssssisssi', 
-                    $name, $location, $patron, $capacity, $coord, $phone, $status, 
-                    $sundayServiceTime, $themeColor,
-                    $s_host, $s_port, $s_user, $s_pass, $s_secure, $s_from_e, $s_from_n,
-                    $id);
+            $types = 'sssissssssis';
+            $params = [
+                $name, $location, $patron, $capacity, $coord, $phone, $status,
+                $sundayServiceTime, $themeColor, $s_host, $s_port, $s_user
+            ];
+            if ($hasPass) {
+                $types .= 's';
+                $params[] = $s_pass;
             }
+            $types .= 'sss';
+            $params[] = $s_secure;
+            $params[] = $s_from_e;
+            $params[] = $s_from_n;
+            if ($imagePath !== null) {
+                $types .= 's';
+                $params[] = $imagePath;
+            }
+            $types .= 'i';
+            $params[] = $id;
+            $s->bind_param($types, ...$params);
             if (!$s->execute()) {
                 throw new Exception($this->conn->error);
             }
@@ -221,22 +233,10 @@ class Chapel {
             throw new Exception("Cannot delete: There are donation records logged for this chapel.");
         }
 
-        // 5. Check for Tickets
-        $res = $this->conn->query("SELECT ticket_id FROM tickets WHERE chapel_id = $id LIMIT 1");
-        if ($res && $res->num_rows > 0) {
-            throw new Exception("Cannot delete: There are support tickets assigned to this chapel.");
-        }
-
-        // 6. Check for Public Inquiries
+        // 5. Check for Public Inquiries
         $res = $this->conn->query("SELECT inquiry_id FROM public_inquiries WHERE chapel_id = $id LIMIT 1");
         if ($res && $res->num_rows > 0) {
             throw new Exception("Cannot delete: There are public inquiries received for this chapel.");
-        }
-
-        // 7. Check for Schedules
-        $res = $this->conn->query("SELECT schedule_id FROM schedules WHERE chapel_id = $id LIMIT 1");
-        if ($res && $res->num_rows > 0) {
-            throw new Exception("Cannot delete: There are schedules assigned to this chapel.");
         }
 
         $this->conn->begin_transaction();

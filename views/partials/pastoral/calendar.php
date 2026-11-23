@@ -2113,7 +2113,9 @@ $isCathedralStaff = ($role === 'Staff' && empty($chapel_id));
             }
             if (typeof renderTimeline === 'function') {
                 var dInput = document.getElementById('timeline-date');
-                var curDate = dInput ? dInput.value : (new Date().toISOString().substring(0, 10));
+                var dNow = new Date();
+                var localToday = dNow.getFullYear() + '-' + String(dNow.getMonth() + 1).padStart(2, '0') + '-' + String(dNow.getDate()).padStart(2, '0');
+                var curDate = dInput ? dInput.value : localToday;
                 renderTimeline(curDate);
             }
         }

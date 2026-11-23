@@ -51,9 +51,29 @@ class RateLimiter
      */
     public static function hit(string $key, int $decaySeconds = 60): int
     {
-        $attempts = self::getAttempts($key, $decaySeconds);
+        $file = self::getFilePath($key);
+        $fh = @fopen($file, 'c+');
+        if ($fh === false) {
+            $attempts = self::getAttempts($key, $decaySeconds);
+            $attempts[] = time();
+            self::saveAttempts($key, $attempts);
+            return count($attempts);
+        }
+        flock($fh, LOCK_EX);
+        $raw = stream_get_contents($fh);
+        $decoded = is_string($raw) && $raw !== '' ? json_decode($raw, true) : [];
+        if (!is_array($decoded)) {
+            $decoded = [];
+        }
+        $cutoff = time() - $decaySeconds;
+        $attempts = array_values(array_filter($decoded, fn($t) => is_int($t) && $t >= $cutoff));
         $attempts[] = time();
-        self::saveAttempts($key, $attempts);
+        ftruncate($fh, 0);
+        rewind($fh);
+        fwrite($fh, json_encode($attempts));
+        fflush($fh);
+        flock($fh, LOCK_UN);
+        fclose($fh);
         return count($attempts);
     }
 
@@ -97,8 +117,15 @@ class RateLimiter
         if (!is_file($file)) {
             return [];
         }
-        $data = @file_get_contents($file);
-        if ($data === false) {
+        $fh = @fopen($file, 'r');
+        if ($fh === false) {
+            return [];
+        }
+        flock($fh, LOCK_SH);
+        $data = stream_get_contents($fh);
+        flock($fh, LOCK_UN);
+        fclose($fh);
+        if (!is_string($data) || $data === '') {
             return [];
         }
         $attempts = json_decode($data, true);
@@ -106,11 +133,7 @@ class RateLimiter
             return [];
         }
         $cutoff = time() - $decaySeconds;
-        $valid = array_values(array_filter($attempts, fn($t) => is_int($t) && $t >= $cutoff));
-        if (count($valid) !== count($attempts)) {
-            self::saveAttempts($key, $valid);
-        }
-        return $valid;
+        return array_values(array_filter($attempts, fn($t) => is_int($t) && $t >= $cutoff));
     }
 
     private static function saveAttempts(string $key, array $attempts): void

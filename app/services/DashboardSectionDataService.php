@@ -6,7 +6,6 @@ require_once __DIR__ . '/../models/Event.php';
 require_once __DIR__ . '/../models/SacramentalRecord.php';
 require_once __DIR__ . '/../models/AuditLogSection.php';
 require_once __DIR__ . '/../models/ParishInfo.php';
-require_once __DIR__ . '/../models/InsightPortfolio.php';
 require_once __DIR__ . '/DashboardExportService.php';
 
 class DashboardSectionDataService
@@ -18,7 +17,6 @@ class DashboardSectionDataService
     private SacramentalRecord $recordM;
     private AuditLogSection $auditM;
     private ParishInfo $parishInfoM;
-    private InsightPortfolio $insightPortfolioM;
     private DashboardExportService $exportService;
 
     public function __construct(
@@ -29,7 +27,6 @@ class DashboardSectionDataService
         SacramentalRecord $recordM,
         AuditLogSection $auditM,
         ParishInfo $parishInfoM,
-        InsightPortfolio $insightPortfolioM,
         DashboardExportService $exportService
     ) {
         $this->userM = $userM;
@@ -39,11 +36,10 @@ class DashboardSectionDataService
         $this->recordM = $recordM;
         $this->auditM = $auditM;
         $this->parishInfoM = $parishInfoM;
-        $this->insightPortfolioM = $insightPortfolioM;
         $this->exportService = $exportService;
     }
 
-    public function loadOverviewSectionData(array $data, ?int $chapelId = null): array
+    public function loadOverviewSectionData(array $data, int|string|null $chapelId = null): array
     {
         $data['stats'] = $this->buildDashboardStats((int) ($data['pending_count'] ?? 0), $chapelId);
         $data['upcoming'] = $this->eventM->getUpcoming(5, $chapelId);
@@ -318,7 +314,7 @@ class DashboardSectionDataService
         return $this->loadPriestScheduleSectionData($data, $userId);
     }
 
-    public function loadReportsSectionData(array $data, ?int $chapelId = null): array
+    public function loadReportsSectionData(array $data, int|string|null $chapelId = null): array
     {
         if (($_GET['export'] ?? '') === 'csv') {
             $this->exportService->streamReportCsv($_GET['from'] ?? '', $_GET['to'] ?? '', $chapelId);
@@ -356,33 +352,7 @@ class DashboardSectionDataService
         return $data;
     }
 
-    public function loadInsightsSectionData(array $data, ?int $chapelId = null): array
-    {
-        $scopeName = 'System-Wide';
-        if ($chapelId) {
-            $ch = $this->chapelM->getById($chapelId);
-            if ($ch) $scopeName = $ch['chapel_name'];
-        }
-
-        $data['intelligence'] = [
-            'scope_name' => $scopeName,
-            'venue_demand' => (array) $this->eventM->getVenueDemand($chapelId),
-            'pastor_load' => (array) $this->eventM->getPriestWorkload($chapelId),
-            'growth_ratio' => (array) $this->recordM->getBaptismFuneralRatio($chapelId),
-            'retention_stats' => (array) $this->recordM->getRetentionStats($chapelId),
-            'usage_stats' => (array) $this->eventM->getUsageStatsByVenue($chapelId),
-            'response_time' => (float) $this->eventM->getResponseTimeStats($chapelId),
-            'user_distribution' => (array) $this->userM->getRoleDistribution($chapelId),
-            'member_stats' => (array) $this->userM->getMemberStats($chapelId),
-            'account_growth' => (array) $this->userM->getGrowthFromLogs($chapelId),
-            'member_detailed' => (array) $this->userM->getDetailedMemberInsights($chapelId),
-        ];
-        $data['donation_stats'] = $this->donationM->getStats($chapelId);
-        $data['insight_portfolio'] = $this->insightPortfolioM->build($data['intelligence'], $data['donation_stats']);
-        return $data;
-    }
-
-    public function loadScheduleSectionData(array $data, string $scope, ?int $chapelId = null): array
+    public function loadScheduleSectionData(array $data, string $scope, int|string|null $chapelId = null): array
     {
         $evPage = (int) ($_GET['page'] ?? $_GET['ev_page'] ?? 1);
         $filters = [
@@ -419,13 +389,14 @@ class DashboardSectionDataService
         return $data;
     }
 
-    private function buildDashboardStats(int $pendingCount, ?int $chapelId = null): array
+    private function buildDashboardStats(int $pendingCount, int|string|null $chapelId = null): array
     {
+        $recCountId = ($chapelId === 'cathedral') ? 0 : (($chapelId !== null && (int)$chapelId < 0) ? -1 : $chapelId);
         return [
             'total_events' => $this->eventM->getCount($chapelId),
             'pending' => $this->eventM->getCountByStatus('Pending', $chapelId),
             'confirmed' => $this->eventM->getCountByStatus('Confirmed', $chapelId),
-            'total_records' => $this->recordM->getCount($chapelId),
+            'total_records' => $this->recordM->getCount($recCountId),
             'chapels_count' => $this->chapelM->countAll(),
             'users_count' => $this->userM->countAll($chapelId),
         ];

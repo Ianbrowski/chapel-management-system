@@ -11,30 +11,42 @@ class EventAnalyticsService
         $this->conn = $conn;
     }
 
-    public function getUpcoming(int $limit = 5, ?int $chapelId = null): array
+    private function appendChapelScope(string &$clause, array &$params, string &$types, int|string|null $chapelId, string $col = 'chapel_id'): void
+    {
+        if ($chapelId === null) {
+            return;
+        }
+        if ($chapelId === 'cathedral' || (is_numeric($chapelId) && (int)$chapelId === 0)) {
+            $clause .= " AND ({$col} IS NULL OR {$col} = 0)";
+        } elseif ((int)$chapelId < 0) {
+            $clause .= " AND 1 = 0";
+        } else {
+            $clause .= " AND {$col} = ?";
+            $params[] = (int)$chapelId;
+            $types .= 'i';
+        }
+    }
+
+    public function getUpcoming(int $limit = 5, int|string|null $chapelId = null): array
     {
         $upcoming = [];
-        if ($chapelId !== null) {
-            $stmt = $this->conn->prepare(
-                "SELECT e.title, e.event_type, e.start_time, IFNULL(c.chapel_name, e.chapel_location) as chapel_location, e.status, e.chapel_id
-                 FROM events e
-                 LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
-                 WHERE e.start_time >= NOW() AND e.chapel_id = ? AND e.is_archived = 0
-                   AND " . self::NON_CERT_E_SQL . "
-                 ORDER BY e.start_time ASC LIMIT ?"
-            );
-            $stmt->bind_param('ii', $chapelId, $limit);
-        } else {
-            $stmt = $this->conn->prepare(
-                "SELECT e.title, e.event_type, e.start_time, IFNULL(c.chapel_name, e.chapel_location) as chapel_location, e.status, e.chapel_id
-                 FROM events e
-                 LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
-                 WHERE e.start_time >= NOW() AND e.is_archived = 0
-                   AND " . self::NON_CERT_E_SQL . "
-                 ORDER BY e.start_time ASC LIMIT ?"
-            );
-            $stmt->bind_param('i', $limit);
+        $sql = "SELECT e.title, e.event_type, e.start_time, IFNULL(c.chapel_name, e.chapel_location) as chapel_location, e.status, e.chapel_id
+                FROM events e
+                LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
+                WHERE e.start_time >= NOW() AND e.is_archived = 0
+                  AND " . self::NON_CERT_E_SQL;
+        $params = [];
+        $types = '';
+        $this->appendChapelScope($sql, $params, $types, $chapelId, 'e.chapel_id');
+        $sql .= " ORDER BY e.start_time ASC LIMIT ?";
+        $params[] = $limit;
+        $types .= 'i';
+
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt) {
+            return $upcoming;
         }
+        $stmt->bind_param($types, ...$params);
         $stmt->execute();
         $res = $stmt->get_result();
         while ($r = $res->fetch_assoc()) {
@@ -44,7 +56,7 @@ class EventAnalyticsService
         return $upcoming;
     }
 
-    public function exportCsv(?string $from, ?string $to, ?int $chapelId = null): array
+    public function exportCsv(?string $from, ?string $to, int|string|null $chapelId = null): array
     {
         $sql = "SELECT e.*, IFNULL(c.chapel_name, e.chapel_location) as chapel_location, COALESCE(NULLIF(u.full_name, ''), u.user) as pastor_assigned
                 FROM events e
@@ -52,7 +64,7 @@ class EventAnalyticsService
                 LEFT JOIN users u ON e.pastor_id = u.id";
         $params = [];
         $types = '';
-        $where = ['e.is_archived = 0'];
+        $where = ['e.is_archived = 0', self::NON_CERT_E_SQL];
         if ($from) {
             $where[] = 'e.start_time >= ?';
             $params[] = $from . ' 00:00:00';
@@ -63,14 +75,8 @@ class EventAnalyticsService
             $params[] = $to . ' 23:59:59';
             $types .= 's';
         }
-        if ($chapelId !== null) {
-            $where[] = 'e.chapel_id = ?';
-            $params[] = $chapelId;
-            $types .= 'i';
-        }
-        if ($where) {
-            $sql .= ' WHERE ' . implode(' AND ', $where);
-        }
+        $sql .= ' WHERE ' . implode(' AND ', $where);
+        $this->appendChapelScope($sql, $params, $types, $chapelId, 'e.chapel_id');
         $sql .= ' ORDER BY e.start_time DESC';
 
         $events = [];
@@ -90,70 +96,38 @@ class EventAnalyticsService
         return $events;
     }
 
-    public function getChartTypes(?int $chapelId = null): array
+    public function getChartTypes(int|string|null $chapelId = null): array
     {
-        // Convert chapelId = 0 to null (0 represents Main Cathedral, which has NULL chapel_id)
-        if ($chapelId === 0) {
-            $chapelId = null;
-        }
-        
         $sql = "SELECT event_type, COUNT(*) as c FROM events WHERE is_archived = 0 AND " . self::NON_CERT_SQL;
         $params = [];
         $types = '';
-        if ($chapelId !== null) {
-            $sql .= " AND chapel_id = ?";
-            $params[] = $chapelId;
-            $types .= 'i';
-        }
+        $this->appendChapelScope($sql, $params, $types, $chapelId, 'chapel_id');
         $sql .= " GROUP BY event_type ORDER BY c DESC";
         return $this->fetchKeyedCounts($sql, 'event_type', 'Other', $params, $types);
     }
 
-    public function getChartStatus(?int $chapelId = null): array
+    public function getChartStatus(int|string|null $chapelId = null): array
     {
-        // Convert chapelId = 0 to null (0 represents Main Cathedral, which has NULL chapel_id)
-        if ($chapelId === 0) {
-            $chapelId = null;
-        }
-        
         $sql = "SELECT status, COUNT(*) as c FROM events WHERE is_archived = 0 AND " . self::NON_CERT_SQL;
         $params = [];
         $types = '';
-        if ($chapelId !== null) {
-            $sql .= " AND chapel_id = ?";
-            $params[] = $chapelId;
-            $types .= 'i';
-        }
+        $this->appendChapelScope($sql, $params, $types, $chapelId, 'chapel_id');
         $sql .= " GROUP BY status";
         return $this->fetchKeyedCounts($sql, 'status', 'Unknown', $params, $types);
     }
 
-    public function getChartMonthly(?int $chapelId = null): array
+    public function getChartMonthly(int|string|null $chapelId = null): array
     {
-        // Convert chapelId = 0 to null (0 represents Main Cathedral, which has NULL chapel_id)
-        if ($chapelId === 0) {
-            $chapelId = null;
-        }
-        
         $params = [];
         $types = '';
         $where = "WHERE is_archived = 0 AND " . self::NON_CERT_SQL . " AND start_time >= DATE_SUB(NOW(), INTERVAL 12 MONTH)";
-        if ($chapelId !== null) {
-            $where .= " AND chapel_id = ?";
-            $params[] = $chapelId;
-            $types .= 'i';
-        }
+        $this->appendChapelScope($where, $params, $types, $chapelId, 'chapel_id');
         $sql = "SELECT DATE_FORMAT(start_time,'%Y-%m') as ym, COUNT(*) as c FROM events $where GROUP BY ym ORDER BY ym ASC";
         return $this->fetchKeyedCounts($sql, 'ym', '', $params, $types);
     }
 
-    public function getPriestWorkload(?int $chapelId = null): array
+    public function getPriestWorkload(int|string|null $chapelId = null): array
     {
-        // Convert chapelId = 0 to null (0 represents Main Cathedral, which has NULL chapel_id)
-        if ($chapelId === 0) {
-            $chapelId = null;
-        }
-        
         $data = [];
         $params = [];
         $types = '';
@@ -161,11 +135,7 @@ class EventAnalyticsService
                 FROM users u
                 JOIN events e ON e.pastor_id = u.id
                 WHERE u.role = 'Priest' AND e.is_archived = 0";
-        if ($chapelId !== null) {
-            $sql .= " AND e.chapel_id = ?";
-            $params[] = $chapelId;
-            $types .= 'i';
-        }
+        $this->appendChapelScope($sql, $params, $types, $chapelId, 'e.chapel_id');
         $sql .= " GROUP BY u.id ORDER BY c DESC";
 
         $stmt = $this->conn->prepare($sql);
@@ -180,35 +150,21 @@ class EventAnalyticsService
         return $data;
     }
 
-    public function getVenueDemand(?int $chapelId = null): array
+    public function getVenueDemand(int|string|null $chapelId = null): array
     {
-        // Convert chapelId = 0 to null (0 represents Main Cathedral, which has NULL chapel_id)
-        if ($chapelId === 0) {
-            $chapelId = null;
-        }
-        
         $params = [];
         $types = '';
         $sql = "SELECT IFNULL(c.chapel_name, e.chapel_location) as label, COUNT(e.event_id) as value
                 FROM events e
                 LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
                 WHERE e.is_archived = 0";
-        if ($chapelId !== null) {
-            $sql .= " AND e.chapel_id = ?";
-            $params[] = $chapelId;
-            $types .= 'i';
-        }
+        $this->appendChapelScope($sql, $params, $types, $chapelId, 'e.chapel_id');
         $sql .= " GROUP BY label ORDER BY value DESC LIMIT 10";
         return $this->fetchRows($sql, $params, $types);
     }
 
-    public function getUsageStatsByVenue(?int $chapelId = null): array
+    public function getUsageStatsByVenue(int|string|null $chapelId = null): array
     {
-        // Convert chapelId = 0 to null (0 represents Main Cathedral, which has NULL chapel_id)
-        if ($chapelId === 0) {
-            $chapelId = null;
-        }
-        
         $confirmedStatus = 'Confirmed';
         $params = [$confirmedStatus];
         $types = 's';
@@ -216,30 +172,17 @@ class EventAnalyticsService
                 FROM events e
                 LEFT JOIN chapels c ON e.chapel_id = c.chapel_id
                 WHERE e.status = ? AND e.is_archived = 0";
-        if ($chapelId !== null) {
-            $sql .= " AND e.chapel_id = ?";
-            $params[] = $chapelId;
-            $types .= 'i';
-        }
+        $this->appendChapelScope($sql, $params, $types, $chapelId, 'e.chapel_id');
         $sql .= " GROUP BY chapel_location ORDER BY total_events DESC";
         return $this->fetchRows($sql, $params, $types);
     }
 
-    public function getResponseTimeStats(?int $chapelId = null): ?float
+    public function getResponseTimeStats(int|string|null $chapelId = null): ?float
     {
-        // Convert chapelId = 0 to null (0 represents Main Cathedral, which has NULL chapel_id)
-        if ($chapelId === 0) {
-            $chapelId = null;
-        }
-        
         $params = [];
         $types = '';
         $where = "WHERE approved_at IS NOT NULL AND is_archived = 0";
-        if ($chapelId !== null) {
-            $where .= " AND chapel_id = ?";
-            $params[] = $chapelId;
-            $types .= 'i';
-        }
+        $this->appendChapelScope($where, $params, $types, $chapelId, 'chapel_id');
 
         // First check if any records match
         $checkSql = "SELECT COUNT(*) as c FROM events $where";

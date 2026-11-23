@@ -149,11 +149,12 @@ $marginalNotes = $metadata['marginal_notes'] ?? '';
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/index.css?v=<?php echo time(); ?>">
-    <link rel="stylesheet" href="assets/css/workspace.css?v=2.5">
+    <?php $assetV = static fn(string $p): int => @filemtime(__DIR__ . '/../../' . $p) ?: 1; ?>
+    <link rel="stylesheet" href="assets/css/index.css?v=<?php echo $assetV('assets/css/index.css'); ?>">
+    <link rel="stylesheet" href="assets/css/workspace.css?v=<?php echo $assetV('assets/css/workspace.css'); ?>">
     <link rel="icon" type="image/x-icon" href="assets/img/2323.png">
     
-    <script src="assets/js/ph-geo-data.js?v=<?php echo time(); ?>"></script>
+    <script src="assets/js/ph-geo-data.js?v=<?php echo $assetV('assets/js/ph-geo-data.js'); ?>"></script>
     <script>
       (function () {
         const savedTheme = localStorage.getItem('theme') || localStorage.getItem('portalTheme') || 'dark';
@@ -709,6 +710,7 @@ $marginalNotes = $metadata['marginal_notes'] ?? '';
                 <input type="hidden" name="action" value="save_marriage_form">
                 <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf); ?>">
                 <input type="hidden" name="target_record_id" value="<?php echo $recordId; ?>">
+                <input type="hidden" name="chapel_id" value="<?php echo (int)($existingRecord['chapel_id'] ?? ($userChapel ?? 0)); ?>">
 
                 <!-- SECTION 1: Filing & Civil Registry Information -->
                 <div class="form-section-card">
@@ -1220,6 +1222,12 @@ $marginalNotes = $metadata['marginal_notes'] ?? '';
                         </label>
                         <textarea name="marginal_notes" id="in-marginal-notes" class="field-input" maxlength="500" style="height: 60px; resize: vertical;" placeholder="Notes, canonical dispensation, pre-cana seminars, etc." oninput="updateCharCount(this)"><?php echo htmlspecialchars($marginalNotes); ?></textarea>
                     </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+                    <button type="submit" class="btn-top-save" style="width:100%; justify-content:center; padding:10px 16px;">
+                        <i class="fa-solid fa-floppy-disk"></i> <?php echo $recordId > 0 ? 'Update Registry Record' : 'Save Marriage Record to Registry'; ?>
+                    </button>
                 </div>
             </form>
         </aside>

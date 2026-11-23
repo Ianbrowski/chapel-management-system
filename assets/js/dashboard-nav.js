@@ -6,7 +6,7 @@
 let dashboardHistory = [];
 let isNavigatingBack = false;
 let currentActiveSection = new URLSearchParams(window.location.search).get('section')
-    || (window.location.pathname.match(/\/dashboard\/([^/?#]+)/)?.[1] || 'overview');
+    || (window.location.pathname.match(/\/dashboard\/([^/?#]+)/)?.[1] || 'events');
 
 async function navigateToSection(id, pushState = true, extraQuery = '') {
     if (id === 'cathedral') id = 'schedule_cathedral';
@@ -20,7 +20,7 @@ async function navigateToSection(id, pushState = true, extraQuery = '') {
             el = document.querySelector('.nav-item[data-section="schedule_cathedral"]') || document.querySelector('.nav-item[data-section="cathedral"]');
         } else if (id === 'schedule_chapel' || id === 'records_chapel') {
             el = document.querySelector('.nav-item[data-section="schedule_chapel"]') || document.querySelector('.nav-item[data-section="chapels"]');
-        } else if (['users', 'chapels', 'services', 'parish_info', 'backups', 'settings', 'reports', 'insights'].includes(id)) {
+        } else if (['users', 'chapels', 'services', 'parish_info', 'backups', 'settings', 'reports'].includes(id)) {
             el = document.querySelector('.nav-item[data-section="settings"]');
         }
     }
@@ -137,8 +137,8 @@ async function navigateToSection(id, pushState = true, extraQuery = '') {
                 await loadScriptAsync(s.src);
             } else if (s.textContent.trim()) {
                 try {
-                    // Convert top-level let/const declarations to var so re-navigation doesn't trigger SyntaxError
-                    const code = s.textContent.replace(/^(const|let)\s+/gm, 'var ');
+                    // Convert indented or top-level let/const declarations to var so re-navigation doesn't trigger SyntaxError
+                    const code = s.textContent.replace(/^\s*(const|let)\s+/gm, 'var ');
                     (0, eval)(code);
                 } catch (e) {
                     console.warn('Notice executing section script for ' + id + ':', e);
@@ -160,6 +160,9 @@ async function navigateToSection(id, pushState = true, extraQuery = '') {
         
         // Re-init section-specific components
         reinitializeSectionComponents(id);
+        if (pushState) {
+            window.scrollTo({ top: 0, behavior: 'auto' });
+        }
 
     } catch (err) {
         console.error('Failed to load partial page', err);
@@ -207,11 +210,13 @@ function reinitializeSectionComponents(id) {
         }
     }
 
-    // 2. Overview Calendar & Agenda
-    if (id === 'overview') {
+    // 2. Overview & Events Calendar & Agenda
+    if (id === 'overview' || id === 'events') {
         if (typeof renderOvCalendar === 'function' && document.getElementById('ov-cal-grid')) {
             renderOvCalendar();
-            const todayStr = typeof localDateKey === 'function' ? localDateKey() : new Date().toISOString().substring(0, 10);
+            const dNow = new Date();
+            const localToday = dNow.getFullYear() + '-' + String(dNow.getMonth() + 1).padStart(2, '0') + '-' + String(dNow.getDate()).padStart(2, '0');
+            const todayStr = typeof localDateKey === 'function' ? localDateKey() : localToday;
             if (typeof ovShowAgenda === 'function') {
                 ovShowAgenda(todayStr);
             }
@@ -227,7 +232,7 @@ function reinitializeSectionComponents(id) {
 
     // 4. Cathedral & Chapel Schedule Auto-Selection
     if (id === 'schedule_cathedral' || id === 'schedule_chapel') {
-        const firstRow = document.querySelector('.record-row');
+        const firstRow = document.querySelector('.sched-row, .record-row');
         if (firstRow && typeof showEventDetails === 'function') {
             const evData = firstRow.getAttribute('data-event') || firstRow.dataset.event;
             if (evData) {
@@ -371,8 +376,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.addEventListener('click', function(e) {
-        const tabLink = e.target.closest('.settings-tab-link[data-section]');
+        const tabLink = e.target.closest('.settings-tab-link[data-section], .cmd-item[href]');
         if (tabLink) {
+            if (tabLink.classList.contains('cmd-item')) {
+                const rawHref = tabLink.getAttribute('href') || '';
+                const urlObj = new URL(rawHref, window.location.href);
+                const qSec = urlObj.searchParams.get('section');
+                const pathMatch = urlObj.pathname.match(/\/dashboard\/([^/?#]+)/);
+                const targetSec = qSec || (pathMatch ? pathMatch[1] : null);
+                if (targetSec) {
+                    e.preventDefault();
+                    urlObj.searchParams.delete('section');
+                    if (typeof closeCommandPalette === 'function') closeCommandPalette();
+                    navigateToSection(targetSec, true, urlObj.searchParams.toString());
+                }
+                return;
+            }
             e.preventDefault();
             const section = tabLink.dataset.section;
             if (section) navigateToSection(section, true);
@@ -395,7 +414,7 @@ window.addEventListener('popstate', function(e) {
                 section = pathParts[dashIdx + 1];
             }
         }
-        navigateToSection(section || 'overview', false);
+        navigateToSection(section || 'events', false);
     }
 });
 

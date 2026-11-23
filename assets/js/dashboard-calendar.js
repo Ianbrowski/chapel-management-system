@@ -291,7 +291,9 @@ function selectChapelFilter(filterId) {
         renderCalendar(calYear, calMonth);
     }
     if (typeof renderTimeline === 'function') {
-        const curDate = calSelectedDate || (new Date().toISOString().substring(0, 10));
+        const dNow = new Date();
+        const localToday = dNow.getFullYear() + '-' + String(dNow.getMonth() + 1).padStart(2, '0') + '-' + String(dNow.getDate()).padStart(2, '0');
+        const curDate = calSelectedDate || localToday;
         renderTimeline(curDate);
     }
     if (typeof renderOvCalendar === 'function') {

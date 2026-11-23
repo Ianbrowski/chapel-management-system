@@ -84,6 +84,10 @@ try {
         exit();
     }
 
+    if (($_REQUEST['action'] ?? '') !== 'mark_read' && session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+
     // Action: Mark notification as read (POST + CSRF required)
     if (($_REQUEST['action'] ?? '') === 'mark_read') {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {

@@ -15,6 +15,9 @@ if (!isset($_SESSION['user_id'])) {
 $sessionRole = $_SESSION['role'] ?? 'Staff';
 $sessionChapelId = $_SESSION['chapel_id'] ?? null;
 $isAdmin = in_array($sessionRole, ['Admin', 'Cathedral Admin']);
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
 
 $venue = $_GET['venue'] ?? null;
 $venueId = ($venue === '0' || $venue === '' || $venue === null || $venue === 'null') ? null : (int)$venue;
@@ -30,8 +33,10 @@ if (!$date) {
     exit;
 }
 
-$isStaffOrClergy = in_array($sessionRole, ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff', 'Priest'], true);
+$isStaffOrClergy = in_array($sessionRole, ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff', 'Priest', 'Pastor'], true);
 $venueId = ($venue === '0' || $venue === '' || $venue === null || $venue === 'null') ? null : (int)$venue;
+$reqVidInt = $venueId ?? 0;
+$canViewTitles = $isAdmin || ($isStaffOrClergy && (($sessionChapelId === null || (int)$sessionChapelId === 0) ? $reqVidInt === 0 : (int)$sessionChapelId === $reqVidInt));
 
 $eventModel = new Event($conn);
 
@@ -76,7 +81,7 @@ while ($row = $res->fetch_assoc()) {
     $row['duration'] = $eventModel->getEventDuration($row['event_type'], $row['custom_duration']);
     $hour = (int)date('H', strtotime($row['start_time']));
     $row['slot'] = ($hour < 12) ? 'Morning' : 'Afternoon';
-    if (!$isStaffOrClergy) {
+    if (!$canViewTitles) {
         $row['title'] = 'Reserved Sanctuary Slot';
     }
     $events[] = $row;

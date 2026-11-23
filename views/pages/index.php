@@ -61,10 +61,6 @@ try {
         header("Location: index.php");
         exit();
     }
-
-    require_once __DIR__ . '/../../app/controllers/BaseController.php';
-    $base = new BaseController($conn, false);
-    $csrf = $base->generateCsrf();
 } catch (Throwable $e) {
     require_once __DIR__ . '/../../app/helpers/error_debug.php';
     cms_store_exception($e);
@@ -83,9 +79,10 @@ try {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" type="text/css" href="assets/css/fonts.css?v=<?php echo time(); ?>">
-    <link rel="stylesheet" type="text/css" href="assets/css/theme.css?v=<?php echo time(); ?>">
-    <link rel="stylesheet" type="text/css" href="assets/css/index.css?v=<?php echo time(); ?>">
+    <?php $assetVer = static fn(string $p): int => @filemtime(__DIR__ . '/../../' . $p) ?: 1; ?>
+    <link rel="stylesheet" type="text/css" href="assets/css/fonts.css?v=<?php echo $assetVer('assets/css/fonts.css'); ?>">
+    <link rel="stylesheet" type="text/css" href="assets/css/theme.css?v=<?php echo $assetVer('assets/css/theme.css'); ?>">
+    <link rel="stylesheet" type="text/css" href="assets/css/index.css?v=<?php echo $assetVer('assets/css/index.css'); ?>">
     <link rel="icon" type="image/x-icon" href="assets/img/2323.png">
     <script>
       (function () {
@@ -725,7 +722,14 @@ function openRequirementsModal(srv) {
     if (srv.requirements && srv.requirements.length > 0) {
         srv.requirements.forEach(r => {
             const li = document.createElement('li');
-            li.innerHTML = `<strong>${r.requirement}</strong>${r.description ? ` <span>— ${r.description}</span>` : ''}`;
+            const strong = document.createElement('strong');
+            strong.textContent = r.requirement || '';
+            li.appendChild(strong);
+            if (r.description) {
+                const span = document.createElement('span');
+                span.textContent = ' — ' + r.description;
+                li.appendChild(span);
+            }
             list.appendChild(li);
         });
     } else {
@@ -1086,7 +1090,7 @@ document.addEventListener('keydown', function(e) {
                 <div>
                     <?php if (!empty($leadership['bishop'])): ?>
                     <div class="clergy-profile-card">
-                        <img class="clergy-avatar" src="<?php echo !empty($leadership['bishop']['image_path']) ? 'storage/'.$leadership['bishop']['image_path'] : 'assets/img/2323.png'; ?>" alt="Bishop">
+                        <img class="clergy-avatar" src="<?php echo htmlspecialchars(!empty($leadership['bishop']['image_path']) ? 'storage/'.$leadership['bishop']['image_path'] : 'assets/img/2323.png', ENT_QUOTES, 'UTF-8'); ?>" alt="Bishop">
                         <div class="clergy-info">
                             <h4><?php echo htmlspecialchars($leadership['bishop']['name']); ?></h4>
                             <p><?php echo htmlspecialchars($leadership['bishop']['title']); ?></p>
@@ -1096,7 +1100,7 @@ document.addEventListener('keydown', function(e) {
 
                     <?php if (!empty($leadership['parish_priest'])): ?>
                     <div class="clergy-profile-card">
-                        <img class="clergy-avatar" src="<?php echo !empty($leadership['parish_priest']['image_path']) ? 'storage/'.$leadership['parish_priest']['image_path'] : 'assets/img/2323.png'; ?>" alt="Parish Priest">
+                        <img class="clergy-avatar" src="<?php echo htmlspecialchars(!empty($leadership['parish_priest']['image_path']) ? 'storage/'.$leadership['parish_priest']['image_path'] : 'assets/img/2323.png', ENT_QUOTES, 'UTF-8'); ?>" alt="Parish Priest">
                         <div class="clergy-info">
                             <h4><?php echo htmlspecialchars($leadership['parish_priest']['name']); ?></h4>
                             <p><?php echo htmlspecialchars($leadership['parish_priest']['title']); ?></p>
@@ -1106,7 +1110,7 @@ document.addEventListener('keydown', function(e) {
 
                     <?php foreach ($cathedralClergy as $ccl): ?>
                     <div class="clergy-profile-card">
-                        <img class="clergy-avatar" src="<?php echo !empty($ccl['image_path']) ? 'storage/'.$ccl['image_path'] : 'assets/img/2323.png'; ?>" alt="Cathedral Canon">
+                        <img class="clergy-avatar" src="<?php echo htmlspecialchars(!empty($ccl['image_path']) ? 'storage/'.$ccl['image_path'] : 'assets/img/2323.png', ENT_QUOTES, 'UTF-8'); ?>" alt="Cathedral Canon">
                         <div class="clergy-info">
                             <h4><?php echo htmlspecialchars($ccl['name']); ?></h4>
                             <p><?php echo htmlspecialchars($ccl['title']); ?></p>
@@ -1296,7 +1300,7 @@ document.addEventListener('keydown', function(e) {
             <?php else: ?>
                 <?php foreach($custom_merch as $item): ?>
                 <div class="merch-item" data-item="<?php echo htmlspecialchars(json_encode($item, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>" onclick="openMerchModal(this)">
-                    <img src="<?php echo $item['photo_path'] ?: 'assets/img/2323.png'; ?>" class="merch-img" alt="<?php echo htmlspecialchars($item['name']); ?>">
+                    <img src="<?php echo htmlspecialchars(!empty($item['photo_path']) ? $item['photo_path'] : 'assets/img/2323.png', ENT_QUOTES, 'UTF-8'); ?>" class="merch-img" alt="<?php echo htmlspecialchars($item['name']); ?>">
                     <div class="merch-info">
                         <h5><?php echo htmlspecialchars($item['name']); ?></h5>
                         <p style="color:var(--gold); font-weight:700; font-size:1.05rem; margin:0;">₱<?php echo number_format($item['price'], 2); ?></p>
@@ -1623,7 +1627,7 @@ document.addEventListener('keydown', function(e) {
     <i id="themeToggleIcon" class="fa-regular fa-sun"></i>
 </button>
 
-<script src="assets/js/three.min.js"></script>
+<script src="assets/js/three.min.js" defer></script>
 <script>
     function toggleLogin(show) {
         openLoginModal();
@@ -1888,13 +1892,22 @@ document.addEventListener('keydown', function(e) {
         const titleEl = document.getElementById('cModalTitle');
         if (titleEl) titleEl.innerText = chapel.chapel_name || 'Community Chapel';
         const patronEl = document.getElementById('cModalPatron');
-        if (patronEl) patronEl.innerHTML = '<i class="fa-solid fa-cross"></i> ' + (chapel.patron_saint && chapel.patron_saint.trim() ? chapel.patron_saint : 'Diocesan Patron');
+        if (patronEl) {
+            patronEl.innerHTML = '<i class="fa-solid fa-cross"></i> ';
+            patronEl.appendChild(document.createTextNode(chapel.patron_saint && chapel.patron_saint.trim() ? chapel.patron_saint : 'Diocesan Patron'));
+        }
         const capEl = document.getElementById('cModalCapacity');
-        if (capEl) capEl.innerHTML = '<i class="fa-solid fa-chair"></i> Seating: ' + (chapel.seating_capacity ? chapel.seating_capacity + ' worshippers' : '50 worshippers');
+        if (capEl) {
+            capEl.innerHTML = '<i class="fa-solid fa-chair"></i> Seating: ';
+            capEl.appendChild(document.createTextNode(chapel.seating_capacity ? chapel.seating_capacity + ' worshippers' : '50 worshippers'));
+        }
         const schedEl = document.getElementById('cModalSchedule');
-        if (schedEl) schedEl.innerHTML = '<strong>Sunday Holy Service:</strong> ' + (chapel.sunday_service_time || 'Check Parish Schedule');
+        if (schedEl) {
+            schedEl.innerHTML = '<strong>Sunday Holy Service:</strong> ';
+            schedEl.appendChild(document.createTextNode(chapel.sunday_service_time || 'Check Parish Schedule'));
+        }
         const locEl = document.getElementById('cModalLocation');
-        if (locEl) locEl.innerHTML = chapel.location && chapel.location.trim() ? chapel.location : 'Located within the Cathedral Parish territorial vicinity. Contact the Parish Office for guidance.';
+        if (locEl) locEl.textContent = chapel.location && chapel.location.trim() ? chapel.location : 'Located within the Cathedral Parish territorial vicinity. Contact the Parish Office for guidance.';
         
         const headerEl = document.getElementById('cModalHeader');
         if (headerEl) headerEl.style.background = 'linear-gradient(90deg, var(--gold, #c9a84c), #ffd700)';

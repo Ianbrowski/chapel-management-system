@@ -16,7 +16,6 @@ switch ($active_section) {
     case 'schedule_audit':     include BASE_PATH . '/views/partials/pastoral/calendar.php'; break;
     case 'my_profile':         include BASE_PATH . '/views/partials/dashboard/profile.php'; break;
     case 'bulletin':           include BASE_PATH . '/views/partials/dashboard/bulletin.php'; break;
-    // case 'tickets': REMOVED per revision #14
     
     // Finance
     case 'donations':          include BASE_PATH . '/views/partials/finance/donations.php'; break;
@@ -52,7 +51,6 @@ switch ($active_section) {
     case 'parish_info':
     case 'backups':
     case 'reports':
-    case 'insights':
         include BASE_PATH . '/views/partials/management/settings_hub.php';
         break;
 

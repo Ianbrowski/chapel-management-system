@@ -196,40 +196,16 @@ class User {
             throw new Exception("Cannot delete: This user has voided donation transactions.");
         }
 
-        // 5. Tickets requested by the user
-        $res = $this->conn->query("SELECT ticket_id FROM tickets WHERE requester_id = $id LIMIT 1");
-        if ($res && $res->num_rows > 0) {
-            throw new Exception("Cannot delete: This user has requested tickets/inquiries.");
-        }
-
-        // 6. Tickets assigned to the user
-        $res = $this->conn->query("SELECT ticket_id FROM tickets WHERE assigned_to = $id LIMIT 1");
-        if ($res && $res->num_rows > 0) {
-            throw new Exception("Cannot delete: This staff member has tickets assigned to them.");
-        }
-
-        // 7. Comments left on tickets
-        $res = $this->conn->query("SELECT comment_id FROM ticket_comments WHERE user_id = $id LIMIT 1");
-        if ($res && $res->num_rows > 0) {
-            throw new Exception("Cannot delete: This user has commented on tickets.");
-        }
-
-        // 8. Sacramental records encoded by the user
+        // 5. Sacramental records encoded by the user
         $res = $this->conn->query("SELECT record_id FROM sacramental_records WHERE encoded_by = $id LIMIT 1");
         if ($res && $res->num_rows > 0) {
             throw new Exception("Cannot delete: This user has encoded sacramental records.");
         }
 
-        // 9. Sacramental records updated by the user
+        // 6. Sacramental records updated by the user
         $res = $this->conn->query("SELECT record_id FROM sacramental_records WHERE updated_by = $id LIMIT 1");
         if ($res && $res->num_rows > 0) {
             throw new Exception("Cannot delete: This user has updated sacramental records.");
-        }
-
-        // 10. Schedules assigned to the user as a pastor
-        $res = $this->conn->query("SELECT schedule_id FROM schedules WHERE pastor_id = $id LIMIT 1");
-        if ($res && $res->num_rows > 0) {
-            throw new Exception("Cannot delete: This priest has active schedules assigned.");
         }
 
         $this->conn->begin_transaction();
@@ -372,11 +348,19 @@ class User {
         return $res ? (int)($res->fetch_assoc()['c'] ?? 0) : 0;
     }
 
-    public function countAll(?int $chapelId = null) {
+    public function countAll(int|string|null $chapelId = null) {
         if ($chapelId !== null) {
+            if ($chapelId === 'cathedral' || (is_numeric($chapelId) && (int)$chapelId === 0)) {
+                $res = $this->conn->query('SELECT COUNT(*) as c FROM users WHERE (chapel_id IS NULL OR chapel_id = 0)');
+                return $res ? ($res->fetch_assoc()['c'] ?? 0) : 0;
+            }
+            if ((int)$chapelId < 0) {
+                return 0;
+            }
+            $cid = (int)$chapelId;
             $stmt = $this->prepareStmt('SELECT COUNT(*) as c FROM users WHERE chapel_id = ?');
             if (!$stmt) return 0;
-            $stmt->bind_param('i', $chapelId);
+            $stmt->bind_param('i', $cid);
             $stmt->execute();
             return $stmt->get_result()->fetch_assoc()['c'] ?? 0;
         }

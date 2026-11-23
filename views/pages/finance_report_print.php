@@ -13,10 +13,14 @@ if (!in_array($_role, ['Admin','Cathedral Admin','Chapel Admin'])) {
     exit();
 }
 
-$userChapelId = !in_array($_role, ['Admin', 'Cathedral Admin'], true) ? (int)($_SESSION['chapel_id'] ?? 0) : null;
-$whereDonation = $userChapelId ? " AND d.chapel_id = $userChapelId" : "";
-$whereRecord = $userChapelId ? " AND sr.chapel_id = $userChapelId" : "";
-$whereEvent = $userChapelId ? " AND e.chapel_id = $userChapelId" : "";
+$userChapelId = null;
+if (!in_array($_role, ['Admin', 'Cathedral Admin'], true)) {
+    $rawChapel = (int)($_SESSION['chapel_id'] ?? 0);
+    $userChapelId = ($rawChapel > 0) ? $rawChapel : -1;
+}
+$whereDonation = ($userChapelId !== null) ? " AND d.chapel_id = " . (int)$userChapelId : "";
+$whereRecord   = ($userChapelId !== null) ? " AND sr.chapel_id = " . (int)$userChapelId : "";
+$whereEvent    = ($userChapelId !== null) ? " AND e.chapel_id = " . (int)$userChapelId : "";
 
 $from = (isset($_GET['from']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['from'])) ? $_GET['from'] : date('Y-m-01');
 $to   = (isset($_GET['to']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['to'])) ? $_GET['to'] : date('Y-m-d');
@@ -64,14 +68,14 @@ function fetch_all_params($conn, $sql, $params) {
 // Existing Breakdowns
 $events_by_type = fetch_all_params($conn, "SELECT event_type, COUNT(*) as cnt FROM events e WHERE start_time BETWEEN ? AND ? AND is_archived=0 $whereEvent GROUP BY event_type ORDER BY cnt DESC", [$p1, $p2]);
 $events_by_status = fetch_all_params($conn, "SELECT status, COUNT(*) as cnt FROM events e WHERE start_time BETWEEN ? AND ? AND is_archived=0 $whereEvent GROUP BY status ORDER BY cnt DESC", [$p1, $p2]);
-$donations_breakdown = fetch_all_params($conn, "SELECT COALESCE(c.chapel_name, 'Main Cathedral') as chapel, payment_method, SUM(amount) as total, COUNT(*) as cnt FROM donations d LEFT JOIN chapels c ON d.chapel_id = c.chapel_id WHERE date_received BETWEEN ? AND ? AND d.is_archived=0 $whereDonation GROUP BY d.chapel_id, payment_method ORDER BY total DESC", [$from, $to]);
-$merch_breakdown = $userChapelId ? [] : fetch_all_params($conn, "SELECT mi.name, SUM(ms.quantity) as qty, SUM(ms.total_price) as total FROM merchandise_sales ms JOIN merchandise_items mi ON ms.item_id = mi.id WHERE sale_date BETWEEN ? AND ? GROUP BY ms.item_id ORDER BY total DESC", [$p1, $p2]);
+$donations_breakdown = fetch_all_params($conn, "SELECT COALESCE(c.chapel_name, 'Main Cathedral') as chapel, payment_method, SUM(amount) as total, COUNT(*) as cnt FROM donations d LEFT JOIN chapels c ON d.chapel_id = c.chapel_id WHERE date_received BETWEEN ? AND ? AND d.is_archived=0 $whereDonation GROUP BY d.chapel_id, c.chapel_name, payment_method ORDER BY total DESC", [$from, $to]);
+$merch_breakdown = $userChapelId ? [] : fetch_all_params($conn, "SELECT mi.name, SUM(ms.quantity) as qty, SUM(ms.total_price) as total FROM merchandise_sales ms JOIN merchandise_items mi ON ms.item_id = mi.id WHERE sale_date BETWEEN ? AND ? GROUP BY ms.item_id, mi.name ORDER BY total DESC", [$p1, $p2]);
 $records_breakdown = fetch_all_params($conn, "SELECT record_type, COUNT(*) as cnt FROM sacramental_records sr WHERE date_added BETWEEN ? AND ? AND is_archived=0 $whereRecord GROUP BY record_type ORDER BY cnt DESC", [$p1, $p2]);
 
 // Analytics
 $top_donors = fetch_all_params($conn, "SELECT donor_name, SUM(amount) as total FROM donations d WHERE date_received BETWEEN ? AND ? AND is_archived=0 $whereDonation GROUP BY donor_name ORDER BY total DESC LIMIT 10", [$from, $to]);
 $voided_donations = fetch_all_params($conn, "SELECT donor_name, amount, date_received, void_reason FROM donations d WHERE is_archived=1 AND date_received BETWEEN ? AND ? $whereDonation ORDER BY date_received DESC", [$from, $to]);
-$ticketSql = $userChapelId ? "SELECT status, COUNT(*) as cnt FROM tickets WHERE created_at BETWEEN ? AND ? AND chapel_id = $userChapelId GROUP BY status" : "SELECT status, COUNT(*) as cnt FROM tickets WHERE created_at BETWEEN ? AND ? GROUP BY status";
+$ticketSql = $userChapelId ? "SELECT status, COUNT(*) as cnt FROM public_inquiries WHERE created_at BETWEEN ? AND ? AND chapel_id = $userChapelId GROUP BY status" : "SELECT status, COUNT(*) as cnt FROM public_inquiries WHERE created_at BETWEEN ? AND ? GROUP BY status";
 $tickets_status = fetch_all_params($conn, $ticketSql, [$p1, $p2]);
 $auditSql = $userChapelId
     ? "SELECT al.performed_by_name, al.action, al.module, COUNT(*) as cnt FROM audit_logs al JOIN users u ON al.performed_by_id = u.id WHERE al.created_at BETWEEN ? AND ? AND u.chapel_id = $userChapelId GROUP BY al.performed_by_name, al.action, al.module ORDER BY cnt DESC LIMIT 15"
@@ -133,13 +137,6 @@ $overall_grand_total = ($overall['total_donations_all'] ?? 0) + ($overall['total
             box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
             outline: none;
             transition: box-shadow 0.15s ease;
-        }
-        .paper-sheet[contenteditable="true"]:focus {
-            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18), 0 0 0 2px rgba(201, 168, 76, 0.55);
-        }
-        .paper-sheet[contenteditable="true"] *:hover {
-            outline: 1px dashed rgba(201, 168, 76, 0.45);
-            outline-offset: 2px;
         }
         .header { text-align: center; margin-bottom: 26px; border-bottom: 2px solid #1e293b; padding-bottom: 16px; }
         .header h1 { font-family: 'Cinzel', serif; font-size: 22px; color: #b8882a; margin: 0 0 6px; }
@@ -305,15 +302,7 @@ $overall_grand_total = ($overall['total_donations_all'] ?? 0) + ($overall['total
             <i class="fa-solid fa-sliders"></i>
             <span>Print &amp; Report Studio</span>
         </h3>
-        <p class="config-subtitle">Toggle sections or click directly on the paper to edit text before printing.</p>
-
-        <div class="edit-mode-box">
-            <label>
-                <input type="checkbox" id="toggle-paper-edit" checked onchange="togglePaperEdit(this.checked)">
-                <span>Editable Paper Mode</span>
-            </label>
-            <p class="edit-mode-hint">Click any heading, date, amount, or label on the sheet to customize it.</p>
-        </div>
+        <p class="config-subtitle">Toggle report sections before printing. Financial figures are locked to database totals.</p>
         
         <div class="config-options">
             <label><input type="checkbox" class="sec-toggle" data-target="sec-revenue" checked> Revenue Summary</label>
@@ -325,7 +314,7 @@ $overall_grand_total = ($overall['total_donations_all'] ?? 0) + ($overall['total
             <label><input type="checkbox" class="sec-toggle" data-target="sec-events" checked> Events &amp; Records Summary</label>
             <label><input type="checkbox" class="sec-toggle" data-target="sec-records-ledger" checked> Sacramental Records Ledger</label>
             <label><input type="checkbox" class="sec-toggle" data-target="sec-certs-ledger" checked> Certificate Issuances</label>
-            <label><input type="checkbox" class="sec-toggle" data-target="sec-tickets-voids" checked> Tickets &amp; Voided Ledger</label>
+            <label><input type="checkbox" class="sec-toggle" data-target="sec-tickets-voids" checked> Inquiries &amp; Voided Ledger</label>
             <label><input type="checkbox" class="sec-toggle" data-target="sec-staff-activity" checked> Staff Activity Logs</label>
             <label><input type="checkbox" class="sec-toggle" data-target="sec-overall" checked> All-Time Overall Stats</label>
         </div>
@@ -337,15 +326,14 @@ $overall_grand_total = ($overall['total_donations_all'] ?? 0) + ($overall['total
             </div>
             <button type="button" class="btn-tb btn-tb-primary" onclick="window.print()">Print Selected Report</button>
             <div class="config-actions-row">
-                <button type="button" class="btn-tb btn-tb-ghost" onclick="resetPaperEdits()">Reset Edits</button>
                 <button type="button" class="btn-tb btn-tb-ghost" onclick="try { window.close(); } catch(e){} setTimeout(() => { window.location.href = '../../dashboard.php?section=reports'; }, 100);">Close</button>
             </div>
         </div>
     </aside>
 
-    <!-- ── Editable Paper Sheet Preview ── -->
+    <!-- ── Report Paper Sheet Preview ── -->
     <main class="paper-workspace">
-        <div class="paper-sheet" id="report-paper" contenteditable="true" spellcheck="false">
+        <div class="paper-sheet" id="report-paper">
 
     <!-- ── Report Header ── -->
     <div class="header">
@@ -636,13 +624,13 @@ $overall_grand_total = ($overall['total_donations_all'] ?? 0) + ($overall['total
         <?php endif; ?>
     </div>
 
-    <!-- ── 8. Tickets & Voided Donations ── -->
+    <!-- ── 8. Public Inquiries & Voided Donations ── -->
     <div id="sec-tickets-voids" class="report-block">
         <div class="two-col-tables" style="margin-top: 20px;">
             <div>
-                <div class="section-title" style="margin-top: 0;">Tickets / Inquiries</div>
+                <div class="section-title" style="margin-top: 0;">Public Inquiries</div>
                 <?php if (empty($tickets_status)): ?>
-                    <p style="font-size:13px; color:#94a3b8;">No tickets created in this period.</p>
+                    <p style="font-size:13px; color:#94a3b8;">No inquiries submitted in this period.</p>
                 <?php else: ?>
                 <table>
                     <thead>
@@ -739,22 +727,6 @@ $overall_grand_total = ($overall['total_donations_all'] ?? 0) + ($overall['total
 </div><!-- /.print-studio-layout -->
 
     <script>
-    const originalPaperHtml = document.getElementById('report-paper')?.innerHTML || '';
-
-    function togglePaperEdit(enabled) {
-        const paper = document.getElementById('report-paper');
-        if (paper) {
-            paper.setAttribute('contenteditable', enabled ? 'true' : 'false');
-        }
-    }
-
-    function resetPaperEdits() {
-        const paper = document.getElementById('report-paper');
-        if (paper && originalPaperHtml) {
-            paper.innerHTML = originalPaperHtml;
-            document.querySelectorAll('.sec-toggle').forEach(cb => applyToggle(cb));
-        }
-    }
     function toggleAllSections(checkAll) {
         document.querySelectorAll('.sec-toggle').forEach(cb => {
             cb.checked = checkAll;

@@ -67,6 +67,33 @@ class BaseController {
         $this->userId = $_SESSION['user_id'];
         $this->role   = $_SESSION['role'] ?? 'Staff';
         $this->chapelId = $_SESSION['chapel_id'] ?? null;
+
+        // Re-verify live account status/role/chapel on active non-Guest sessions so rejections/demotions apply immediately
+        if ((int)$this->userId > 0 && $this->conn instanceof mysqli) {
+            try {
+                $stAuth = @$this->conn->prepare("SELECT role, chapel_id, status, is_archived FROM users WHERE id = ? LIMIT 1");
+                if ($stAuth) {
+                    $uid = (int)$this->userId;
+                    $stAuth->bind_param('i', $uid);
+                    $stAuth->execute();
+                    $uRow = $stAuth->get_result()->fetch_assoc();
+                    $stAuth->close();
+                    $uStatus = strtolower(trim((string)($uRow['status'] ?? 'active')));
+                    if (!$uRow || $uStatus !== 'active' || !empty($uRow['is_archived'])) {
+                        $_SESSION = [];
+                        if (session_status() === PHP_SESSION_ACTIVE) session_destroy();
+                        $this->respondSessionExpired();
+                    }
+                    $this->role = (string)$uRow['role'];
+                    $this->chapelId = $uRow['chapel_id'] !== null ? (int)$uRow['chapel_id'] : null;
+                    $_SESSION['role'] = $this->role;
+                    $_SESSION['chapel_id'] = $this->chapelId;
+                }
+            } catch (Throwable $e) {
+                // Keep session fallback when DB object is a non-connected stub in offline tests
+            }
+        }
+
         $this->initPermissions();
     }
 
@@ -131,7 +158,7 @@ class BaseController {
         switch ($this->role) {
             case 'Staff':
                 // Sensitive governance resources blocked from staff
-                if (in_array($resource, ['backups', 'users', 'settings', 'reports', 'insights', 'audit_log', 'schedule_audit'], true)) {
+                if (in_array($resource, ['backups', 'users', 'settings', 'reports', 'audit_log', 'schedule_audit'], true)) {
                     return false;
                 }
                 if ($action === 'delete') return false; // Maker-Checker: Staff cannot delete critical records
@@ -211,6 +238,23 @@ class BaseController {
         return $this->chapelId;
     }
 
+    /**
+     * Resolve strict chapel scope filter for scoped queries:
+     * - null: Global Admin / Cathedral Admin (unrestricted unless filtered)
+     * - int > 0: Assigned branch chapel ID
+     * - 'cathedral': Cathedral-scoped non-admin role (Staff/Priest at Main Cathedral)
+     * - -1: Fail-closed sentinel for Chapel Admin missing an assigned chapel_id
+     */
+    protected function resolveScopedChapelFilter() {
+        if (in_array($this->role, ['Admin', 'Cathedral Admin'], true)) {
+            return null;
+        }
+        if ($this->chapelId !== null && (int)$this->chapelId > 0) {
+            return (int)$this->chapelId;
+        }
+        return ($this->role === 'Chapel Admin') ? -1 : 'cathedral';
+    }
+
     protected function initPermissions() {
         $r = $this->role;
         $isSuperAdmin  = ($r === 'Admin');
@@ -232,7 +276,7 @@ class BaseController {
 
             // Sacramental Records & Registry
             'can_cathedral_rec'    => ($isAdmin || ($isStaff && ($this->chapelId === null || (int)$this->chapelId === 0))),
-            'can_chapel_rec'       => ($isAdmin || $isChapelAdmin || $isStaff),
+            'can_chapel_rec'       => ($isAdmin || $isChapelAdmin || ($isStaff && $this->chapelId !== null && (int)$this->chapelId > 0)),
             'can_create_records'   => ($isAdmin || $isChapelAdmin || $isStaff),
             'can_approve_records'  => ($isAdmin || $isChapelAdmin), // Maker-Checker: Staff encodes, Admin approves
             'can_delete_records'   => ($isAdmin || $isChapelAdmin), // Maker-Checker: Staff cannot delete records
@@ -242,7 +286,7 @@ class BaseController {
             'can_view_full_calendar'   => true,
             'can_view_public_schedule' => true,
             'can_cathedral_sched'      => $isAdmin,
-            'can_chapel_sched'         => ($isAdmin || $isChapelAdmin || $isStaff),
+            'can_chapel_sched'         => ($isAdmin || $isChapelAdmin || ($isStaff && $this->chapelId !== null && (int)$this->chapelId > 0)),
             'can_approve_events'       => ($isAdmin || $isChapelAdmin), // Maker-Checker: Staff cannot self-approve bookings
             'can_update_events'        => ($isAdmin || $isChapelAdmin),
             'can_delete_events'        => ($isAdmin || $isChapelAdmin),
@@ -259,7 +303,6 @@ class BaseController {
             'can_manage_donations' => $isAdmin,
             'can_finance_reports'  => $isAdmin,
             'can_reports'          => ($isAdmin || $isChapelAdmin), // Staff cannot view executive financial reports
-            'can_insights'         => ($isAdmin || $isChapelAdmin),
 
             // Parish Community & Desk
             'can_bulletin'         => true,
@@ -268,8 +311,7 @@ class BaseController {
             'parish_info'          => $isAdmin,
             'can_parish_info'      => $isAdmin,
             'can_manage_services'  => $isAdmin,
-            'can_view_services'    => true,
-            'can_tickets'          => ($isAdmin || $isChapelAdmin || $isStaff)
+            'can_view_services'    => true
         ];
     }
 

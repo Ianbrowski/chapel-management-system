@@ -3,6 +3,11 @@
  * Handles opening, closing, and pre-populating modals.
  */
 
+function localYmdToday() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 function openModal(id) {
     const el = document.getElementById(id);
     if (el) {
@@ -13,7 +18,7 @@ function openModal(id) {
     if (id === 'modal-add-event') {
         const dateInput = document.getElementById('field-date-modal');
         if (dateInput && !dateInput.value) {
-            dateInput.value = new Date().toISOString().substring(0, 10);
+            dateInput.value = localYmdToday();
         }
         if (typeof window.syncModalDateTimeAndSlots === 'function') {
             window.syncModalDateTimeAndSlots('modal');
@@ -752,11 +757,23 @@ function viewEventDetails(input, readonly = false, options = {}) {
         const reqUid = parseInt(ev.requested_by || 0, 10);
         const curUid = parseInt(window.CURRENT_USER_ID || 0, 10);
         if (reqUid > 0 && reqUid !== curUid && window.ParishChat) {
+            chatBtn.innerHTML = '<i class="fa-solid fa-comments" style="color: var(--accent);"></i> Chat Requester';
             chatBtn.style.display = 'inline-flex';
             chatBtn.onclick = () => {
                 closeModal('modal-view-event-details');
                 if (typeof window.ParishChat.toggleChat === 'function') window.ParishChat.toggleChat(true);
                 if (typeof window.ParishChat.startDirectChat === 'function') window.ParishChat.startDirectChat(reqUid);
+            };
+        } else if (!isStaffView && !window.ParishChat) {
+            chatBtn.innerHTML = '<i class="fa-solid fa-envelope" style="color: var(--accent);"></i> Message Parish Office';
+            chatBtn.style.display = 'inline-flex';
+            chatBtn.onclick = () => {
+                closeModal('modal-view-event-details');
+                if (typeof navigateToSection === 'function') {
+                    navigateToSection('public_inquiries', true);
+                } else {
+                    window.location.href = 'dashboard.php?section=public_inquiries';
+                }
             };
         } else {
             chatBtn.style.display = 'none';
@@ -1313,105 +1330,6 @@ document.addEventListener('change', (e) => {
     }
 });
 
-/**
- * Ticketing Section JS
- */
-async function viewTicket(id) {
-    const modal = document.getElementById('modal-view-ticket');
-    if (!modal) return;
-
-    // Reset UI
-    const noEl = document.getElementById('vt-ticket-no');
-    if (noEl) noEl.innerText = 'Loading...';
-    const subEl = document.getElementById('vt-subject');
-    if (subEl) subEl.innerText = '...';
-    const commentsEl = document.getElementById('vt-comments-container');
-    if (commentsEl) commentsEl.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text2);"><i class="fa-solid fa-spinner fa-spin"></i> Fetching conversation...</div>';
-
-    openModal('modal-view-ticket');
-
-    try {
-        const formData = new FormData();
-        formData.append('form_section', 'tickets');
-        formData.append('action', 'get_details');
-        formData.append('ticket_id', id);
-        formData.append('csrf', document.querySelector('input[name="csrf"]')?.value || '');
-
-        const baseUrl = (typeof window !== 'undefined' && window.BASE_URL) ? window.BASE_URL.replace(/\/+$/, '') : '';
-        const endpoint = baseUrl ? `${baseUrl}/dashboard.php?ajax=1` : 'dashboard.php?ajax=1';
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            body: formData
-        });
-
-        const data = await response.json();
-        if (data.error) {
-            alert('Error: ' + data.error);
-            closeModal('modal-view-ticket');
-            return;
-        }
-
-        const t = data.ticket;
-        if (noEl) noEl.innerText = 'Ticket ' + (t.ticket_no || '');
-        if (subEl) subEl.innerText = t.subject || '';
-        const descEl = document.getElementById('vt-description');
-        if (descEl) descEl.innerText = t.description || 'No description provided.';
-        const submitIdEl = document.getElementById('vt-submit-id');
-        if (submitIdEl) submitIdEl.value = t.ticket_id || '';
-
-        const dateStr = t.created_at ? new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-        const metaEl = document.getElementById('vt-meta');
-        if (metaEl) metaEl.innerText = `Category: ${t.category || 'General'} • Created: ${dateStr} • By: ${t.requester_name || 'Guest'}`;
-
-        const statusEl = document.getElementById('vt-status');
-        if (statusEl) {
-            statusEl.className = 'status-pill status-' + (t.status || 'open').toLowerCase().replace(' ', '-');
-            statusEl.innerText = t.status || 'Open';
-        }
-
-        const priorityDot = document.getElementById('vt-priority-dot');
-        if (priorityDot) priorityDot.className = 'priority-dot ' + (t.priority || 'medium').toLowerCase();
-        const prioText = document.getElementById('vt-priority-text');
-        if (prioText) prioText.innerText = t.priority || 'Medium';
-
-        // Render Comments
-        const commentsContainer = document.getElementById('vt-comments-container');
-        if (commentsContainer) {
-            commentsContainer.innerHTML = '';
-            
-            if (data.comments && data.comments.length > 0) {
-                data.comments.forEach(c => {
-                    const isMe = parseInt(c.user_id) === parseInt(data.current_user_id);
-                    const commentDiv = document.createElement('div');
-                    commentDiv.style = `margin-bottom:20px; display:flex; flex-direction:column; align-items: ${isMe ? 'flex-end' : 'flex-start'};`;
-                    
-                    const time = c.created_at ? new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-                    const internalBadge = c.is_internal == 1 ? '<span style="background:rgba(197,160,89,0.15); color:var(--accent); padding:2px 6px; border-radius:4px; font-size:9px; margin-left:6px;">INTERNAL NOTE</span>' : '';
-                    
-                    commentDiv.innerHTML = `
-                        <div style="font-size:11px; color:var(--text2); margin-bottom:4px;">
-                            ${isMe ? 'You' : (c.author_name || 'System')} • ${time} ${internalBadge}
-                        </div>
-                        <div style="max-width:85%; padding:12px 16px; border-radius:14px; background: ${isMe ? 'var(--accent)' : 'var(--bg3)'}; color: ${isMe ? '#000' : 'var(--text)'}; font-size:13px; line-height:1.5; border:1px solid var(--border);">
-                            ${escHtml(c.comment_text)}
-                        </div>
-                    `;
-                    commentsContainer.appendChild(commentDiv);
-                });
-                // Scroll to bottom
-                setTimeout(() => { commentsContainer.scrollTop = commentsContainer.scrollHeight; }, 100);
-            } else {
-                commentsContainer.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text2); opacity:0.5;">No messages yet. Start the conversation below.</div>';
-            }
-        }
-
-    } catch (e) {
-        console.error('Ticket Fetch Error:', e);
-        alert('Failed to load ticket details.');
-    }
-}
-
 function escHtml(str) {
     if (!str) return '';
     const div = document.createElement('div');
@@ -1425,5 +1343,4 @@ window.addFiestaRow = addFiestaRow;
 window.selectChapelColorPreset = selectChapelColorPreset;
 window.updateChapelColorDisplay = updateChapelColorDisplay;
 window.handleChapelImageSelect = handleChapelImageSelect;
-window.viewTicket = viewTicket;
 window.escHtml = escHtml;

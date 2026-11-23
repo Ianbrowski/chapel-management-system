@@ -8,7 +8,7 @@ class SacramentalReportingService
         $this->conn = $conn;
     }
 
-    public function exportByScope(string $scope, ?int $chapelId = null): array
+    public function exportByScope(string $scope, int|string|null $chapelId = null): array
     {
         $sql = "SELECT sr.reference_id, sr.record_type, sr.person_name, sr.event_date,
                        COALESCE(c.chapel_name, 'Main Cathedral') AS chapel_name,
@@ -21,8 +21,10 @@ class SacramentalReportingService
 
         if ($scope === 'cathedral') {
             if ($chapelId !== null) {
-                if ((int)$chapelId === 0) {
+                if ($chapelId === 'cathedral' || (int)$chapelId === 0) {
                     $sql .= " AND (sr.scope = 'cathedral' OR sr.chapel_id IS NULL OR sr.chapel_id = 0)";
+                } elseif ((int)$chapelId < 0) {
+                    $sql .= " AND 1 = 0";
                 } else {
                     $sql .= " AND sr.chapel_id = ?";
                     $params[] = (int)$chapelId;
@@ -31,9 +33,13 @@ class SacramentalReportingService
             }
         } elseif ($scope === 'chapel') {
             if ($chapelId !== null) {
-                $sql .= " AND sr.chapel_id = ?";
-                $params[] = (int)$chapelId;
-                $types .= 'i';
+                if ($chapelId === 'cathedral' || (int)$chapelId <= 0) {
+                    $sql .= " AND 1 = 0";
+                } else {
+                    $sql .= " AND sr.chapel_id = ?";
+                    $params[] = (int)$chapelId;
+                    $types .= 'i';
+                }
             } else {
                 $sql .= " AND (sr.scope = 'chapel' OR (sr.chapel_id IS NOT NULL AND sr.chapel_id > 0))";
             }
@@ -61,15 +67,16 @@ class SacramentalReportingService
         return $rows;
     }
 
-    public function getChartTypes(?int $chapelId = null): array
+    public function getChartTypes(int|string|null $chapelId = null): array
     {
         $where = "WHERE is_archived=0";
         $params = [];
         $types = '';
         if ($chapelId !== null) {
-            $isCathedral = ($chapelId === 0);
-            if ($isCathedral) {
+            if ($chapelId === 'cathedral' || (is_numeric($chapelId) && (int)$chapelId === 0)) {
                 $where .= " AND (scope = 'cathedral' OR chapel_id IS NULL OR chapel_id = 0)";
+            } elseif ((int)$chapelId < 0) {
+                $where .= " AND 1 = 0";
             } else {
                 $where .= " AND chapel_id = ?";
                 $params[] = (int)$chapelId;

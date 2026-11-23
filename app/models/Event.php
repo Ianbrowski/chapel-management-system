@@ -932,6 +932,103 @@ class Event
         ];
     }
 
+    private function appendChapelScopeSql(string &$sql, array &$params, string &$types, $chapelId, string $col = 'chapel_id'): void
+    {
+        if ($chapelId === null) {
+            return;
+        }
+        $isCathedral = ($chapelId === 'cathedral' || (is_numeric($chapelId) && (int)$chapelId === 0));
+        if ($isCathedral) {
+            $sql .= " AND ({$col} IS NULL OR {$col} = 0)";
+        } else {
+            $sql .= " AND {$col} = ?";
+            $params[] = (int)$chapelId;
+            $types .= 'i';
+        }
+    }
+
+    private function runScalarIntQuery(string $sql, array $params = [], string $types = ''): int
+    {
+        if ($params !== []) {
+            $stmt = $this->conn->prepare($sql);
+            if (!$stmt) {
+                return 0;
+            }
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            return (int)($row['c'] ?? 0);
+        }
+        $res = $this->conn->query($sql);
+        $row = $res ? $res->fetch_assoc() : null;
+        return (int)($row['c'] ?? 0);
+    }
+
+    /** Count active pending non-certificate events whose scheduled start time has already passed. */
+    public function countOverduePendingRequests($chapelId = null): int
+    {
+        $sql = "SELECT COUNT(*) AS c FROM events e WHERE e.status = 'Pending' AND e.is_archived = 0 AND e.start_time < NOW() AND " . self::NON_CERT_E_SQL;
+        $params = [];
+        $types = '';
+        $this->appendChapelScopeSql($sql, $params, $types, $chapelId, 'e.chapel_id');
+        return $this->runScalarIntQuery($sql, $params, $types);
+    }
+
+    /** Count active confirmed non-certificate events in the past requiring completion or resolution. */
+    public function countStaleConfirmedEvents($scope = null, $chapelId = null): int
+    {
+        $sql = "SELECT COUNT(*) AS c FROM events e WHERE e.status = 'Confirmed' AND e.start_time < NOW() AND e.is_archived = 0 AND " . self::NON_CERT_E_SQL;
+        $params = [];
+        $types = '';
+        if ($scope) {
+            $sql .= " AND e.event_scope = ?";
+            $params[] = $scope;
+            $types .= 's';
+        }
+        $this->appendChapelScopeSql($sql, $params, $types, $chapelId, 'e.chapel_id');
+        return $this->runScalarIntQuery($sql, $params, $types);
+    }
+
+    /** Aggregate total, archived, and per-status event counts in a single query. */
+    public function getStatusStats($chapelId = null): array
+    {
+        $sql = "SELECT
+                    COALESCE(SUM(CASE WHEN is_archived = 0 THEN 1 ELSE 0 END), 0) AS total,
+                    COALESCE(SUM(CASE WHEN is_archived = 1 THEN 1 ELSE 0 END), 0) AS archived,
+                    COALESCE(SUM(CASE WHEN is_archived = 0 AND status = 'Confirmed' THEN 1 ELSE 0 END), 0) AS confirmed,
+                    COALESCE(SUM(CASE WHEN is_archived = 0 AND status = 'Pending' THEN 1 ELSE 0 END), 0) AS pending,
+                    COALESCE(SUM(CASE WHEN is_archived = 0 AND status = 'Completed' THEN 1 ELSE 0 END), 0) AS completed,
+                    COALESCE(SUM(CASE WHEN is_archived = 0 AND status = 'Cancelled' THEN 1 ELSE 0 END), 0) AS cancelled
+                FROM events WHERE " . self::NON_CERT_SQL;
+        $params = [];
+        $types = '';
+        $this->appendChapelScopeSql($sql, $params, $types, $chapelId, 'chapel_id');
+
+        if ($params !== []) {
+            $stmt = $this->conn->prepare($sql);
+            if (!$stmt) {
+                return ['total' => 0, 'archived' => 0, 'confirmed' => 0, 'pending' => 0, 'completed' => 0, 'cancelled' => 0];
+            }
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+        } else {
+            $res = $this->conn->query($sql);
+            $row = $res ? $res->fetch_assoc() : null;
+        }
+
+        return [
+            'total'     => (int)($row['total'] ?? 0),
+            'archived'  => (int)($row['archived'] ?? 0),
+            'confirmed' => (int)($row['confirmed'] ?? 0),
+            'pending'   => (int)($row['pending'] ?? 0),
+            'completed' => (int)($row['completed'] ?? 0),
+            'cancelled' => (int)($row['cancelled'] ?? 0),
+        ];
+    }
+
     public function getOverduePendingRequests($chapelId = null)
     {
         $requests = [];
@@ -1222,9 +1319,15 @@ class Event
         $types = '';
 
         if ($chapelId !== null) {
-            $where .= " AND e.chapel_id = ?";
-            $params[] = (int)$chapelId;
-            $types .= 'i';
+            if ($chapelId === 'cathedral' || (is_numeric($chapelId) && (int)$chapelId === 0)) {
+                $where .= " AND (e.chapel_id IS NULL OR e.chapel_id = 0)";
+            } elseif ((int)$chapelId < 0) {
+                $where .= " AND 1 = 0";
+            } else {
+                $where .= " AND e.chapel_id = ?";
+                $params[] = (int)$chapelId;
+                $types .= 'i';
+            }
         }
 
         $sql = "SELECT e.*, IFNULL(c.chapel_name, e.chapel_location) as chapel_location,
@@ -1266,9 +1369,15 @@ class Event
         $types = '';
 
         if ($chapelId !== null) {
-            $where .= " AND e.chapel_id = ?";
-            $params[] = (int)$chapelId;
-            $types .= 'i';
+            if ($chapelId === 'cathedral' || (is_numeric($chapelId) && (int)$chapelId === 0)) {
+                $where .= " AND (e.chapel_id IS NULL OR e.chapel_id = 0)";
+            } elseif ((int)$chapelId < 0) {
+                $where .= " AND 1 = 0";
+            } else {
+                $where .= " AND e.chapel_id = ?";
+                $params[] = (int)$chapelId;
+                $types .= 'i';
+            }
         }
 
         $sql = "SELECT e.*, IFNULL(c.chapel_name, e.chapel_location) as chapel_location,
@@ -1409,10 +1518,16 @@ class Event
             $types .= 's';
         }
 
-        if (!empty($filters['chapel_id'])) {
-            $where[] = 'e.chapel_id = ?';
-            $params[] = $filters['chapel_id'];
-            $types .= 'i';
+        if (isset($filters['chapel_id']) && $filters['chapel_id'] !== null && $filters['chapel_id'] !== '') {
+            if ($filters['chapel_id'] === 'cathedral' || (is_numeric($filters['chapel_id']) && (int)$filters['chapel_id'] === 0)) {
+                $where[] = '(e.chapel_id IS NULL OR e.chapel_id = 0)';
+            } elseif ((int)$filters['chapel_id'] < 0) {
+                $where[] = '1 = 0';
+            } else {
+                $where[] = 'e.chapel_id = ?';
+                $params[] = (int)$filters['chapel_id'];
+                $types .= 'i';
+            }
         }
 
         if (!empty($filters['pastor_id'])) {
@@ -1674,7 +1789,7 @@ class Event
 
                     // 2. Check Overlapping Scheduled Events
                     if ($available) {
-                        $conflictCheck = $this->conflicts->checkPriestOnly($p['id'], $dateTime, $eventType, $excludeId, $customDuration);
+                        $conflictCheck = $this->conflicts->checkPriestOnly($p['id'], $dateTime, $eventType, $excludeId, $customDuration, true);
                         if ($conflictCheck['conflict'] && $conflictCheck['type'] === 'Priest') {
                             $available = false;
                             $conflict  = $conflictCheck['details'];

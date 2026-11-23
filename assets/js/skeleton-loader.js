@@ -375,7 +375,7 @@ window.SkeletonLoader = (function () {
         }
 
         // 5. FINANCE / REPORTS / DONATIONS SKELETON
-        if (id === 'finance' || id === 'reports' || id === 'donations' || id === 'merchandise' || id === 'insights') {
+        if (id === 'finance' || id === 'reports' || id === 'donations' || id === 'merchandise') {
             return `
                 <div class="sk-section-container">
                     <div style="display:flex; justify-content:space-between; align-items:center; height:38px;">

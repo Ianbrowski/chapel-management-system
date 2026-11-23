@@ -124,13 +124,7 @@ class AuditLogger
      */
     private static function getIp(): string
     {
-        $keys = ['HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'REMOTE_ADDR'];
-        foreach ($keys as $key) {
-            if (!empty($_SERVER[$key])) {
-                $ips = explode(',', $_SERVER[$key]);
-                return trim($ips[0]);
-            }
-        }
-        return '0.0.0.0';
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '0.0.0.0';
     }
 }

@@ -314,12 +314,14 @@ if (!in_array($initialTab, ['catalog', 'sales', 'pos', 'archived'], true)) {
             </div>
         </div>
 
+        <?php if (!empty($can_manage_donations)): ?>
         <div style="display: flex; align-items: center; gap: 6px;">
             <button type="button" class="btn btn-primary btn-sm" onclick="openModal('modal-add-merch-item')" 
                     style="height: 28px; font-weight: 600; font-size: 11.5px; display: inline-flex; align-items: center; gap: 5px; background: #111111; color: #FFFFFF; border: 1px solid #111111; border-radius: 999px; padding: 0 13px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
                 <i class="fa-solid fa-plus"></i> Add Item
             </button>
         </div>
+        <?php endif; ?>
     </div>
 
     <!-- ── TAB 1: INVENTORY CATALOG (Full-Width High-Data View) ── -->
@@ -412,6 +414,7 @@ if (!in_array($initialTab, ['catalog', 'sales', 'pos', 'archived'], true)) {
                                             <i class="fa-solid fa-cart-shopping" style="font-size: 12px;"></i>
                                         </button>
                                         <?php endif; ?>
+                                        <?php if (!empty($can_manage_donations)): ?>
                                         <button class="btn-sm btn-ghost" 
                                                 title="Edit Item" 
                                                 data-item="<?php echo htmlspecialchars(json_encode($item, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
@@ -428,6 +431,7 @@ if (!in_array($initialTab, ['catalog', 'sales', 'pos', 'archived'], true)) {
                                                 <i class="fa-solid fa-box-archive" style="font-size: 12px;"></i>
                                             </button>
                                         </form>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>
@@ -891,49 +895,7 @@ if (!in_array($initialTab, ['catalog', 'sales', 'pos', 'archived'], true)) {
     </div>
 </div>
 
-<!-- Member Reserve Modal -->
-<div class="modal-overlay" id="modal-member-reserve">
-    <div class="modal">
-        <div class="modal-header">
-            <div class="modal-title"><i class="fa-solid fa-cart-plus"></i> Reserve Item</div>
-            <button class="modal-close" onclick="closeModal('modal-member-reserve')">×</button>
-        </div>
-        <form method="POST">
-            <input type="hidden" name="form_section" value="merchandise">
-            <input type="hidden" name="action" value="member_reserve">
-            <input type="hidden" name="id" id="member-res-item-id">
-            <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-            <div class="modal-body">
-                <div style="background: #F6F6F6; padding: 14px 16px; border-radius: 8px; margin-bottom: 14px; border: 1px solid var(--border);">
-                    <div id="member-res-item-name" style="font-size: 16px; font-weight: 700; color: #111111;"></div>
-                    <div id="member-res-item-price" style="font-size: 13px; color: var(--text2); margin-top: 4px;"></div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Quantity</label>
-                    <input type="number" name="quantity" id="member-res-qty" min="1" value="1" required>
-                </div>
-                <div class="form-group" style="margin-top:10px;">
-                    <label class="form-label">Pickup Location</label>
-                    <select name="chapel_id" required>
-                        <option value="0">IFI Cathedral (Main)</option>
-                        <?php foreach ($chapels as $ch): ?>
-                        <option value="<?php echo $ch['chapel_id']; ?>" <?php echo ($chapel_id == $ch['chapel_id']) ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($ch['chapel_name']); ?>
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <p style="font-size:12px; color:var(--text2); margin-top:12px;">
-                    <i class="fa-solid fa-circle-info"></i> Note: This will record your order in our system. Please visit the parish office for pickup and payment.
-                </p>
-            </div>
-            <div class="modal-footer">
-                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Confirm Reservation</button>
-                <button type="button" class="btn btn-gray" onclick="closeModal('modal-member-reserve')">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
+<!-- Member Reserve Modal is rendered globally in views/modals/dashboard_modals.php -->
 
 <!-- Sale Detail Modal -->
 <div class="modal-overlay" id="modal-sale-detail">
@@ -1369,6 +1331,12 @@ function viewMerchSaleDetails(input) {
     }
     if (!sale || typeof sale !== 'object') return;
 
+    const escSaleHtml = (v) => String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     const fmt = (v) => parseFloat(v).toLocaleString('en-PH', { minimumFractionDigits: 2 });
     const dt  = sale.sale_date
         ? new Date(sale.sale_date.replace(' ', 'T')).toLocaleString('en-US', {
@@ -1381,26 +1349,26 @@ function viewMerchSaleDetails(input) {
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
             <div style="padding:10px 12px; border-radius:8px; background:#F9FAFB; border:1px solid var(--border);">
                 <div style="font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--text2); margin-bottom:2px; font-weight:700;">Item Name</div>
-                <div style="font-weight:700; color:var(--text); font-size:13px;">${sale.item_name || '—'}</div>
+                <div style="font-weight:700; color:var(--text); font-size:13px;">${escSaleHtml(sale.item_name || '—')}</div>
             </div>
             <div style="padding:10px 12px; border-radius:8px; background:#F9FAFB; border:1px solid var(--border);">
                 <div style="font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--text2); margin-bottom:2px; font-weight:700;">Customer</div>
-                <div style="font-weight:600; color:var(--text); font-size:13px;">${sale.buyer_name || 'Walk-in'}</div>
+                <div style="font-weight:600; color:var(--text); font-size:13px;">${escSaleHtml(sale.buyer_name || 'Walk-in')}</div>
             </div>
             <div style="padding:10px 12px; border-radius:8px; background:#F9FAFB; border:1px solid var(--border);">
                 <div style="font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--text2); margin-bottom:2px; font-weight:700;">Quantity</div>
-                <div style="font-weight:800; color:var(--text); font-size:18px;">${sale.quantity}</div>
+                <div style="font-weight:800; color:var(--text); font-size:18px;">${Number(sale.quantity) || 0}</div>
             </div>
             <div style="padding:10px 12px; border-radius:8px; background:rgba(201,168,76,0.12); border:1px solid rgba(201,168,76,0.3);">
                 <div style="font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--text2); margin-bottom:2px; font-weight:700;">Total Amount</div>
-                <div style="font-weight:800; color:var(--accent); font-size:18px;">₱${fmt(sale.total_price)}</div>
+                <div style="font-weight:800; color:var(--accent); font-size:18px;">₱${escSaleHtml(fmt(sale.total_price))}</div>
             </div>
         </div>
         <div style="padding:8px 12px; border-radius:6px; background:#F9FAFB; border:1px solid var(--border); font-size:11.5px; color:var(--text2);">
-            <i class="fa-solid fa-clock" style="margin-right:5px;"></i>${dt}
+            <i class="fa-solid fa-clock" style="margin-right:5px;"></i>${escSaleHtml(dt)}
         </div>
     `;
-    document.getElementById('sale-detail-receipt-link').href = `views/pages/merchandise_receipt.php?id=${sale.id}`;
+    document.getElementById('sale-detail-receipt-link').href = `views/pages/merchandise_receipt.php?id=${encodeURIComponent(sale.id)}`;
     openModal('modal-sale-detail');
 }
 window.viewMerchSaleDetails = viewMerchSaleDetails;

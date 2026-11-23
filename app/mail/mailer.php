@@ -180,11 +180,35 @@ function sendViaEmailWebhook($webhookUrl, $secret, array $payload) {
 
     $scheme = strtolower((string)parse_url($webhookUrl, PHP_URL_SCHEME));
     $host = strtolower((string)parse_url($webhookUrl, PHP_URL_HOST));
-    $isLocalHttp = ($scheme === 'http' && in_array($host, ['localhost', '127.0.0.1'], true));
-    if ($scheme !== 'https' && !$isLocalHttp) {
+    if ($scheme !== 'https' || $host === '') {
         $GLOBALS['lastMailError'] = 'Email Webhook URL must use https://.';
         error_log('Church webhook mailer skipped: HTTPS required.');
         return false;
+    }
+
+    // Block loopback, private, and link-local destinations to prevent SSRF
+    $resolvedIps = [];
+    if (filter_var($host, FILTER_VALIDATE_IP)) {
+        $resolvedIps[] = $host;
+    } else {
+        $aRecords = @dns_get_record($host, DNS_A | DNS_AAAA);
+        if (is_array($aRecords)) {
+            foreach ($aRecords as $rec) {
+                if (!empty($rec['ip'])) $resolvedIps[] = $rec['ip'];
+                if (!empty($rec['ipv6'])) $resolvedIps[] = $rec['ipv6'];
+            }
+        }
+        $fallbackIp = @gethostbyname($host);
+        if ($fallbackIp && $fallbackIp !== $host) {
+            $resolvedIps[] = $fallbackIp;
+        }
+    }
+    foreach (array_unique($resolvedIps) as $ip) {
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            $GLOBALS['lastMailError'] = 'Email Webhook URL cannot target private or internal network addresses.';
+            error_log('Church webhook mailer blocked SSRF target IP: ' . $ip);
+            return false;
+        }
     }
 
     if (!function_exists('curl_init')) {
@@ -209,11 +233,11 @@ function sendViaEmailWebhook($webhookUrl, $secret, array $payload) {
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => $json,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_MAXREDIRS      => 5,
+        CURLOPT_FOLLOWLOCATION => false,
         CURLOPT_TIMEOUT        => 20,
         CURLOPT_CONNECTTIMEOUT => 8,
         CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
         CURLOPT_HTTPHEADER     => [
             'Content-Type: application/json',
             'Accept: application/json',

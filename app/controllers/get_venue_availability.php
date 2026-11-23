@@ -18,14 +18,31 @@ $locationType   = in_array($_GET['location_type'] ?? '', ['Church', 'Outside'], 
 
 $role = $_SESSION['role'] ?? 'Staff';
 $sessionChapelId = $_SESSION['chapel_id'] ?? null;
-$isAdmin = in_array($role, ['Admin', 'Cathedral Admin'], true);
+$isGlobalAdmin = in_array($role, ['Admin', 'Cathedral Admin'], true);
+$isStaffOrClergy = in_array($role, ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff', 'Priest', 'Pastor'], true);
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
 $requestedVenueId = ($venue === '' || $venue === '0' || $venue === 'null') ? null : (int)$venue;
 
 $eventM = new Event($conn);
 if ($venue === '') {
     $response = $eventM->getVenueAvailability($datetime, $eventType, $excludeId, $customDuration, $locationType);
+    foreach ($response as &$v) {
+        $vId = isset($v['id']) && $v['id'] !== '' ? (int)$v['id'] : 0;
+        $canViewDetails = $isGlobalAdmin || ($isStaffOrClergy && (($sessionChapelId === null || (int)$sessionChapelId === 0) ? $vId === 0 : (int)$sessionChapelId === $vId));
+        if (!$canViewDetails && !empty($v['conflict_reason'])) {
+            $v['conflict_reason'] = 'Time slot unavailable';
+        }
+    }
+    unset($v);
 } else {
     $response = $eventM->checkVenueConflict($requestedVenueId, $datetime, $eventType, $excludeId, $customDuration, $locationType);
+    $vId = $requestedVenueId ?? 0;
+    $canViewDetails = $isGlobalAdmin || ($isStaffOrClergy && (($sessionChapelId === null || (int)$sessionChapelId === 0) ? $vId === 0 : (int)$sessionChapelId === $vId));
+    if (!$canViewDetails && !empty($response['conflict'])) {
+        $response['conflict'] = 'Time slot unavailable';
+    }
 }
 
 header('Content-Type: application/json');

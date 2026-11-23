@@ -66,8 +66,6 @@ $readyCertCount    = $certCounts['confirmed'] ?? count(array_filter($cert_reques
 $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_requests, fn($r) => ($r['status'] ?? '') === 'Completed'));
 ?>
 
-<link rel="stylesheet" href="assets/css/workspace.css?v=2.5">
-
 <style>
 /* Segmented Tabs Navigation */
 .cert-tabs-bar {
@@ -507,8 +505,8 @@ $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_reques
                                                 <i class="fa-solid fa-comments" style="color: var(--accent);"></i> Chat Applicant
                                             </a>
                                             <?php elseif (!$isAdmin && !$isGuest): ?>
-                                            <a class="dropdown-item" href="javascript:void(0)" onclick="if (window.ParishChat) ParishChat.toggleChat(true);" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); border-radius: 4px;">
-                                                <i class="fa-solid fa-comments" style="color: var(--accent);"></i> Chat Parish Office
+                                            <a class="dropdown-item" href="javascript:void(0)" onclick="if (window.ParishChat) { ParishChat.toggleChat(true); } else if (typeof navigateToSection === 'function') { navigateToSection('public_inquiries', true); } else { window.location.href = 'dashboard.php?section=public_inquiries'; }" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); border-radius: 4px;">
+                                                <i class="fa-solid fa-comments" style="color: var(--accent);"></i> Message Parish Office
                                             </a>
                                             <?php endif; ?>
                                             <?php if ($st === 'Pending'): ?>
@@ -777,10 +775,19 @@ $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_reques
                                 </label>
                                 <input type="date" id="cert-pickup-date-input"
                                        min="<?php echo date('Y-m-d', strtotime('+1 day')); ?>" max="2099-12-31"
-                                       value="<?php echo date('Y-m-d', strtotime('+2 days')); ?>"
-                                       onchange="onCertPickupDateChange(this.value)"
+                                       value="<?php
+                                           $defaultPickupTs = strtotime('+2 days');
+                                           if ((int)date('N', $defaultPickupTs) === 1) {
+                                               $defaultPickupTs = strtotime('+3 days');
+                                           }
+                                           echo date('Y-m-d', $defaultPickupTs);
+                                       ?>"
+                                       onchange="const pEl = this; if (pEl.value) { const pd = new Date(pEl.value + 'T00:00:00'); if (pd.getDay() === 1) { const nextTue = new Date(pd.getTime() + 86400000); const tueStr = nextTue.getFullYear() + '-' + String(nextTue.getMonth()+1).padStart(2,'0') + '-' + String(nextTue.getDate()).padStart(2,'0'); pEl.value = tueStr; const wEl = document.getElementById('cert-monday-warning'); if (wEl) { wEl.style.display = 'block'; setTimeout(() => { wEl.style.display = 'none'; }, 5000); } } } onCertPickupDateChange(pEl.value)"
                                        required
                                        style="padding: 6px 12px; height: 36px; font-size: 12.5px; box-sizing: border-box; width: 100%; border-radius: 6px; border: 1px solid var(--border); background: #FFFFFF; color: var(--text); font-weight: 500;">
+                                <div id="cert-monday-warning" style="display: none; font-size: 11px; color: #b45309; margin-top: 4px; font-weight: 600;">
+                                    <i class="fa-solid fa-circle-info"></i> Parish office is closed Mondays; adjusted to Tuesday.
+                                </div>
                                 <div style="font-size: 11px; color: var(--text2); margin-top: 5px;">
                                     <i class="fa-regular fa-clock" style="color: var(--accent); margin-right: 3px;"></i> Releasing: Tue&ndash;Sun, 8am&ndash;12pm &amp; 1:30pm&ndash;5pm (Closed Mondays)
                                 </div>

@@ -10,22 +10,35 @@ class SacramentalCertificateService
 
     public function logCertificateIssuance(int $recordId, string $issuedTo, string $purpose, int $issuedBy, callable $auditLogger): int|false
     {
-        $certNo = $this->generateCertNo($recordId);
+        $this->conn->begin_transaction();
+        try {
+            $certNo = $this->generateCertNo($recordId);
 
-        $stmt = $this->conn->prepare(
-            "INSERT INTO certificate_issuances (record_id, issued_to, purpose, issued_by, certificate_no)
-             VALUES (?,?,?,?,?)"
-        );
-        $stmt->bind_param('issis', $recordId, $issuedTo, $purpose, $issuedBy, $certNo);
-        $ok = $stmt->execute();
-        $issuanceId = $ok ? (int) $this->conn->insert_id : false;
-        $stmt->close();
+            $stmt = $this->conn->prepare(
+                "INSERT INTO certificate_issuances (record_id, issued_to, purpose, issued_by, certificate_no)
+                 VALUES (?,?,?,?,?)"
+            );
+            if (!$stmt) {
+                $this->conn->rollback();
+                return false;
+            }
+            $stmt->bind_param('issis', $recordId, $issuedTo, $purpose, $issuedBy, $certNo);
+            $ok = $stmt->execute();
+            $issuanceId = $ok ? (int) $this->conn->insert_id : false;
+            $stmt->close();
 
-        if ($ok) {
+            if (!$ok) {
+                $this->conn->rollback();
+                return false;
+            }
+
+            $this->conn->commit();
             $auditLogger($recordId, 'printed', $issuedBy, null, ['issued_to' => $issuedTo, 'cert_no' => $certNo]);
+            return $issuanceId;
+        } catch (Throwable $e) {
+            $this->conn->rollback();
+            return false;
         }
-
-        return $issuanceId;
     }
 
     public function getCertificateHistory(int $recordId): array
@@ -49,7 +62,7 @@ class SacramentalCertificateService
 
     private function generateCertNo(int $recordId): string
     {
-        $stmt = $this->conn->prepare("SELECT COUNT(*)+1 AS nxt FROM certificate_issuances WHERE record_id=?");
+        $stmt = $this->conn->prepare("SELECT COUNT(*)+1 AS nxt FROM certificate_issuances WHERE record_id=? FOR UPDATE");
         $stmt->bind_param('i', $recordId);
         $stmt->execute();
         $next = $stmt->get_result()->fetch_assoc()['nxt'] ?? 1;

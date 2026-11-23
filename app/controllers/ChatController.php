@@ -38,6 +38,24 @@ class ChatController extends BaseController {
 
         $action = $_REQUEST['action'] ?? '';
 
+        if (in_array($action, ['get_state', 'get_messages', 'poll', 'unread_count'], true)
+            && session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
+        if (in_array($action, ['send_message', 'start_direct', 'mark_read'], true)) {
+            $csrfToken = $_POST['csrf'] ?? ($_POST['csrf_token'] ?? '');
+            if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST' || !$this->validateCsrf($csrfToken)) {
+                http_response_code(403);
+                echo json_encode([
+                    'success'  => false,
+                    'error'    => 'Security token expired or invalid request method.',
+                    'new_csrf' => $this->generateCsrf()
+                ]);
+                exit();
+            }
+        }
+
         try {
             switch ($action) {
                 case 'get_state':

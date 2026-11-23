@@ -32,6 +32,9 @@ $role            = $_SESSION['role'] ?? '';
 $sessionChapelId = (int)($_SESSION['chapel_id'] ?? 0);
 $isGlobalAdmin   = in_array($role, ['Admin', 'Cathedral Admin'], true);
 $isStaffOrClergy = in_array($role, ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff', 'Priest'], true);
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
 
 $escaped       = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q);
 $prefixPattern = $escaped . '%';
@@ -70,10 +73,12 @@ if (in_array($scope, ['records', 'records_cathedral', 'records_chapel'], true)) 
     $types  = str_repeat('s', 8);
 
     if ($scope === 'records_cathedral') {
-        if (!$isGlobalAdmin && $sessionChapelId > 0) {
-            $where[]  = 'sr.chapel_id = ?';
-            $params[] = $sessionChapelId;
-            $types   .= 'i';
+        if (!$isGlobalAdmin) {
+            if ($role === 'Chapel Admin' || $sessionChapelId > 0) {
+                echo json_encode(['suggestions' => []]);
+                exit();
+            }
+            $where[] = "(sr.scope = 'cathedral' OR sr.chapel_id IS NULL OR sr.chapel_id = 0)";
         } elseif (isset($_GET['chapel_id']) && $_GET['chapel_id'] !== '') {
             $reqCid = (int)$_GET['chapel_id'];
             if ($reqCid === 0) {
@@ -86,10 +91,15 @@ if (in_array($scope, ['records', 'records_cathedral', 'records_chapel'], true)) 
         }
     } elseif ($scope === 'records_chapel') {
         $reqChapelId = (int)($_GET['chapel_id'] ?? 0);
-        if (!$isGlobalAdmin && $sessionChapelId > 0) {
-            $where[]  = 'sr.chapel_id = ?';
-            $params[] = $sessionChapelId;
-            $types   .= 'i';
+        if (!$isGlobalAdmin) {
+            if ($sessionChapelId > 0) {
+                $where[]  = 'sr.chapel_id = ?';
+                $params[] = $sessionChapelId;
+                $types   .= 'i';
+            } else {
+                echo json_encode(['suggestions' => []]);
+                exit();
+            }
         } elseif ($reqChapelId > 0) {
             $where[]  = 'sr.chapel_id = ?';
             $params[] = $reqChapelId;
@@ -97,10 +107,16 @@ if (in_array($scope, ['records', 'records_cathedral', 'records_chapel'], true)) 
         } else {
             $where[] = "(sr.scope = 'chapel' OR (sr.chapel_id IS NOT NULL AND sr.chapel_id > 0))";
         }
-    } elseif (!$isGlobalAdmin && $sessionChapelId > 0) {
-        $where[]  = 'sr.chapel_id = ?';
-        $params[] = $sessionChapelId;
-        $types   .= 'i';
+    } elseif (!$isGlobalAdmin) {
+        if ($sessionChapelId > 0) {
+            $where[]  = 'sr.chapel_id = ?';
+            $params[] = $sessionChapelId;
+            $types   .= 'i';
+        } elseif ($role === 'Chapel Admin') {
+            $where[] = '1 = 0';
+        } else {
+            $where[] = "(sr.scope = 'cathedral' OR sr.chapel_id IS NULL OR sr.chapel_id = 0)";
+        }
     }
 
     $recType = trim($_GET['record_type'] ?? '');
@@ -173,10 +189,16 @@ if (in_array($scope, ['records', 'records_cathedral', 'records_chapel'], true)) 
             $where[]  = 'e.requested_by = ?';
             $params[] = $userId;
             $types   .= 'i';
-        } elseif (!$isGlobalAdmin && $sessionChapelId > 0) {
-            $where[]  = 'e.chapel_id = ?';
-            $params[] = $sessionChapelId;
-            $types   .= 'i';
+        } elseif (!$isGlobalAdmin) {
+            if ($sessionChapelId > 0) {
+                $where[]  = 'e.chapel_id = ?';
+                $params[] = $sessionChapelId;
+                $types   .= 'i';
+            } elseif ($role === 'Chapel Admin') {
+                $where[] = '1 = 0';
+            } elseif ($role === 'Staff') {
+                $where[] = '(e.chapel_id IS NULL OR e.chapel_id = 0)';
+            }
         }
         if ($scope === 'priest_duties') {
             $where[] = "(e.pastor_id IS NOT NULL OR (e.pastor_assigned IS NOT NULL AND e.pastor_assigned != ''))";
@@ -192,7 +214,7 @@ if (in_array($scope, ['records', 'records_cathedral', 'records_chapel'], true)) 
             $types   .= 'i';
         }
     } elseif ($scope === 'cathedral_events') {
-        if (!$isStaffOrClergy) {
+        if (!$isStaffOrClergy || (!$isGlobalAdmin && ($role === 'Chapel Admin' || $sessionChapelId > 0))) {
             echo json_encode(['suggestions' => []]);
             exit();
         }
@@ -203,10 +225,15 @@ if (in_array($scope, ['records', 'records_cathedral', 'records_chapel'], true)) 
             exit();
         }
         $where[] = '(e.chapel_id IS NOT NULL AND e.chapel_id > 0)';
-        if (!$isGlobalAdmin && $sessionChapelId > 0) {
-            $where[]  = 'e.chapel_id = ?';
-            $params[] = $sessionChapelId;
-            $types   .= 'i';
+        if (!$isGlobalAdmin) {
+            if ($sessionChapelId > 0) {
+                $where[]  = 'e.chapel_id = ?';
+                $params[] = $sessionChapelId;
+                $types   .= 'i';
+            } elseif ($role === 'Chapel Admin' || $role === 'Staff') {
+                echo json_encode(['suggestions' => []]);
+                exit();
+            }
         }
     }
 
@@ -254,60 +281,6 @@ if (in_array($scope, ['records', 'records_cathedral', 'records_chapel'], true)) 
                 $suggestions[] = [
                     'label'      => $title,
                     'value'      => $fillVal,
-                    'sub'        => implode(' · ', $meta),
-                    'badge'      => $badge['label'],
-                    'badgeColor' => $badge['color'],
-                    'badgeBg'    => $badge['bg'],
-                ];
-            }
-        }
-        $stmt->close();
-    }
-} elseif ($scope === 'tickets') {
-    $where  = ['(t.subject LIKE ? OR t.ticket_no LIKE ? OR t.description LIKE ? OR COALESCE(t.requester_name, \'\') LIKE ?)'];
-    $params = array_fill(0, 4, $likePattern);
-    $types  = 'ssss';
-
-    if (!$isGlobalAdmin) {
-        if ($isStaffOrClergy && $sessionChapelId > 0) {
-            $where[]  = '(t.chapel_id = ? OR t.requester_id = ?)';
-            $params[] = $sessionChapelId;
-            $params[] = $userId;
-            $types   .= 'ii';
-        } else {
-            $where[]  = 't.requester_id = ?';
-            $params[] = $userId;
-            $types   .= 'i';
-        }
-    }
-
-    $sql = "SELECT t.ticket_id, t.ticket_no, t.subject, t.category, t.priority, t.status, t.requester_name
-            FROM tickets t
-            WHERE " . implode(' AND ', $where) . "
-            ORDER BY CASE WHEN t.subject LIKE ? OR t.ticket_no LIKE ? THEN 0 ELSE 1 END,
-                     t.ticket_id DESC
-            LIMIT 8";
-
-    $params[] = $prefixPattern;
-    $params[] = $prefixPattern;
-    $types   .= 'ss';
-
-    if ($stmt = $conn->prepare($sql)) {
-        $stmt->bind_param($types, ...$params);
-        if ($stmt->execute()) {
-            $res = $stmt->get_result();
-            while ($row = $res->fetch_assoc()) {
-                $subject = trim((string)($row['subject'] ?? ''));
-                if ($subject === '') continue;
-                $badge = acStatusBadgeStyle((string)($row['status'] ?? ''));
-                $meta  = [];
-                if (!empty($row['ticket_no']))      $meta[] = $row['ticket_no'];
-                if (!empty($row['category']))       $meta[] = $row['category'];
-                if (!empty($row['requester_name'])) $meta[] = $row['requester_name'];
-
-                $suggestions[] = [
-                    'label'      => $subject,
-                    'value'      => $subject,
                     'sub'        => implode(' · ', $meta),
                     'badge'      => $badge['label'],
                     'badgeColor' => $badge['color'],

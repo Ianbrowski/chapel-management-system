@@ -8,7 +8,7 @@ class DashboardExportService
         $this->conn = $conn;
     }
 
-    public function streamReportCsv(?string $from, ?string $to, ?int $chapelId = null): void
+    public function streamReportCsv(?string $from, ?string $to, int|string|null $chapelId = null): void
     {
         $from = trim((string) $from);
         $to = trim((string) $to);
@@ -29,6 +29,18 @@ class DashboardExportService
             @ob_end_clean();
         }
 
+        // Neutralize Excel/CSV formula injection on untrusted cells
+        $safeCell = static function ($v): string {
+            $s = (string)($v ?? '');
+            if ($s !== '' && in_array($s[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+                return "'" . $s;
+            }
+            return $s;
+        };
+        $safeRow = static function (array $row) use ($safeCell): array {
+            return array_map($safeCell, $row);
+        };
+
         // We will output a highly styled multi-section CSV for professional Excel rendering.
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="parish_detailed_report_' . date('Ymd_His') . '.csv"');
@@ -38,6 +50,20 @@ class DashboardExportService
         // Helper to output empty line
         $br = function() use ($out) { fputcsv($out, []); };
 
+        $isCathedralScope = ($chapelId === 'cathedral' || $chapelId === 0 || $chapelId === '0');
+        $isBranchScope    = (!$isCathedralScope && $chapelId !== null && (int)$chapelId > 0);
+        $isDeniedScope    = (!$isCathedralScope && $chapelId !== null && (int)$chapelId < 0);
+        $branchId         = $isBranchScope ? (int)$chapelId : 0;
+
+        $scopeLabel = 'Full Parish (All Chapels & Cathedral)';
+        if ($isBranchScope) {
+            $scopeLabel = 'Chapel ID ' . $branchId;
+        } elseif ($isCathedralScope) {
+            $scopeLabel = 'Main Cathedral Only';
+        } elseif ($isDeniedScope) {
+            $scopeLabel = 'Unassigned Scope (None)';
+        }
+
         // Output Premium Title and Metadata block
         fputcsv($out, ['======================================================================']);
         fputcsv($out, ['   IFI CATHEDRAL PARISH — DETAILED MANAGEMENT & FINANCIAL REPORT']);
@@ -45,23 +71,23 @@ class DashboardExportService
         fputcsv($out, ['REPORT PARAMETERS']);
         fputcsv($out, ['  Date Range:', $from . ' to ' . $to]);
         fputcsv($out, ['  Generated On:', date('Y-m-d h:i:s A')]);
-        fputcsv($out, ['  Scope Filter:', $chapelId ? 'Chapel ID ' . $chapelId : 'Full Parish (All Chapels & Cathedral)']);
+        fputcsv($out, ['  Scope Filter:', $scopeLabel]);
         fputcsv($out, ['======================================================================']);
         $br();
 
         // Common filter bindings
         $p1 = $from . ' 00:00:00';
         $p2 = $to . ' 23:59:59';
-        
-        $whereChapelEvent = $chapelId ? ' AND chapel_id = ' . (int)$chapelId : '';
-        $whereChapelDonation = $chapelId ? ' AND d.chapel_id = ' . (int)$chapelId : '';
-        $whereChapelRecord = $chapelId ? ' AND chapel_id = ' . (int)$chapelId : '';
+
+        $whereChapelEvent    = $isDeniedScope ? ' AND 1=0' : ($isBranchScope ? (' AND chapel_id = ' . $branchId) : ($isCathedralScope ? ' AND (chapel_id IS NULL OR chapel_id = 0)' : ''));
+        $whereChapelDonation = $isDeniedScope ? ' AND 1=0' : ($isBranchScope ? (' AND d.chapel_id = ' . $branchId) : ($isCathedralScope ? ' AND (d.chapel_id IS NULL OR d.chapel_id = 0)' : ''));
+        $whereChapelRecord   = $whereChapelEvent;
 
         // --- 1. REVENUE SUMMARY ---
         fputcsv($out, ['----------------------------------------------------------------------']);
         fputcsv($out, [' SECTION 1: FINANCIAL REVENUE OVERVIEW']);
         fputcsv($out, ['----------------------------------------------------------------------']);
-        if ($chapelId) {
+        if ($isBranchScope || $isDeniedScope) {
             $stats_sql = "SELECT 
                 (SELECT SUM(amount) FROM donations d WHERE date_received BETWEEN ? AND ? AND is_archived=0 $whereChapelDonation) as total_donations,
                 (SELECT COUNT(*) FROM donations d WHERE date_received BETWEEN ? AND ? AND is_archived=0 $whereChapelDonation) as count_donations,
@@ -71,7 +97,7 @@ class DashboardExportService
                 (SELECT COUNT(*) FROM events WHERE start_time BETWEEN ? AND ? AND status='Completed' AND is_archived=0 $whereChapelEvent) as events_completed
             ";
             $stmt = $this->conn->prepare($stats_sql);
-            $stmt->bind_param('ssssssss', $p1, $p2, $p1, $p2, $p1, $p2, $p1, $p2);
+            $stmt->bind_param('ssssssss', $from, $to, $from, $to, $p1, $p2, $p1, $p2);
         } else {
             $stats_sql = "SELECT 
                 (SELECT SUM(amount) FROM donations d WHERE date_received BETWEEN ? AND ? AND is_archived=0 $whereChapelDonation) as total_donations,
@@ -82,7 +108,7 @@ class DashboardExportService
                 (SELECT COUNT(*) FROM events WHERE start_time BETWEEN ? AND ? AND status='Completed' AND is_archived=0 $whereChapelEvent) as events_completed
             ";
             $stmt = $this->conn->prepare($stats_sql);
-            $stmt->bind_param('ssssssssssss', $p1, $p2, $p1, $p2, $p1, $p2, $p1, $p2, $p1, $p2, $p1, $p2);
+            $stmt->bind_param('ssssssssssss', $from, $to, $from, $to, $p1, $p2, $p1, $p2, $p1, $p2, $p1, $p2);
         }
         $stmt->execute();
         $stats = $stmt->get_result()->fetch_assoc();
@@ -102,34 +128,34 @@ class DashboardExportService
         $don_sql = "SELECT COALESCE(c.chapel_name, 'Main Cathedral') as chapel, d.payment_method, COUNT(*) as txns, SUM(d.amount) as total 
                     FROM donations d LEFT JOIN chapels c ON d.chapel_id = c.chapel_id 
                     WHERE d.date_received BETWEEN ? AND ? AND d.is_archived=0 $whereChapelDonation 
-                    GROUP BY d.chapel_id, d.payment_method ORDER BY total DESC";
+                    GROUP BY d.chapel_id, c.chapel_name, d.payment_method ORDER BY total DESC";
         $stmt = $this->conn->prepare($don_sql);
         $stmt->bind_param('ss', $from, $to);
         $stmt->execute();
         $res = $stmt->get_result();
         fputcsv($out, ['VENUE LOCATION', 'PAYMENT METHOD', 'TRANSACTION COUNT', 'TOTAL AMOUNT (PHP)']);
         while ($r = $res->fetch_assoc()) {
-            fputcsv($out, [$r['chapel'], $r['payment_method'], $r['txns'], number_format((float)$r['total'], 2, '.', '')]);
+            fputcsv($out, $safeRow([$r['chapel'], $r['payment_method'], $r['txns'], number_format((float)$r['total'], 2, '.', '')]));
         }
         $stmt->close();
         $br();
 
-        // --- 3. MERCHANDISE BREAKDOWN (Cathedral Store — Admin/Cathedral Admin only) ---
-        if (!$chapelId) {
+        // --- 3. MERCHANDISE BREAKDOWN (Cathedral Store — Admin/Cathedral Admin/Cathedral Staff only) ---
+        if (!$isBranchScope && !$isDeniedScope) {
             fputcsv($out, ['----------------------------------------------------------------------']);
             fputcsv($out, [' SECTION 3: MERCHANDISE SALES BY ITEM']);
             fputcsv($out, ['----------------------------------------------------------------------']);
             $merch_sql = "SELECT mi.name, SUM(ms.quantity) as qty, SUM(ms.total_price) as total 
                           FROM merchandise_sales ms JOIN merchandise_items mi ON ms.item_id = mi.id 
                           WHERE ms.sale_date BETWEEN ? AND ? 
-                          GROUP BY ms.item_id ORDER BY total DESC";
+                          GROUP BY ms.item_id, mi.name ORDER BY total DESC";
             $stmt = $this->conn->prepare($merch_sql);
             $stmt->bind_param('ss', $p1, $p2);
             $stmt->execute();
             $res = $stmt->get_result();
             fputcsv($out, ['ITEM NAME', 'UNITS SOLD', 'TOTAL REVENUE (PHP)']);
             while ($r = $res->fetch_assoc()) {
-                fputcsv($out, [$r['name'], $r['qty'], number_format((float)$r['total'], 2, '.', '')]);
+                fputcsv($out, $safeRow([$r['name'], $r['qty'], number_format((float)$r['total'], 2, '.', '')]));
             }
             $stmt->close();
             $br();
@@ -149,7 +175,7 @@ class DashboardExportService
         $stmt->execute();
         $res = $stmt->get_result();
         while ($r = $res->fetch_assoc()) {
-            fputcsv($out, ['  ' . $r['event_type'], $r['cnt']]);
+            fputcsv($out, $safeRow(['  ' . $r['event_type'], $r['cnt']]));
         }
         $stmt->close();
         $br();
@@ -162,7 +188,7 @@ class DashboardExportService
         $stmt->execute();
         $res = $stmt->get_result();
         while ($r = $res->fetch_assoc()) {
-            fputcsv($out, ['  ' . $r['status'], $r['cnt']]);
+            fputcsv($out, $safeRow(['  ' . $r['status'], $r['cnt']]));
         }
         $stmt->close();
         $br();
@@ -180,7 +206,7 @@ class DashboardExportService
         $stmt->execute();
         $res = $stmt->get_result();
         while ($r = $res->fetch_assoc()) {
-            fputcsv($out, [$r['record_type'], $r['cnt']]);
+            fputcsv($out, $safeRow([$r['record_type'], $r['cnt']]));
         }
         $stmt->close();
         $br();
@@ -199,14 +225,14 @@ class DashboardExportService
         $res = $stmt->get_result();
         fputcsv($out, ['DATE & TIME', 'EVENT TITLE', 'TYPE', 'LOCATION', 'ASSIGNED PRIEST', 'STATUS']);
         while ($row = $res->fetch_assoc()) {
-            fputcsv($out, [
+            fputcsv($out, $safeRow([
                 date('Y-m-d h:i A', strtotime($row['start_time'])),
                 $row['title'],
                 $row['event_type'],
                 $row['chapel_location'] ?: 'Main Cathedral',
                 $row['pastor_assigned'] ?: '—',
                 $row['status']
-            ]);
+            ]));
         }
         $stmt->close();
         $br();
@@ -222,7 +248,7 @@ class DashboardExportService
         $res = $stmt->get_result();
         fputcsv($out, ['DONOR NAME', 'TOTAL AMOUNT (PHP)']);
         while ($row = $res->fetch_assoc()) {
-            fputcsv($out, [$row['donor_name'], number_format((float)$row['total'], 2, '.', '')]);
+            fputcsv($out, $safeRow([$row['donor_name'], number_format((float)$row['total'], 2, '.', '')]));
         }
         $stmt->close();
         $br();
@@ -238,20 +264,20 @@ class DashboardExportService
         $res = $stmt->get_result();
         fputcsv($out, ['TRANSACTION ID', 'DONOR NAME', 'AMOUNT (PHP)', 'PURPOSE / FUND', 'PAYMENT METHOD', 'DATE RECEIVED']);
         while ($row = $res->fetch_assoc()) {
-            fputcsv($out, [
-                'DON-' . str_pad($row['donation_id'], 6, '0', STR_PAD_LEFT),
+            fputcsv($out, $safeRow([
+                'DON-' . str_pad((string)$row['donation_id'], 6, '0', STR_PAD_LEFT),
                 $row['donor_name'],
                 number_format((float)$row['amount'], 2, '.', ''),
                 $row['purpose'],
                 $row['payment_method'],
                 $row['date_received']
-            ]);
+            ]));
         }
         $stmt->close();
         $br();
 
-        // --- 9. INDIVIDUAL MERCHANDISE SALES (Cathedral Store — Admin/Cathedral Admin only) ---
-        if (!$chapelId) {
+        // --- 9. INDIVIDUAL MERCHANDISE SALES (Cathedral Store) ---
+        if (!$isBranchScope && !$isDeniedScope) {
             fputcsv($out, ['----------------------------------------------------------------------']);
             fputcsv($out, [' SECTION 9: DETAILED MERCHANDISE SALES LEDGER']);
             fputcsv($out, ['----------------------------------------------------------------------']);
@@ -262,14 +288,14 @@ class DashboardExportService
             $res = $stmt->get_result();
             fputcsv($out, ['SALE ID', 'ITEM NAME', 'BUYER NAME', 'QUANTITY', 'TOTAL VALUE (PHP)', 'SALE DATE']);
             while ($row = $res->fetch_assoc()) {
-                fputcsv($out, [
-                    'SALE-' . str_pad($row['id'], 6, '0', STR_PAD_LEFT),
+                fputcsv($out, $safeRow([
+                    'SALE-' . str_pad((string)$row['id'], 6, '0', STR_PAD_LEFT),
                     $row['item'],
                     $row['buyer_name'],
                     $row['quantity'],
                     number_format((float)$row['total_price'], 2, '.', ''),
                     date('Y-m-d h:i A', strtotime($row['sale_date']))
-                ]);
+                ]));
             }
             $stmt->close();
             $br();
@@ -285,7 +311,7 @@ class DashboardExportService
         $stmt->execute();
         $res = $stmt->get_result();
         fputcsv($out, ['SACRAMENT TYPE', 'PRIMARY PERSON NAME', 'EVENT/SACRAMENT DATE', 'BOOK NUMBER', 'PAGE NUMBER']);
-        while ($row = $res->fetch_assoc()) { fputcsv($out, $row); }
+        while ($row = $res->fetch_assoc()) { fputcsv($out, $safeRow($row)); }
         $stmt->close();
         $br();
 
@@ -293,38 +319,44 @@ class DashboardExportService
         fputcsv($out, ['----------------------------------------------------------------------']);
         fputcsv($out, [' SECTION 11: CERTIFICATES ISSUANCES LOG']);
         fputcsv($out, ['----------------------------------------------------------------------']);
-        $sql = $chapelId
-            ? "SELECT ci.certificate_no, ci.issued_to, ci.purpose, ci.issued_at FROM certificate_issuances ci JOIN sacramental_records sr ON ci.record_id = sr.record_id WHERE ci.issued_at BETWEEN ? AND ? AND sr.chapel_id = " . (int)$chapelId . " ORDER BY ci.issued_at DESC"
-            : "SELECT certificate_no, issued_to, purpose, issued_at FROM certificate_issuances WHERE issued_at BETWEEN ? AND ? ORDER BY issued_at DESC";
+        $certScopeWhere = $isDeniedScope ? ' AND 1=0'
+            : ($isBranchScope ? (' AND sr.chapel_id = ' . $branchId)
+            : ($isCathedralScope ? ' AND (sr.chapel_id IS NULL OR sr.chapel_id = 0)' : ''));
+        $sql = "SELECT ci.certificate_no, ci.issued_to, ci.purpose, ci.issued_at
+                FROM certificate_issuances ci
+                JOIN sacramental_records sr ON ci.record_id = sr.record_id
+                WHERE sr.is_archived = 0 AND ci.issued_at BETWEEN ? AND ? {$certScopeWhere}
+                ORDER BY ci.issued_at DESC";
         $stmt = $this->conn->prepare($sql);
         $stmt->bind_param('ss', $p1, $p2);
         $stmt->execute();
         $res = $stmt->get_result();
         fputcsv($out, ['CERTIFICATE NUMBER', 'ISSUED TO', 'PURPOSE', 'DATE & TIME ISSUED']);
         while ($row = $res->fetch_assoc()) {
-            fputcsv($out, [
+            fputcsv($out, $safeRow([
                 $row['certificate_no'],
                 $row['issued_to'],
                 $row['purpose'],
                 date('Y-m-d h:i A', strtotime($row['issued_at']))
-            ]);
+            ]));
         }
         $stmt->close();
         $br();
 
-        // --- 12. TICKETS / INQUIRIES ---
+        // --- 12. PUBLIC INQUIRIES ---
         fputcsv($out, ['----------------------------------------------------------------------']);
-        fputcsv($out, [' SECTION 12: INCOMING INQUIRIES & TICKETS SUMMARY']);
+        fputcsv($out, [' SECTION 12: INCOMING PUBLIC INQUIRIES SUMMARY']);
         fputcsv($out, ['----------------------------------------------------------------------']);
-        $sql = $chapelId
-            ? "SELECT status, COUNT(*) as cnt FROM tickets WHERE created_at BETWEEN ? AND ? AND chapel_id = " . (int)$chapelId . " GROUP BY status"
-            : "SELECT status, COUNT(*) as cnt FROM tickets WHERE created_at BETWEEN ? AND ? GROUP BY status";
+        $inqWhere = $isDeniedScope ? ' AND 1=0'
+            : ($isBranchScope ? (' AND chapel_id = ' . $branchId)
+            : ($isCathedralScope ? ' AND (chapel_id IS NULL OR chapel_id = 0)' : ''));
+        $sql = "SELECT status, COUNT(*) as cnt FROM public_inquiries WHERE created_at BETWEEN ? AND ? {$inqWhere} GROUP BY status";
         $stmt = $this->conn->prepare($sql);
         $stmt->bind_param('ss', $p1, $p2);
         $stmt->execute();
         $res = $stmt->get_result();
-        fputcsv($out, ['TICKET STATUS', 'TOTAL COUNT']);
-        while ($row = $res->fetch_assoc()) { fputcsv($out, $row); }
+        fputcsv($out, ['INQUIRY STATUS', 'TOTAL COUNT']);
+        while ($row = $res->fetch_assoc()) { fputcsv($out, $safeRow($row)); }
         $stmt->close();
         $br();
 
@@ -332,19 +364,19 @@ class DashboardExportService
         fputcsv($out, ['----------------------------------------------------------------------']);
         fputcsv($out, [' SECTION 13: VOIDED DONATIONS LEDGER (AUDIT ONLY)']);
         fputcsv($out, ['----------------------------------------------------------------------']);
-        $sql = "SELECT donor_name, amount, void_reason, date_received FROM donations d WHERE is_archived=1 AND date_received BETWEEN ? AND ? $whereChapelDonation ORDER BY date_received DESC";
+        $sql = "SELECT donor_name, amount, void_reason, date_received FROM donations d WHERE is_archived=1 AND voided_at IS NOT NULL AND date_received BETWEEN ? AND ? $whereChapelDonation ORDER BY date_received DESC";
         $stmt = $this->conn->prepare($sql);
         $stmt->bind_param('ss', $from, $to);
         $stmt->execute();
         $res = $stmt->get_result();
         fputcsv($out, ['DONOR NAME', 'AMOUNT VOIDED (PHP)', 'VOID REASON / EXPLANATION', 'ORIGINAL DATE']);
         while ($row = $res->fetch_assoc()) {
-            fputcsv($out, [
+            fputcsv($out, $safeRow([
                 $row['donor_name'],
                 number_format((float)$row['amount'], 2, '.', ''),
                 $row['void_reason'],
                 $row['date_received']
-            ]);
+            ]));
         }
         $stmt->close();
         $br();
@@ -353,15 +385,21 @@ class DashboardExportService
         fputcsv($out, ['----------------------------------------------------------------------']);
         fputcsv($out, [' SECTION 14: SYSTEM AUDIT & STAFF ACTIVITY LOGS']);
         fputcsv($out, ['----------------------------------------------------------------------']);
-        $sql = $chapelId
-            ? "SELECT al.performed_by_name, al.action, al.module, COUNT(*) as cnt FROM audit_logs al JOIN users u ON al.performed_by_id = u.id WHERE al.created_at BETWEEN ? AND ? AND u.chapel_id = " . (int)$chapelId . " GROUP BY al.performed_by_name, al.action, al.module ORDER BY cnt DESC LIMIT 15"
-            : "SELECT performed_by_name, action, module, COUNT(*) as cnt FROM audit_logs WHERE created_at BETWEEN ? AND ? GROUP BY performed_by_name, action, module ORDER BY cnt DESC LIMIT 15";
+        if ($isDeniedScope) {
+            $sql = "SELECT performed_by_name, action, module, COUNT(*) as cnt FROM audit_logs WHERE 1=0 AND created_at BETWEEN ? AND ? GROUP BY performed_by_name, action, module";
+        } elseif ($isBranchScope) {
+            $sql = "SELECT al.performed_by_name, al.action, al.module, COUNT(*) as cnt FROM audit_logs al JOIN users u ON al.performed_by_id = u.id WHERE al.created_at BETWEEN ? AND ? AND u.chapel_id = {$branchId} GROUP BY al.performed_by_name, al.action, al.module ORDER BY cnt DESC LIMIT 15";
+        } elseif ($isCathedralScope) {
+            $sql = "SELECT al.performed_by_name, al.action, al.module, COUNT(*) as cnt FROM audit_logs al JOIN users u ON al.performed_by_id = u.id WHERE al.created_at BETWEEN ? AND ? AND (u.chapel_id IS NULL OR u.chapel_id = 0) GROUP BY al.performed_by_name, al.action, al.module ORDER BY cnt DESC LIMIT 15";
+        } else {
+            $sql = "SELECT performed_by_name, action, module, COUNT(*) as cnt FROM audit_logs WHERE created_at BETWEEN ? AND ? GROUP BY performed_by_name, action, module ORDER BY cnt DESC LIMIT 15";
+        }
         $stmt = $this->conn->prepare($sql);
         $stmt->bind_param('ss', $p1, $p2);
         $stmt->execute();
         $res = $stmt->get_result();
         fputcsv($out, ['STAFF MEMBER NAME', 'ACTION PERFORMED', 'SYSTEM MODULE', 'TOTAL ACTION COUNT']);
-        while ($row = $res->fetch_assoc()) { fputcsv($out, $row); }
+        while ($row = $res->fetch_assoc()) { fputcsv($out, $safeRow($row)); }
         $stmt->close();
         $br();
 
@@ -371,13 +409,17 @@ class DashboardExportService
 
     public function streamAuditCsv(array $rows): void
     {
+        $safeCell = static function ($v): string {
+            $s = (string)($v ?? '');
+            return ($s !== '' && in_array($s[0], ['=', '+', '-', '@', "\t", "\r"], true)) ? ("'" . $s) : $s;
+        };
         header('Content-Type: text/csv');
         header('Content-Disposition: attachment; filename="audit_logs_' . date('Ymd_His') . '.csv"');
 
         $out = fopen('php://output', 'w');
         fputcsv($out, ['Timestamp', 'Action', 'Module', 'Target', 'Performed By', 'Role', 'IP Address']);
         foreach ($rows as $row) {
-            fputcsv($out, [
+            fputcsv($out, array_map($safeCell, [
                 $row['created_at'] ?? '',
                 $row['action'] ?? '',
                 $row['module'] ?? '',
@@ -385,7 +427,7 @@ class DashboardExportService
                 $row['performed_by_name'] ?? '',
                 $row['performed_by_role'] ?? '',
                 $row['ip_address'] ?? '',
-            ]);
+            ]));
         }
         fclose($out);
         exit();
@@ -393,13 +435,17 @@ class DashboardExportService
 
     public function streamRecordsCsv(string $scope, array $rows): void
     {
+        $safeCell = static function ($v): string {
+            $s = (string)($v ?? '');
+            return ($s !== '' && in_array($s[0], ['=', '+', '-', '@', "\t", "\r"], true)) ? ("'" . $s) : $s;
+        };
         header('Content-Type: text/csv');
         header('Content-Disposition: attachment; filename="records_' . $scope . '_' . date('Ymd_His') . '.csv"');
 
         $out = fopen('php://output', 'w');
         fputcsv($out, ['Reference ID', 'Type', 'Primary Person', 'Event Date', 'Venue', 'Priest', 'Book', 'Page']);
         foreach ($rows as $row) {
-            fputcsv($out, [
+            fputcsv($out, array_map($safeCell, [
                 $row['reference_id'] ?? '',
                 $row['record_type'] ?? '',
                 $row['person_name'] ?? '',
@@ -408,7 +454,7 @@ class DashboardExportService
                 $row['officiating_priest'] ?? '',
                 $row['book_number'] ?? '',
                 $row['page_number'] ?? '',
-            ]);
+            ]));
         }
         fclose($out);
         exit();

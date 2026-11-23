@@ -296,7 +296,7 @@ const ParishChat = (() => {
             const raw = await res.text();
 
             if (raw.trim().startsWith('<') || raw.includes('__test') || raw.includes('aes.js')) {
-                throw new Error('InfinityFree Anti-Bot filter blocked chat. Please reload your browser.');
+                throw new Error('Unable to connect to parish chat right now. Please reload the page.');
             }
 
             let data;
@@ -587,7 +587,7 @@ const ParishChat = (() => {
         try {
             const res = await chatFetch(`${API_ENDPOINT}?action=get_messages&room_id=${state.currentRoomId}&after_id=0`);
             const raw = await res.text();
-            if (raw.trim().startsWith('<')) throw new Error('InfinityFree security filter intercepted request. Please reload.');
+            if (raw.trim().startsWith('<')) throw new Error('Unable to load chat messages right now. Please reload the page.');
             const data = JSON.parse(raw);
             if (!res.ok) {
                 throw new Error(data.error || `Server returned HTTP ${res.status}`);

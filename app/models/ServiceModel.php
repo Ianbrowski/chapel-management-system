@@ -6,17 +6,29 @@
 class ServiceModel
 {
     protected mysqli $conn;
+    private static array $catalogCache = [];
 
     public function __construct(mysqli $conn)
     {
         $this->conn = $conn;
     }
 
+    public static function clearCatalogCache(): void
+    {
+        self::$catalogCache = [];
+    }
+
     /**
      * Get all categories with nested services, variants, requirements, charges, and schedules
+     * Uses bulk IN (...) queries + per-request cache instead of nested N+1 queries.
      */
     public function getFullCatalog(bool $activeOnly = true): array
     {
+        $cacheKey = spl_object_id($this->conn) . '|' . ($activeOnly ? '1' : '0');
+        if (isset(self::$catalogCache[$cacheKey])) {
+            return self::$catalogCache[$cacheKey];
+        }
+
         $statusClause = $activeOnly ? "WHERE sc.status = 'active'" : "";
         $res = $this->conn->query("
             SELECT sc.* 
@@ -24,34 +36,86 @@ class ServiceModel
             {$statusClause}
             ORDER BY sc.display_order ASC, sc.name ASC
         ");
-        
+
         $catalog = [];
-        if (!$res) return $catalog;
-
-        while ($cat = $res->fetch_assoc()) {
-            $catId = (int)$cat['id'];
-            $srvStatus = $activeOnly ? "AND s.status = 'active'" : "";
-            $srvRes = $this->conn->query("
-                SELECT s.* 
-                FROM services s 
-                WHERE s.category_id = {$catId} {$srvStatus}
-                ORDER BY s.id ASC
-            ");
-
-            $cat['services'] = [];
-            if ($srvRes) {
-                while ($srv = $srvRes->fetch_assoc()) {
-                    $srvId = (int)$srv['id'];
-                    $srv['variants']     = $this->getVariants($srvId, $activeOnly);
-                    $srv['requirements'] = $this->getRequirements($srvId, $activeOnly);
-                    $srv['charges']      = $this->getAdditionalCharges($srvId, $activeOnly);
-                    $srv['schedules']    = $this->getSchedules($srvId, $activeOnly);
-                    $cat['services'][]   = $srv;
-                }
-            }
-            $catalog[] = $cat;
+        $catIndexById = [];
+        if (!$res) {
+            return $catalog;
         }
 
+        while ($cat = $res->fetch_assoc()) {
+            $cat['services'] = [];
+            $cid = (int)$cat['id'];
+            $catIndexById[$cid] = count($catalog);
+            $catalog[] = $cat;
+        }
+        if (empty($catalog)) {
+            return self::$catalogCache[$cacheKey] = $catalog;
+        }
+
+        $catIds = implode(',', array_keys($catIndexById));
+        $srvStatus = $activeOnly ? "AND s.status = 'active'" : "";
+        $srvRes = $this->conn->query("
+            SELECT s.* 
+            FROM services s 
+            WHERE s.category_id IN ({$catIds}) {$srvStatus}
+            ORDER BY s.id ASC
+        ");
+
+        $servicesById = [];
+        $serviceCatById = [];
+        if ($srvRes) {
+            while ($srv = $srvRes->fetch_assoc()) {
+                $sid = (int)$srv['id'];
+                $srv['variants']     = [];
+                $srv['requirements'] = [];
+                $srv['charges']      = [];
+                $srv['schedules']    = [];
+                $servicesById[$sid]   = $srv;
+                $serviceCatById[$sid] = (int)$srv['category_id'];
+            }
+        }
+
+        if (!empty($servicesById)) {
+            $sidList = implode(',', array_keys($servicesById));
+
+            $varFilter = $activeOnly ? "AND status = 'active' AND is_current = 1" : "";
+            if ($r = $this->conn->query("SELECT * FROM service_variants WHERE service_id IN ({$sidList}) {$varFilter} ORDER BY price ASC, id ASC")) {
+                while ($row = $r->fetch_assoc()) {
+                    $servicesById[(int)$row['service_id']]['variants'][] = $row;
+                }
+            }
+
+            $reqFilter = $activeOnly ? "AND status = 'active'" : "";
+            if ($r = $this->conn->query("SELECT * FROM service_requirements WHERE service_id IN ({$sidList}) {$reqFilter} ORDER BY is_required DESC, id ASC")) {
+                while ($row = $r->fetch_assoc()) {
+                    $servicesById[(int)$row['service_id']]['requirements'][] = $row;
+                }
+            }
+
+            $chgFilter = $activeOnly ? "AND status = 'active'" : "";
+            if ($r = $this->conn->query("SELECT * FROM service_additional_charges WHERE service_id IN ({$sidList}) {$chgFilter} ORDER BY price ASC, id ASC")) {
+                while ($row = $r->fetch_assoc()) {
+                    $servicesById[(int)$row['service_id']]['charges'][] = $row;
+                }
+            }
+
+            $schFilter = $activeOnly ? "AND status = 'active'" : "";
+            if ($r = $this->conn->query("SELECT * FROM service_schedules WHERE service_id IN ({$sidList}) {$schFilter} ORDER BY id ASC")) {
+                while ($row = $r->fetch_assoc()) {
+                    $servicesById[(int)$row['service_id']]['schedules'][] = $row;
+                }
+            }
+
+            foreach ($servicesById as $sid => $srvData) {
+                $catIdx = $catIndexById[$serviceCatById[$sid]] ?? null;
+                if ($catIdx !== null) {
+                    $catalog[$catIdx]['services'][] = $srvData;
+                }
+            }
+        }
+
+        self::$catalogCache[$cacheKey] = $catalog;
         return $catalog;
     }
 
@@ -169,7 +233,9 @@ class ServiceModel
     {
         $stmt = $this->conn->prepare("UPDATE certificate_types SET price_per_copy = ?, updated_at = NOW() WHERE id = ?");
         $stmt->bind_param("di", $price, $id);
-        return $stmt->execute();
+        $ok = $stmt->execute();
+        if ($ok) self::clearCatalogCache();
+        return $ok;
     }
 
     /**
@@ -201,12 +267,16 @@ class ServiceModel
             $sched = $old['schedule_type'];
             $spons = (int)$old['included_sponsors'];
             $stmtNew->bind_param("issdsis", $sId, $name, $desc, $newPrice, $sched, $spons, $effDate);
-            return $stmtNew->execute();
+            $ok = $stmtNew->execute();
+            if ($ok) self::clearCatalogCache();
+            return $ok;
         } else {
             // Direct overwrite
             $stmt = $this->conn->prepare("UPDATE service_variants SET price = ?, effective_from = ? WHERE id = ?");
             $stmt->bind_param("dsi", $newPrice, $effDate, $variantId);
-            return $stmt->execute();
+            $ok = $stmt->execute();
+            if ($ok) self::clearCatalogCache();
+            return $ok;
         }
     }
 
@@ -218,6 +288,7 @@ class ServiceModel
         ");
         $stmt->bind_param("issdsi", $serviceId, $name, $description, $price, $scheduleType, $sponsors);
         if ($stmt->execute()) {
+            self::clearCatalogCache();
             return $this->conn->insert_id;
         }
         return 0;
@@ -227,7 +298,9 @@ class ServiceModel
     {
         $stmt = $this->conn->prepare("UPDATE service_variants SET status = ? WHERE id = ?");
         $stmt->bind_param("si", $status, $variantId);
-        return $stmt->execute();
+        $ok = $stmt->execute();
+        if ($ok) self::clearCatalogCache();
+        return $ok;
     }
 
     public function addRequirement(int $serviceId, string $requirement, bool $isRequired = true, string $description = ''): int
@@ -239,6 +312,7 @@ class ServiceModel
         ");
         $stmt->bind_param("isis", $serviceId, $requirement, $reqVal, $description);
         if ($stmt->execute()) {
+            self::clearCatalogCache();
             return $this->conn->insert_id;
         }
         return 0;
@@ -248,7 +322,9 @@ class ServiceModel
     {
         $stmt = $this->conn->prepare("DELETE FROM service_requirements WHERE id = ?");
         $stmt->bind_param("i", $requirementId);
-        return $stmt->execute();
+        $ok = $stmt->execute();
+        if ($ok) self::clearCatalogCache();
+        return $ok;
     }
 
     public function addAdditionalCharge(int $serviceId, string $name, float $price, string $description = '', bool $isOptional = true): int
@@ -260,6 +336,7 @@ class ServiceModel
         ");
         $stmt->bind_param("issdi", $serviceId, $name, $description, $price, $optVal);
         if ($stmt->execute()) {
+            self::clearCatalogCache();
             return $this->conn->insert_id;
         }
         return 0;
@@ -269,21 +346,27 @@ class ServiceModel
     {
         $stmt = $this->conn->prepare("DELETE FROM service_additional_charges WHERE id = ?");
         $stmt->bind_param("i", $chargeId);
-        return $stmt->execute();
+        $ok = $stmt->execute();
+        if ($ok) self::clearCatalogCache();
+        return $ok;
     }
 
     public function updateAdditionalChargePrice(int $chargeId, float $price): bool
     {
         $stmt = $this->conn->prepare("UPDATE service_additional_charges SET price = ? WHERE id = ?");
         $stmt->bind_param("di", $price, $chargeId);
-        return $stmt->execute();
+        $ok = $stmt->execute();
+        if ($ok) self::clearCatalogCache();
+        return $ok;
     }
 
     public function updateServiceStatus(int $serviceId, string $status): bool
     {
         $stmt = $this->conn->prepare("UPDATE services SET status = ? WHERE id = ?");
         $stmt->bind_param("si", $status, $serviceId);
-        return $stmt->execute();
+        $ok = $stmt->execute();
+        if ($ok) self::clearCatalogCache();
+        return $ok;
     }
 
     public function updateServiceMetadata(int $serviceId, string $name, string $description, string $referenceSource, string $effectiveDate, bool $isReferenceOnly): bool
@@ -295,7 +378,9 @@ class ServiceModel
             WHERE id = ?
         ");
         $stmt->bind_param("ssssii", $name, $description, $referenceSource, $effectiveDate, $refVal, $serviceId);
-        return $stmt->execute();
+        $ok = $stmt->execute();
+        if ($ok) self::clearCatalogCache();
+        return $ok;
     }
 
     /**

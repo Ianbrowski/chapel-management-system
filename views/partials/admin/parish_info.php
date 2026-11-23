@@ -530,7 +530,15 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
                                 </div>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <button type="button" class="btn btn-ghost btn-sm" onclick="openScheduleModal(<?php echo $s['schedule_id']; ?>,'<?php echo addslashes($s['day_type']); ?>','<?php echo addslashes($s['schedule_time']); ?>',<?php echo $s['sort_order']; ?>,<?php echo $s['is_active']; ?>)" title="Edit schedule">
+                                <button type="button" class="btn btn-ghost btn-sm"
+                                        data-schedule="<?php echo htmlspecialchars(json_encode([
+                                            'id' => (int)$s['schedule_id'],
+                                            'day_type' => (string)$s['day_type'],
+                                            'schedule_time' => (string)$s['schedule_time'],
+                                            'sort_order' => (int)$s['sort_order'],
+                                            'is_active' => (int)$s['is_active'],
+                                        ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
+                                        onclick="openScheduleModalFromEl(this)" title="Edit schedule">
                                     <i class="fa-solid fa-pen-to-square mr-1"></i> Edit
                                 </button>
                                 <form method="POST" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this schedule?')">
@@ -616,7 +624,16 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
                                 </div>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <button type="button" class="btn btn-ghost btn-sm" onclick="openHistoryModal(<?php echo $h['history_id']; ?>,'<?php echo addslashes($h['year']); ?>','<?php echo addslashes($h['title']); ?>','<?php echo addslashes($h['description']); ?>',<?php echo $h['sort_order']; ?>,<?php echo $h['is_active']; ?>)" title="Edit milestone">
+                                <button type="button" class="btn btn-ghost btn-sm"
+                                        data-history="<?php echo htmlspecialchars(json_encode([
+                                            'id' => (int)$h['history_id'],
+                                            'year' => (string)$h['year'],
+                                            'title' => (string)$h['title'],
+                                            'description' => (string)$h['description'],
+                                            'sort_order' => (int)$h['sort_order'],
+                                            'is_active' => (int)$h['is_active'],
+                                        ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
+                                        onclick="openHistoryModalFromEl(this)" title="Edit milestone">
                                     <i class="fa-solid fa-pen-to-square mr-1"></i> Edit
                                 </button>
                                 <form method="POST" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this timeline event?')">
@@ -713,7 +730,18 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
                                 </div>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <button type="button" class="btn btn-ghost btn-sm" onclick="openLeaderModal(<?php echo $l['leader_id']; ?>,'<?php echo addslashes($l['name']); ?>','<?php echo addslashes($l['title']); ?>','<?php echo $l['position_type']; ?>','<?php echo addslashes($l['subtitle'] ?? ''); ?>',<?php echo $l['sort_order']; ?>,<?php echo $l['is_active']; ?>,'<?php echo addslashes($l['image_path'] ?? ''); ?>')" title="Edit leader">
+                                <button type="button" class="btn btn-ghost btn-sm"
+                                        data-leader="<?php echo htmlspecialchars(json_encode([
+                                            'id' => (int)$l['leader_id'],
+                                            'name' => (string)$l['name'],
+                                            'title' => (string)$l['title'],
+                                            'position_type' => (string)$l['position_type'],
+                                            'subtitle' => (string)($l['subtitle'] ?? ''),
+                                            'sort_order' => (int)$l['sort_order'],
+                                            'is_active' => (int)$l['is_active'],
+                                            'image_path' => (string)($l['image_path'] ?? ''),
+                                        ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
+                                        onclick="openLeaderModalFromEl(this)" title="Edit leader">
                                     <i class="fa-solid fa-pen-to-square mr-1"></i> Edit
                                 </button>
                                 <form method="POST" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this leader?')">
@@ -1200,6 +1228,27 @@ function handleMapUrlInput(val) {
             container.style.display = 'none';
         }
     }
+}
+
+function openScheduleModalFromEl(el) {
+    try {
+        const d = JSON.parse(el.getAttribute('data-schedule') || '{}');
+        openScheduleModal(d.id || 0, d.day_type || '', d.schedule_time || '', d.sort_order || 0, d.is_active ?? 1);
+    } catch (e) { console.error(e); }
+}
+
+function openHistoryModalFromEl(el) {
+    try {
+        const d = JSON.parse(el.getAttribute('data-history') || '{}');
+        openHistoryModal(d.id || 0, d.year || '', d.title || '', d.description || '', d.sort_order || 0, d.is_active ?? 1);
+    } catch (e) { console.error(e); }
+}
+
+function openLeaderModalFromEl(el) {
+    try {
+        const d = JSON.parse(el.getAttribute('data-leader') || '{}');
+        openLeaderModal(d.id || 0, d.name || '', d.title || '', d.position_type || 'parish_priest', d.subtitle || '', d.sort_order || 0, d.is_active ?? 1, d.image_path || '');
+    } catch (e) { console.error(e); }
 }
 
 function openScheduleModal(id, day='', time='', sort=0, active=1) {

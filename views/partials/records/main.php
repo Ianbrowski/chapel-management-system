@@ -863,6 +863,18 @@ $isAllActive = empty($curType);
                 </div>
                 <i class="fa-solid fa-arrow-right intake-arrow"></i>
             </a>
+
+            <!-- First Communion Modal Card -->
+            <a href="javascript:void(0)" onclick="closeModal('modal-select-official-form'); openCommunionAddModal('<?php echo $scope; ?>');" class="canonical-intake-card">
+                <div class="intake-icon">
+                    <i class="fa-solid fa-wine-glass"></i>
+                </div>
+                <div style="flex: 1;">
+                    <div class="intake-title">First Holy Communion Record</div>
+                    <div class="intake-desc">Communion Registry · Communicant details, parents, officiating priest &amp; registry folio</div>
+                </div>
+                <i class="fa-solid fa-arrow-right intake-arrow"></i>
+            </a>
         </div>
         <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end;">
             <button type="button" class="btn btn-sm btn-ghost" onclick="closeModal('modal-select-official-form')">Cancel</button>
@@ -873,8 +885,8 @@ $isAllActive = empty($curType);
 <script>
 window.sacramentalCsrf = '<?php echo $csrf; ?>';
 window.userRolePermissions = {
-    can_delete: <?php echo ($scope === 'cathedral' ? in_array($role, ['Admin', 'Cathedral Admin']) : in_array($role, ['Admin', 'Cathedral Admin', 'Chapel Admin'])) ? 'true' : 'false'; ?>,
-    can_edit: <?php echo ($scope === 'cathedral' ? in_array($role, ['Admin', 'Cathedral Admin']) : in_array($role, ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff'])) ? 'true' : 'false'; ?>
+    can_delete: <?php echo $can_delete ? 'true' : 'false'; ?>,
+    can_edit: <?php echo $can_edit ? 'true' : 'false'; ?>
 };
 window.recordsScope = '<?php echo $scope; ?>';
 var currentSelectedRecord = null;
@@ -1144,15 +1156,27 @@ function showRecordDetails(rec, rowElement) {
             <!-- Action Toolbar -->
             <div class="inspector-actions" style="margin-top: 4px; display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                    <a href="${certUrl}" target="_blank" class="btn btn-primary" style="height: 36px; padding: 0 10px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; text-decoration: none;">
-                        <i class="fa-solid fa-print"></i> Certificate
-                    </a>
+                    <button type="button" onclick="openCertModal(currentSelectedRecord, recordsScope)" class="btn btn-primary" style="height: 36px; padding: 0 10px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; border: none; cursor: pointer;">
+                        <i class="fa-solid fa-certificate"></i> Certificate
+                    </button>
                     ${editBtn}
                 </div>
                 ${deleteBtn}
             </div>
         </div>
     `;
+}
+
+function openCommunionAddModal(scope) {
+    const targetScope = scope || window.recordsScope || 'cathedral';
+    const uid = (targetScope === 'cathedral') ? 'add-cath' : 'add-chap';
+    const modalId = (targetScope === 'cathedral') ? 'modal-add-cathedral-record' : 'modal-add-chapel-record';
+    if (typeof selectSacramentPill === 'function') {
+        selectSacramentPill(uid, 'Communion');
+    }
+    if (typeof openModal === 'function') {
+        openModal(modalId);
+    }
 }
 
 // Official Form Handlers
@@ -1172,6 +1196,8 @@ function handleNewRecordAction(scopeOrEl, currentType) {
         window.location.href = 'marriage_form.php?scope=' + scope + chapelParam;
     } else if (currentType === 'Funeral') {
         window.location.href = 'funeral_form.php?scope=' + scope + chapelParam;
+    } else if (currentType === 'Communion') {
+        openCommunionAddModal(scope);
     } else {
         openModal('modal-select-official-form');
     }

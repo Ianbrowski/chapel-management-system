@@ -52,8 +52,12 @@ class Merchandise {
         return $this->getAllItems($includeArchived);
     }
 
-    public function getItem($id) {
-        $stmt = $this->conn->prepare("SELECT * FROM merchandise_items WHERE id = ?");
+    public function getItem($id, bool $includeArchived = false) {
+        $sql = "SELECT * FROM merchandise_items WHERE id = ?";
+        if ($this->supportsArchive && !$includeArchived) {
+            $sql .= " AND is_archived = 0";
+        }
+        $stmt = $this->conn->prepare($sql);
         if (!$stmt) return null;
         $stmt->bind_param("i", $id);
         $stmt->execute();
@@ -62,8 +66,8 @@ class Merchandise {
         return $item;
     }
 
-    public function getById($id) {
-        return $this->getItem($id);
+    public function getById($id, bool $includeArchived = false) {
+        return $this->getItem($id, $includeArchived);
     }
 
     public function addItem($name, $desc, $price, $stock, $photo_path = null) {
@@ -203,11 +207,16 @@ class Merchandise {
         return $sales;
     }
 
+    public function getTotalSalesRevenue(): float {
+        $res = $this->conn->query("SELECT COALESCE(SUM(total_price), 0) AS total FROM merchandise_sales");
+        return $res ? (float)($res->fetch_assoc()['total'] ?? 0) : 0.0;
+    }
+
     public function getSaleById($id) {
         $stmt = $this->conn->prepare("
-            SELECT s.*, m.name as item_name, m.price as unit_price, u.user as sold_by_name
+            SELECT s.*, COALESCE(m.name, CONCAT('Item #', s.item_id)) as item_name, COALESCE(m.price, 0) as unit_price, u.user as sold_by_name
             FROM merchandise_sales s
-            JOIN merchandise_items m ON s.item_id = m.id
+            LEFT JOIN merchandise_items m ON s.item_id = m.id
             LEFT JOIN users u ON s.processed_by = u.id
             WHERE s.id = ?
         ");
@@ -219,7 +228,7 @@ class Merchandise {
         return $sale ?: null;
     }
 
-    public function recordSale($item_id, $buyer_name, $quantity, $user_id) {
+    public function recordSale($item_id, $buyer_name, $quantity, $user_id, bool $wrapTransaction = true) {
         $item_id = (int)$item_id;
         $quantity = (int)$quantity;
         $buyer_name = trim((string)$buyer_name);
@@ -231,10 +240,17 @@ class Merchandise {
             return "Quantity must be at least 1.";
         }
 
-        $this->conn->begin_transaction();
+        if ($wrapTransaction) {
+            $this->conn->begin_transaction();
+        }
         try {
-            // Get item price and check stock
-            $stmt = $this->conn->prepare("SELECT price, stock_quantity FROM merchandise_items WHERE id = ? FOR UPDATE");
+            // Get item price and check stock (exclude archived items)
+            $sql = "SELECT price, stock_quantity FROM merchandise_items WHERE id = ?";
+            if ($this->supportsArchive) {
+                $sql .= " AND is_archived = 0";
+            }
+            $sql .= " FOR UPDATE";
+            $stmt = $this->conn->prepare($sql);
             $stmt->bind_param("i", $item_id);
             $stmt->execute();
             $res = $stmt->get_result();
@@ -261,10 +277,14 @@ class Merchandise {
             $stmt->execute();
             $stmt->close();
 
-            $this->conn->commit();
+            if ($wrapTransaction) {
+                $this->conn->commit();
+            }
             return true;
         } catch (Exception $e) {
-            $this->conn->rollback();
+            if ($wrapTransaction) {
+                $this->conn->rollback();
+            }
             return $e->getMessage();
         }
     }

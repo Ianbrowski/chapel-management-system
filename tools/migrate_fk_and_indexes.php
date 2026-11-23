@@ -355,6 +355,27 @@ foreach ($eventMetaColsToEnsure as $colName => $colDef) {
     }
 }
 
+// Step 0d: Ensure donations.payment_method includes Check alongside Cash/GCash/Bank Transfer/Maya/Other
+$rPayMethod = $conn->query(
+    "SELECT COLUMN_TYPE
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'donations' AND COLUMN_NAME = 'payment_method'
+     LIMIT 1"
+);
+if ($rPayMethod && ($pmRow = $rPayMethod->fetch_assoc())) {
+    $pmType = strtolower((string)($pmRow['COLUMN_TYPE'] ?? ''));
+    if (strpos($pmType, 'enum(') === 0 && strpos($pmType, "'check'") === false) {
+        if ($dryRun) {
+            echo "[DRY] ALTER TABLE donations MODIFY COLUMN payment_method ENUM('Cash','GCash','Bank Transfer','Maya','Check','Other') NOT NULL DEFAULT 'Cash'\n";
+        } elseif (@$conn->query("ALTER TABLE donations MODIFY COLUMN payment_method ENUM('Cash','GCash','Bank Transfer','Maya','Check','Other') NOT NULL DEFAULT 'Cash'")) {
+            echo "[COL OK] Widened donations.payment_method to include 'Check'\n";
+        } else {
+            echo "[COL ERR] donations.payment_method widen failed: {$conn->error}\n";
+        }
+    }
+    $rPayMethod->free();
+}
+
 echo "=== SUMMARY ===\n";
 echo "INDEXES: added={$idxAdded} skipped={$idxSkipped} failed={$idxFailed}\n";
 echo "FOREIGN_KEYS: added={$fkAdded} skipped={$fkSkipped} failed={$fkFailed}\n";

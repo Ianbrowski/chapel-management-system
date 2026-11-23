@@ -749,14 +749,17 @@ $categoryColors = [
         if (legendEl) {
             legendEl.innerHTML = '';
             if (hasData) {
+                const escLegend = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
                 ds.labels.forEach((label, i) => {
-                    const count = ds.values[i];
+                    const count = Number(ds.values[i]) || 0;
                     const pct = ds.total ? Math.round(count / ds.total * 100) : 0;
                     const color = ds.colors[i % ds.colors.length];
+                    const safeLabel = escLegend(label);
+                    const safeColor = escLegend(color);
                     legendEl.innerHTML += `
                         <li style="display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 2px 0;">
-                            <span class="legend-dot" style="background:${color}; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;"></span>
-                            <span class="legend-label" title="${label}" style="flex: 1; color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${label}</span>
+                            <span class="legend-dot" style="background:${safeColor}; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;"></span>
+                            <span class="legend-label" title="${safeLabel}" style="flex: 1; color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${safeLabel}</span>
                             <span class="legend-count" style="font-weight: 700; color: var(--text); font-size: 12px;">${count}</span>
                             <span style="font-size: 11px; color: var(--text2); min-width: 36px; text-align: right; font-weight: 600;">${pct}%</span>
                         </li>`;

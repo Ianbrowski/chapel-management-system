@@ -15,6 +15,9 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $role = $_SESSION['role'] ?? '';
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
 $allowedRoles = ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff', 'Priest'];
 if (!in_array($role, $allowedRoles, true)) {
     echo json_encode(['suggestions' => []]);
@@ -42,10 +45,16 @@ $types  = 'ssssss';
 
 $isGlobalAdmin = in_array($role, ['Admin', 'Cathedral Admin'], true);
 $sessionChapelId = (int)($_SESSION['chapel_id'] ?? 0);
-if (!$isGlobalAdmin && $sessionChapelId > 0) {
-    $where[]  = 'sr.chapel_id = ?';
-    $params[] = $sessionChapelId;
-    $types   .= 'i';
+if (!$isGlobalAdmin) {
+    if ($sessionChapelId > 0) {
+        $where[]  = 'sr.chapel_id = ?';
+        $params[] = $sessionChapelId;
+        $types   .= 'i';
+    } elseif ($role === 'Chapel Admin') {
+        $where[] = '1 = 0';
+    } else {
+        $where[] = "(sr.scope = 'cathedral' OR sr.chapel_id IS NULL OR sr.chapel_id = 0)";
+    }
 }
 
 $recordTypeHint = trim($_GET['record_type'] ?? '');

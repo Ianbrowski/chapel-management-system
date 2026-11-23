@@ -116,60 +116,73 @@ class InquiryController extends BaseController {
     }
 
     private function fulfillMerchReservation($id) {
-        // 1. Get Details & Prevent Duplicate Fulfillment
-        $inq = $this->inquiryModel->getById($id);
-        if (!$inq) {
-            $this->flash('error', 'Inquiry not found.');
-            return;
-        }
-        if (($inq['status'] ?? '') === 'Completed' || !empty($inq['is_archived'])) {
-            $this->flash('error', 'This merchandise reservation has already been fulfilled or archived.');
-            return;
-        }
-
-        // 2. Prefer structured columns (item_id, quantity), fall back to details regex
-        $itemId = (int)($inq['item_id'] ?? 0);
-        $qty    = (int)($inq['quantity'] ?? 0);
-        if ($itemId <= 0 && preg_match('/\(Item ID: (\d+)\)/', (string)($inq['details'] ?? ''), $idMatch)) {
-            $itemId = (int)$idMatch[1];
-        }
-        if ($qty <= 0) {
-            $qty = preg_match('/x (\d+)\./', (string)($inq['details'] ?? ''), $qtyMatch) ? (int)$qtyMatch[1] : 1;
-        }
-
-        if ($itemId <= 0 || $qty <= 0) {
-            $this->flash('error', 'Could not identify the merchandise item or quantity.');
-            return;
-        }
-
-        // 3. Record Sale
+        $id = (int)$id;
         require_once BASE_PATH . '/app/models/Merchandise.php';
         $merchM = new Merchandise($this->conn);
-        $res = $merchM->recordSale($itemId, $inq['full_name'], $qty, $this->userId);
 
-        if ($res !== true) {
-            $this->flash('error', 'Inventory Error: ' . ($res ?: 'Failed to record sale.'));
+        $inq = null;
+        $this->conn->begin_transaction();
+        try {
+            // 1. Lock row & prevent duplicate fulfillment
+            $lockStmt = $this->conn->prepare("SELECT * FROM public_inquiries WHERE id = ? FOR UPDATE");
+            if (!$lockStmt) {
+                throw new RuntimeException('Unable to lock reservation record.');
+            }
+            $lockStmt->bind_param('i', $id);
+            $lockStmt->execute();
+            $inq = $lockStmt->get_result()->fetch_assoc();
+            $lockStmt->close();
+
+            if (!$inq) {
+                throw new RuntimeException('Inquiry not found.');
+            }
+            if (($inq['status'] ?? '') === 'Completed' || !empty($inq['is_archived'])) {
+                throw new RuntimeException('This merchandise reservation has already been fulfilled or archived.');
+            }
+
+            // 2. Prefer structured columns (item_id, quantity), fall back to details regex
+            $itemId = (int)($inq['item_id'] ?? 0);
+            $qty    = (int)($inq['quantity'] ?? 0);
+            if ($itemId <= 0 && preg_match('/\(Item ID: (\d+)\)/', (string)($inq['details'] ?? ''), $idMatch)) {
+                $itemId = (int)$idMatch[1];
+            }
+            if ($qty <= 0) {
+                $qty = preg_match('/x (\d+)\./', (string)($inq['details'] ?? ''), $qtyMatch) ? (int)$qtyMatch[1] : 1;
+            }
+            if ($itemId <= 0 || $qty <= 0) {
+                throw new RuntimeException('Could not identify the merchandise item or quantity.');
+            }
+
+            // 3. Record Sale inside caller transaction
+            $res = $merchM->recordSale($itemId, $inq['full_name'], $qty, $this->userId, false);
+            if ($res !== true) {
+                throw new RuntimeException('Inventory Error: ' . ($res ?: 'Failed to record sale.'));
+            }
+
+            // 4. Update Inquiry to Completed + auto-archive atomically
+            if (!$this->inquiryModel->updateStatus($id, 'Completed', "One-click fulfillment: Automated sale recorded & stock deducted.")
+                || !$this->inquiryModel->archive($id)) {
+                throw new RuntimeException('Could not update inquiry status after recording the sale.');
+            }
+
+            $this->conn->commit();
+        } catch (Throwable $e) {
+            $this->conn->rollback();
+            $this->flash('error', $e->getMessage());
             return;
         }
 
-        // 4. Update Inquiry to Completed + auto-archive
-        if (!$this->inquiryModel->updateStatus($id, 'Completed', "One-click fulfillment: Automated sale recorded & stock deducted.")) {
-            $this->flash('error', 'Could not update inquiry status after recording the sale.');
-            return;
-        }
-        $this->inquiryModel->archive($id);
-            // Capture old inquiry state before fulfillment
-            $before = $inq;
-            // After status update and archiving, retrieve updated record (may be archived)
-            $after = $this->inquiryModel->getById($id);
-            AuditLogger::logFromSession(
-                $this->conn,
-                'updated',
-                'Inquiries',
-                "Fulfilled Merch Reservation #{$id} automatically.",
-                $before,
-                $after
-            );
+        // Capture inquiry state change for audit trail
+        $before = $inq;
+        $after = $this->inquiryModel->getById($id);
+        AuditLogger::logFromSession(
+            $this->conn,
+            'updated',
+            'Inquiries',
+            "Fulfilled Merch Reservation #{$id} automatically.",
+            $before,
+            $after
+        );
 
         // 5. Trigger Notifications
         $notifSummary = $this->sendInquiryNotifications($id, 'Completed', 'Your reservation has been processed and is now marked as picked up. Thank you!');

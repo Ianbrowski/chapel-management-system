@@ -86,27 +86,6 @@ class SmsService
     }
 
     /**
-     * Notify requester that a support ticket has been completed.
-     */
-    public static function sendTicketCompleted(mysqli $conn, int $ticketId, string $status = 'Resolved'): bool
-    {
-        $ticket = self::fetchTicket($conn, $ticketId);
-        if (!$ticket || empty($ticket['requester_phone'])) return false;
-
-        $name = trim((string)($ticket['requester_name'] ?? ''));
-        if ($name === '') {
-            $name = 'Parishioner';
-        }
-
-        $ticketNo = $ticket['ticket_no'] ?? ('#' . $ticketId);
-        $subject = $ticket['subject'] ?? 'request';
-        $statusLabel = strtoupper($status);
-        $msg = "Hi {$name}! Your parish support ticket {$ticketNo} for '{$subject}' is now {$statusLabel}. If you still need help, please contact the parish office.";
-
-        return self::send($ticket['requester_phone'], $msg);
-    }
-
-    /**
      * Notify requester that their public inquiry has been updated.
      */
     public static function sendInquiryUpdated(mysqli $conn, int $inquiryId, string $status): bool
@@ -157,20 +136,6 @@ class SmsService
         );
         if (!$stmt) return null;
         $stmt->bind_param('i', $eventId);
-        $stmt->execute();
-        return $stmt->get_result()->fetch_assoc();
-    }
-
-    private static function fetchTicket(mysqli $conn, int $ticketId): ?array
-    {
-        $stmt = $conn->prepare(
-            "SELECT ticket_no, subject, requester_phone,
-                    COALESCE(requester_name, '') AS requester_name
-             FROM tickets
-             WHERE ticket_id = ? LIMIT 1"
-        );
-        if (!$stmt) return null;
-        $stmt->bind_param('i', $ticketId);
         $stmt->execute();
         return $stmt->get_result()->fetch_assoc();
     }
@@ -249,7 +214,8 @@ class SmsService
             CURLOPT_POSTFIELDS => $payload,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 20,
-            CURLOPT_SSL_VERIFYPEER => false, // Bypass SSL verification for local environments
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
                 'Accept: application/json'

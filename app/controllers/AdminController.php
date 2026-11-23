@@ -203,6 +203,10 @@ class AdminController extends BaseController {
                     $this->flash('error', 'User not found.');
                     break;
                 }
+                if (($targetUser['role'] ?? '') !== 'Member') {
+                    $this->flash('error', 'Only Member registrations can be approved through this queue.');
+                    break;
+                }
                 if ($this->userModel->approveUser($id)) {
                     AuditLogger::logFromSession(
                         $this->conn,
@@ -225,6 +229,10 @@ class AdminController extends BaseController {
                 $targetUser = $this->userModel->getById($id);
                 if (!$targetUser) {
                     $this->flash('error', 'User not found.');
+                    break;
+                }
+                if (($targetUser['role'] ?? '') !== 'Member') {
+                    $this->flash('error', 'Only Member registrations can be declined through this queue.');
                     break;
                 }
                 if ($this->userModel->rejectUser($id)) {
@@ -299,35 +307,8 @@ class AdminController extends BaseController {
         }
 
         // 1. Handle Chapel Image Upload
-        $imagePath = null;
         $uploadError = '';
-        if (isset($_FILES['chapel_image']) && $_FILES['chapel_image']['error'] === UPLOAD_ERR_OK) {
-            $file = $_FILES['chapel_image'];
-            $tmpName = $file['tmp_name'];
-            $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
-            
-            // Validate MIME
-            $mime = class_exists('finfo') ? (new finfo(FILEINFO_MIME_TYPE))->file($tmpName) : $file['type'];
-            
-            if (!isset($allowed[$mime])) {
-                $uploadError = " (Invalid format)";
-            } elseif ($file['size'] > 5*1024*1024) { // 5MB limit
-                $uploadError = " (Image too large)";
-            } else {
-                $ext = $allowed[$mime];
-                $filename = 'chapel_' . bin2hex(random_bytes(8)) . '.' . $ext;
-                $relativeDir = 'uploads/chapels/';
-                $absDir = BASE_PATH . '/storage/' . $relativeDir;
-                
-                if (!is_dir($absDir)) mkdir($absDir, 0755, true);
-                
-                if (move_uploaded_file($tmpName, $absDir . $filename)) {
-                    $imagePath = $relativeDir . $filename;
-                } else {
-                    $uploadError = " (Upload failed)";
-                }
-            }
-        }
+        $imagePath = $this->handleImageUpload('chapel_image', 'uploads/chapels/', 'chapel_', 5 * 1024 * 1024, $uploadError);
 
         // 2. Collect Multi-Fiestas
         $fiestas = [];
@@ -423,30 +404,14 @@ class AdminController extends BaseController {
                     }
                 }
 
-                $imagePath = null;
                 $uploadMsg = '';
-                if (isset($_FILES['cathedral_image']) && $_FILES['cathedral_image']['error'] === UPLOAD_ERR_OK) {
-                    $file = $_FILES['cathedral_image'];
-                    $tmpName = $file['tmp_name'];
-                    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
-                    $mime = class_exists('finfo') ? (new finfo(FILEINFO_MIME_TYPE))->file($tmpName) : $file['type'];
-
-                    if (isset($allowed[$mime])) {
-                        $ext = $allowed[$mime];
-                        $filename = 'cathedral_' . bin2hex(random_bytes(8)) . '.' . $ext;
-                        $relativeDir = 'uploads/chapels/';
-                        $absDir = BASE_PATH . '/storage/' . $relativeDir;
-                        if (!is_dir($absDir)) mkdir($absDir, 0755, true);
-                        if (move_uploaded_file($tmpName, $absDir . $filename)) {
-                            $imagePath = $relativeDir . $filename;
-                        }
-                    }
-                }
+                $imagePath = $this->handleImageUpload('cathedral_image', 'uploads/chapels/', 'cathedral_', 5 * 1024 * 1024, $uploadMsg);
 
                 $oldData = $this->parishModel->getContactInfo();
+                $targetInfoId = (int)($oldData['info_id'] ?? 1);
                 $sql = "UPDATE parish_contact_info SET parish_name=?, address=?, phone=?, email=?, office_hours=?, map_embed_url=?, updated_by=?, patron_saint=?, coordinator_name=?, coordinator_phone=?";
                 if ($imagePath) $sql .= ", cathedral_image=?";
-                $sql .= " WHERE info_id=1";
+                $sql .= " WHERE info_id=?";
 
                 $stmt = $this->conn->prepare($sql);
                 if (!$stmt) {
@@ -454,9 +419,9 @@ class AdminController extends BaseController {
                     break;
                 }
                 if ($imagePath) {
-                    $stmt->bind_param('ssssssissss', $name, $addr, $ph, $em, $hrs, $map, $this->userId, $patron, $cname, $cphone, $imagePath);
+                    $stmt->bind_param('ssssssissssi', $name, $addr, $ph, $em, $hrs, $map, $this->userId, $patron, $cname, $cphone, $imagePath, $targetInfoId);
                 } else {
-                    $stmt->bind_param('ssssssisss', $name, $addr, $ph, $em, $hrs, $map, $this->userId, $patron, $cname, $cphone);
+                    $stmt->bind_param('ssssssisssi', $name, $addr, $ph, $em, $hrs, $map, $this->userId, $patron, $cname, $cphone, $targetInfoId);
                 }
                 
                 if ($stmt->execute()) {
@@ -515,13 +480,31 @@ class AdminController extends BaseController {
             
             case 'update_email_settings':
                 $webhookUrl = trim((string)($_POST['email_webhook_url'] ?? ''));
-                if ($webhookUrl !== '' && !filter_var($webhookUrl, FILTER_VALIDATE_URL)) {
-                    $this->flash('error', 'Please enter a valid Email Webhook URL (or leave it empty).');
-                    break;
-                }
-                if ($webhookUrl !== '' && stripos($webhookUrl, 'https://') !== 0) {
-                    $this->flash('error', 'Email Webhook URL must begin with https:// (e.g. https://script.google.com/macros/s/.../exec).');
-                    break;
+                if ($webhookUrl !== '') {
+                    if (!filter_var($webhookUrl, FILTER_VALIDATE_URL)) {
+                        $this->flash('error', 'Please enter a valid Email Webhook URL (or leave it empty).');
+                        break;
+                    }
+                    $parsedWebhook = parse_url($webhookUrl);
+                    $whScheme = strtolower((string)($parsedWebhook['scheme'] ?? ''));
+                    $whHost = strtolower((string)($parsedWebhook['host'] ?? ''));
+                    if ($whScheme !== 'https' || $whHost === '') {
+                        $this->flash('error', 'Email Webhook URL must begin with https:// (e.g. https://script.google.com/macros/s/.../exec).');
+                        break;
+                    }
+                    $whIps = filter_var($whHost, FILTER_VALIDATE_IP) ? [$whHost] : [];
+                    if (empty($whIps)) {
+                        $resolved = @gethostbyname($whHost);
+                        if ($resolved && $resolved !== $whHost) {
+                            $whIps[] = $resolved;
+                        }
+                    }
+                    foreach ($whIps as $whIp) {
+                        if (!filter_var($whIp, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                            $this->flash('error', 'Email Webhook URL cannot point to private, loopback, or reserved network addresses.');
+                            break 2;
+                        }
+                    }
                 }
                 $emailProvider = strtolower(trim((string)($_POST['email_provider'] ?? '')));
                 if (!in_array($emailProvider, ['', 'brevo', 'resend', 'sendgrid', 'webhook', 'smtp'], true)) {
@@ -588,8 +571,9 @@ class AdminController extends BaseController {
                     $stmt->close();
                     break;
                 }
+                $stmt->close();
                 $this->flash('success', 'Schedule deleted.');
-AuditLogger::logFromSession($this->conn, 'deleted', 'Records', "Deleted mass schedule ID: {$id}");
+                AuditLogger::logFromSession($this->conn, 'deleted', 'Records', "Deleted mass schedule ID: {$id}");
                 
                 break;
 
@@ -652,29 +636,8 @@ AuditLogger::logFromSession($this->conn, 'deleted', 'Records', "Deleted mass sch
                 $active = isset($_POST['is_active']) ? 1 : 0;
 
                 $oldData = $id ? $this->parishModel->getLeaderById($id) : null;
-                $imagePath = null;
                 $uploadMsg = '';
-                if (isset($_FILES['leader_image']) && $_FILES['leader_image']['error'] === UPLOAD_ERR_OK) {
-                    $file = $_FILES['leader_image'];
-                    $tmpName = $file['tmp_name'];
-                    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
-                    $mime = class_exists('finfo') ? (new finfo(FILEINFO_MIME_TYPE))->file($tmpName) : $file['type'];
-
-                    if (isset($allowed[$mime])) {
-                        $ext = $allowed[$mime];
-                        $filename = 'leader_' . bin2hex(random_bytes(8)) . '.' . $ext;
-                        $relativeDir = 'uploads/leaders/';
-                        $absDir = BASE_PATH . '/storage/' . $relativeDir;
-                        if (!is_dir($absDir)) mkdir($absDir, 0755, true);
-                        if (move_uploaded_file($tmpName, $absDir . $filename)) {
-                            $imagePath = $relativeDir . $filename;
-                        } else {
-                            $uploadMsg = ' (Image upload failed)';
-                        }
-                    } else {
-                        $uploadMsg = ' (Invalid image format)';
-                    }
-                }
+                $imagePath = $this->handleImageUpload('leader_image', 'uploads/leaders/', 'leader_', 5 * 1024 * 1024, $uploadMsg);
 
                 if ($this->parishModel->saveLeader($id, $name, $title, $type, $subtitle, $sort, $active, $this->userId, $imagePath)) {
                     $newData = ['name' => $name, 'title' => $title, 'type' => $type, 'active' => $active];
@@ -750,47 +713,7 @@ AuditLogger::logFromSession($this->conn, 'deleted', 'Records', "Deleted mass sch
             }
 
             $uploadMsg = '';
-            $profilePicPath = null;
-
-            // Handle image upload
-            if (isset($_FILES['profile_pic']) && $_FILES['profile_pic']['error'] === UPLOAD_ERR_OK) {
-                $file = $_FILES['profile_pic'];
-                $tmpName = $file['tmp_name'];
-                
-                if (class_exists('finfo')) {
-                    $finfo = new finfo(FILEINFO_MIME_TYPE);
-                    $mime  = $finfo->file($tmpName);
-                } else {
-                    $mime = $file['type'];
-                }
-                
-                $allowed = [
-                    'image/jpeg' => 'jpg',
-                    'image/png'  => 'png',
-                    'image/webp' => 'webp'
-                ];
-
-                if (!isset($allowed[$mime])) {
-                    $uploadMsg = " (Invalid image format)";
-                } elseif ($file['size'] > 2*1024*1024) { // 2MB limit
-                    $uploadMsg = " (Image too large, max 2MB)";
-                } else {
-                    $ext = $allowed[$mime];
-                    $newFilename = bin2hex(random_bytes(16)) . '.' . $ext;
-                    $relativeDir = 'uploads/profiles/';
-                    $targetPath  = BASE_PATH . '/storage/' . $relativeDir . $newFilename;
-                    
-                    if (!is_dir(dirname($targetPath))) {
-                        mkdir(dirname($targetPath), 0755, true);
-                    }
-                    
-                    if (move_uploaded_file($tmpName, $targetPath)) {
-                        $profilePicPath = $relativeDir . $newFilename;
-                    } else {
-                        $uploadMsg = " (Upload failed)";
-                    }
-                }
-            }
+            $profilePicPath = $this->handleImageUpload('profile_pic', 'uploads/profiles/', '', 2 * 1024 * 1024, $uploadMsg);
 
             // Handle password change
             $curPwd = $_POST['current_password'] ?? '';
@@ -806,6 +729,9 @@ AuditLogger::logFromSession($this->conn, 'deleted', 'Records', "Deleted mass sch
                 if ($curPwd && password_verify($curPwd, $hash)) {
                     $newHash = password_hash($newPwd, PASSWORD_DEFAULT);
                     $this->userModel->updateProfileAndPassword($this->userId, $name, $profilePicPath, $newHash);
+                    if (session_status() === PHP_SESSION_ACTIVE) {
+                        session_regenerate_id(true);
+                    }
                     $this->flash('success', 'Profile and password updated.' . $uploadMsg);
                 } else {
                     $this->flash('error', 'Current password is incorrect.');
@@ -819,6 +745,65 @@ AuditLogger::logFromSession($this->conn, 'deleted', 'Records', "Deleted mass sch
         }
 
         $this->redirect('dashboard.php?section=my_profile');
+    }
+
+    private function handleImageUpload(string $field, string $relativeDir, string $prefix, int $maxBytes, string &$uploadMsg): ?string {
+        if (!isset($_FILES[$field])) {
+            return null;
+        }
+        $file = $_FILES[$field];
+        $err = $file['error'] ?? UPLOAD_ERR_NO_FILE;
+        if ($err === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+        if ($err !== UPLOAD_ERR_OK) {
+            $uploadMsg = ' (Upload failed)';
+            return null;
+        }
+
+        $tmpName = $file['tmp_name'] ?? '';
+        if (!is_uploaded_file($tmpName)) {
+            $uploadMsg = ' (Invalid upload source)';
+            return null;
+        }
+        if (($file['size'] ?? 0) <= 0 || $file['size'] > $maxBytes) {
+            $mb = max(1, (int)round($maxBytes / (1024 * 1024)));
+            $uploadMsg = " (Image too large, max {$mb}MB)";
+            return null;
+        }
+        if (!class_exists('finfo')) {
+            $uploadMsg = ' (Server MIME inspector unavailable)';
+            return null;
+        }
+
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmpName) ?: '';
+        $allowed = [
+            'image/jpeg' => 'jpg',
+            'image/png'  => 'png',
+            'image/webp' => 'webp',
+        ];
+        if (!isset($allowed[$mime]) || @getimagesize($tmpName) === false) {
+            $uploadMsg = ' (Invalid image format)';
+            return null;
+        }
+
+        $ext = $allowed[$mime];
+        $bytesLen = ($prefix === '') ? 16 : 8;
+        $filename = $prefix . bin2hex(random_bytes($bytesLen)) . '.' . $ext;
+        $rel = trim($relativeDir, '/\\') . '/';
+        $absDir = BASE_PATH . '/storage/' . $rel;
+
+        if (!is_dir($absDir) && !mkdir($absDir, 0755, true) && !is_dir($absDir)) {
+            $uploadMsg = ' (Upload storage error)';
+            return null;
+        }
+
+        if (move_uploaded_file($tmpName, $absDir . $filename)) {
+            return $rel . $filename;
+        }
+
+        $uploadMsg = ' (Upload failed)';
+        return null;
     }
 
     /**

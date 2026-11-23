@@ -51,23 +51,30 @@ class SacramentalRecord
 
         if (!empty($filters['scope'])) {
             if ($filters['scope'] === 'cathedral') {
-                // Centralized Cathedral view shows all records by default;
-                // allow filtering to Main Cathedral only (chapel_id = 0) or a specific chapel (> 0).
+                // Centralized Cathedral view shows all records for global admins;
+                // allow filtering to Main Cathedral only (chapel_id = 0/'cathedral') or a specific chapel (> 0).
+                if (isset($filters['chapel_id']) && $filters['chapel_id'] !== null && $filters['chapel_id'] !== '') {
+                    $rawCid = $filters['chapel_id'];
+                    if ($rawCid === 'cathedral' || (int)$rawCid === 0) {
+                        $where[] = "(sr.scope = 'cathedral' OR sr.chapel_id IS NULL OR sr.chapel_id = 0)";
+                    } elseif ((int)$rawCid < 0) {
+                        $where[] = '1 = 0';
+                    } else {
+                        $where[] = 'sr.chapel_id = ?';
+                        $params[] = (int)$rawCid;
+                        $types .= 'i';
+                    }
+                }
+            } elseif ($filters['scope'] === 'chapel') {
                 if (isset($filters['chapel_id']) && $filters['chapel_id'] !== null && $filters['chapel_id'] !== '') {
                     $cid = (int)$filters['chapel_id'];
-                    if ($cid === 0) {
-                        $where[] = "(sr.scope = 'cathedral' OR sr.chapel_id IS NULL OR sr.chapel_id = 0)";
+                    if ($cid <= 0) {
+                        $where[] = '1 = 0';
                     } else {
                         $where[] = 'sr.chapel_id = ?';
                         $params[] = $cid;
                         $types .= 'i';
                     }
-                }
-            } elseif ($filters['scope'] === 'chapel') {
-                if (!empty($filters['chapel_id'])) {
-                    $where[] = 'sr.chapel_id = ?';
-                    $params[] = (int)$filters['chapel_id'];
-                    $types .= 'i';
                 } else {
                     $where[] = "(sr.scope = 'chapel' OR (sr.chapel_id IS NOT NULL AND sr.chapel_id > 0))";
                 }
@@ -329,7 +336,7 @@ class SacramentalRecord
         // Note: No future-date block here. Staff legitimately pre-register upcoming
         // events (e.g. scheduled weddings, funeral masses). The date input is trusted.
 
-        $age = !empty($d['age_at_death']) ? (int)$d['age_at_death'] : null;
+        $age = ($d['age_at_death'] !== '' && $d['age_at_death'] !== null) ? (int)$d['age_at_death'] : null;
         $encByVal = ($encoded_by > 0) ? $encoded_by : null;
 
         $vals = [
@@ -402,7 +409,7 @@ class SacramentalRecord
         // Records may have been legitimately saved with future dates (e.g., a pre-scheduled
         // wedding or funeral mass). Blocking edits would prevent correcting those records.
 
-        $age = $d['age_at_death'] ? (int)$d['age_at_death'] : null;
+        $age = ($d['age_at_death'] !== '' && $d['age_at_death'] !== null) ? (int)$d['age_at_death'] : null;
         $updByVal = ($updated_by > 0) ? $updated_by : null;
 
         $vals = [

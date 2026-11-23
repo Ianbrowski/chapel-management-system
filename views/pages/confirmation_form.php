@@ -97,9 +97,10 @@ $refId = $existingRecord['reference_id'] ?? '';
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/index.css?v=<?php echo time(); ?>">
-    <link rel="stylesheet" href="assets/css/workspace.css?v=2.5">
-    <script src="assets/js/ph-geo-data.js?v=<?php echo time(); ?>"></script>
+    <?php $assetV = static fn(string $p): int => @filemtime(__DIR__ . '/../../' . $p) ?: 1; ?>
+    <link rel="stylesheet" href="assets/css/index.css?v=<?php echo $assetV('assets/css/index.css'); ?>">
+    <link rel="stylesheet" href="assets/css/workspace.css?v=<?php echo $assetV('assets/css/workspace.css'); ?>">
+    <script src="assets/js/ph-geo-data.js?v=<?php echo $assetV('assets/js/ph-geo-data.js'); ?>"></script>
     <link rel="icon" type="image/x-icon" href="assets/img/2323.png">
     
     <script>
@@ -661,8 +662,8 @@ $refId = $existingRecord['reference_id'] ?? '';
                     <div class="field-group" style="margin-top:4px;">
                         <label>Filiation (Civil / Church Status)</label>
                         <select name="filiation" id="in-filiation" class="field-select" onchange="syncFormToPaper()">
-                            <option value="Kasal" <?php echo stripos($filiation, 'kasal') !== false && stripos($filiation, 'di') === false ? 'selected' : ''; ?>>Kasal (Legitimate)</option>
-                            <option value="Di Kasal" <?php echo stripos($filiation, 'di') !== false ? 'selected' : ''; ?>>Di Kasal (Illegitimate)</option>
+                            <option value="Kasal" <?php echo ((stripos($filiation, 'kasal') !== false && stripos($filiation, 'di') === false) || strcasecmp($filiation, 'Legitimate') === 0) ? 'selected' : ''; ?>>Kasal (Legitimate)</option>
+                            <option value="Di Kasal" <?php echo (stripos($filiation, 'di') !== false || strcasecmp($filiation, 'Illegitimate') === 0) ? 'selected' : ''; ?>>Di Kasal (Illegitimate)</option>
                         </select>
                     </div>
                 </div>
@@ -995,11 +996,11 @@ $refId = $existingRecord['reference_id'] ?? '';
         const mPob = document.getElementById('in-mother-pob')?.value || '';
         document.getElementById('pp-mother-pob').textContent = mPob || '\u00A0';
 
-        const filiation = document.getElementById('in-filiation')?.value || 'Kasal';
+        const filiation = (document.getElementById('in-filiation')?.value || 'Kasal').toLowerCase();
         const kasalBox = document.getElementById('pp-filiation-kasal-box');
         const diKasalBox = document.getElementById('pp-filiation-di-kasal-box');
         if (kasalBox && diKasalBox) {
-            if (filiation.toLowerCase().includes('di')) {
+            if (filiation.includes('di') || filiation === 'illegitimate') {
                 kasalBox.textContent = '';
                 diKasalBox.textContent = '✓';
             } else {

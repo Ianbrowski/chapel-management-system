@@ -128,14 +128,14 @@ class EventConflictService
         ];
     }
 
-    public function checkPriestOnly($pastorId, string $startTime, string $eventType = 'Other', $excludeId = null, ?int $customDuration = null): array
+    public function checkPriestOnly($pastorId, string $startTime, string $eventType = 'Other', $excludeId = null, ?int $customDuration = null, bool $skipDutyHoursCheck = false): array
     {
         $window = $this->buildWindow($startTime, $eventType, $customDuration);
         if (isset($window['error'])) {
             return $window['error'];
         }
 
-        if ($pastorId) {
+        if ($pastorId && !$skipDutyHoursCheck) {
             $dutyConflict = $this->checkPriestDutyHours($pastorId, $window['start']);
             if ($dutyConflict) {
                 return $dutyConflict;

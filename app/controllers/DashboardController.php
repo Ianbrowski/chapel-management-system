@@ -16,14 +16,11 @@ require_once __DIR__ . '/../models/Inquiry.php';
 require_once __DIR__ . '/../models/Bulletin.php';
 require_once __DIR__ . '/../models/AuditLogger.php';
 require_once __DIR__ . '/../models/AuditLogSection.php';
-require_once __DIR__ . '/../models/InsightPortfolio.php';
 require_once __DIR__ . '/../models/ParishInfo.php';
 require_once __DIR__ . '/../models/Merchandise.php';
 require_once __DIR__ . '/EventController.php';
-require_once __DIR__ . '/TicketController.php';
 require_once __DIR__ . '/../mail/DocumentReadyMailer.php';
 require_once __DIR__ . '/../services/SmsService.php';
-require_once __DIR__ . '/../models/Ticket.php';
 
 /**
  * DashboardController — The 'Traffic Controller' for the dashboard.
@@ -32,12 +29,12 @@ require_once __DIR__ . '/../models/Ticket.php';
 class DashboardController extends BaseController
 {
 
-    // Sub-controllers for specialized tasks
-    private $finance;
-    private $admin;
-    private $inquiry;
-    private $sacramental;
-    private $event;
+    // Lazy-loaded sub-controllers for specialized tasks
+    private ?FinanceController $finance = null;
+    private ?AdminController $admin = null;
+    private ?InquiryController $inquiry = null;
+    private ?SacramentalController $sacramental = null;
+    private ?EventController $event = null;
 
     // Models for overview stats
     private $userM;
@@ -49,7 +46,6 @@ class DashboardController extends BaseController
     private $auditM;
     private $inquiryM;
     private $parishInfoM;
-    private $insightPortfolioM;
     private $exportService;
     private $sectionDataService;
     private $isMember;
@@ -61,12 +57,6 @@ class DashboardController extends BaseController
         $this->isMember = ($this->role === 'Member');
         $this->isGuest  = ($this->role === 'Guest');
 
-        $this->finance = new FinanceController($conn);
-        $this->admin = new AdminController($conn);
-        $this->inquiry = new InquiryController($conn);
-        $this->sacramental = new SacramentalController($conn);
-        $this->event = new EventController($conn);
-
         $this->userM = new User($conn);
         $this->chapelM = new Chapel($conn);
         $this->donationM = new Donation($conn);
@@ -76,7 +66,6 @@ class DashboardController extends BaseController
         $this->auditM = new AuditLogSection($conn);
         $this->inquiryM = new Inquiry($conn);
         $this->parishInfoM = new ParishInfo($conn);
-        $this->insightPortfolioM = new InsightPortfolio();
         $this->exportService = new DashboardExportService($conn);
         $this->sectionDataService = new DashboardSectionDataService(
             $this->userM,
@@ -86,9 +75,33 @@ class DashboardController extends BaseController
             $this->recordM,
             $this->auditM,
             $this->parishInfoM,
-            $this->insightPortfolioM,
             $this->exportService
         );
+    }
+
+    private function finance(): FinanceController
+    {
+        return $this->finance ??= new FinanceController($this->conn);
+    }
+
+    private function admin(): AdminController
+    {
+        return $this->admin ??= new AdminController($this->conn);
+    }
+
+    private function inquiry(): InquiryController
+    {
+        return $this->inquiry ??= new InquiryController($this->conn);
+    }
+
+    private function sacramental(): SacramentalController
+    {
+        return $this->sacramental ??= new SacramentalController($this->conn);
+    }
+
+    private function event(): EventController
+    {
+        return $this->event ??= new EventController($this->conn);
     }
 
     /**
@@ -107,10 +120,15 @@ class DashboardController extends BaseController
             }
             $action = $_GET['action'];
             if ($action === 'export_donations') {
-                $this->finance->exportDonations();
+                $this->finance()->exportDonations();
             } elseif ($action === 'export_sales') {
-                $this->finance->exportSales();
+                $this->finance()->exportSales();
             } elseif ($action === 'export_report') {
+                if (empty($this->permissions['can_reports']) && empty($this->permissions['can_finance_reports'])) {
+                    $this->flash('error', 'Unauthorized to export report data.');
+                    $this->redirect('dashboard.php?section=events');
+                    return;
+                }
                 $this->exportReportCsv();
             }
         }
@@ -128,15 +146,15 @@ class DashboardController extends BaseController
 
         // Routing to specialized controllers
         if (in_array($section, ['donations', 'merchandise'])) {
-            $this->finance->handleRequest();
+            $this->finance()->handleRequest();
         } elseif (in_array($section, ['users', 'chapels', 'parish_info', 'my_profile'])) {
-            $this->admin->handleRequest();
+            $this->admin()->handleRequest();
         } elseif (str_starts_with($section, 'record') || str_ends_with($section, '_form')) {
-            $this->sacramental->handleRequest();
+            $this->sacramental()->handleRequest();
         } elseif (in_array($section, ['public_inquiries'])) {
-            $this->inquiry->handleRequest();
+            $this->inquiry()->handleRequest();
         } elseif (in_array($section, ['events', 'event_request', 'certificate_request', 'review_request', 'priest_prefs', 'pastor_prefs', 'schedule_audit'])) {
-            $this->event->handleRequest();
+            $this->event()->handleRequest();
         } elseif (in_array($section, ['services'])) {
             require_once __DIR__ . '/ServiceController.php';
             $srvCtrl = new ServiceController($this->conn);
@@ -348,7 +366,6 @@ class DashboardController extends BaseController
             'chapel_events' => [],
             'priests' => [],
             'priest_prefs' => [],
-            'tickets' => [],
             'stale_count' => 0,
             'schedule_conflicts' => [],
             'schedule_misplacements' => [],
@@ -357,13 +374,6 @@ class DashboardController extends BaseController
                 'event_status' => [],
                 'events_monthly' => [],
                 'record_types' => []
-            ],
-            'intelligence' => [
-                'venue_demand' => [],
-                'pastor_load' => [],
-                'growth_ratio' => [],
-                'retention_stats' => [],
-                'usage_stats' => []
             ],
             'my_event_types' => [],
             'rfrom' => '',
@@ -430,11 +440,11 @@ class DashboardController extends BaseController
                 $chapelFilter = 'cathedral';
             }
             $data['pending_count'] = $this->eventM->getCountByStatus('Pending', $chapelFilter);
-            $data['overdue_request_count'] = count($this->eventM->getOverduePendingRequests($chapelFilter));
+            $data['overdue_request_count'] = $this->eventM->countOverduePendingRequests($chapelFilter);
             $data['audit_issue_count'] = $data['overdue_request_count'];
             if ($p['can_audit_health']) {
                 $auditScope = in_array($this->role, ['Admin', 'Cathedral Admin', 'Priest', 'Pastor']) ? null : 'chapel';
-                $data['stale_count'] = count($this->eventM->getStaleConfirmedEvents($auditScope, $chapelFilter));
+                $data['stale_count'] = $this->eventM->countStaleConfirmedEvents($auditScope, $chapelFilter);
                 $data['audit_issue_count'] += $data['stale_count'];
             }
             $inqFilter = in_array($this->role, ['Admin', 'Cathedral Admin', 'Priest', 'Pastor'], true)
@@ -505,29 +515,22 @@ class DashboardController extends BaseController
                 $rawCalendarEvents = $this->eventM->getAll(350, $chapelFilter);
                 $data['all_calendar_events'] = $this->sanitizeCalendarEventsForRole($rawCalendarEvents);
 
-                // Precompute accurate status counters
-                $data['event_stats'] = [
-                    'total'     => $this->eventM->getCount($chapelFilter),
-                    'archived'  => $this->eventM->getArchivedCount($chapelFilter),
-                    'confirmed' => $this->eventM->getCountByStatus('Confirmed', $chapelFilter),
-                    'pending'   => $this->eventM->getCountByStatus('Pending', $chapelFilter),
-                    'completed' => $this->eventM->getCountByStatus('Completed', $chapelFilter),
-                    'cancelled' => $this->eventM->getCountByStatus('Cancelled', $chapelFilter),
-                ];
+                // Precompute accurate status counters in one query
+                $data['event_stats'] = $this->eventM->getStatusStats($chapelFilter);
                 break;
 
             case 'donations':
                 // ── Delegated to FinanceController::getFinanceViewData() ──
                 if (!$p['can_donations'])
                     return $this->loadViewData('events');
-                $data = array_merge($data, $this->finance->getFinanceViewData());
+                $data = array_merge($data, $this->finance()->getFinanceViewData());
                 break;
 
             case 'merchandise':
                 // ── Delegated to FinanceController::getFinanceViewData() ──
                 if (!$p['can_donations'] && !$this->isMember)
                     return $this->loadViewData('events');
-                $data = array_merge($data, $this->finance->getFinanceViewData());
+                $data = array_merge($data, $this->finance()->getFinanceViewData());
                 break;
 
             case 'records_cathedral':
@@ -537,14 +540,14 @@ class DashboardController extends BaseController
                 if (($_GET['export'] ?? '') === 'records_csv') {
                     $this->exportRecordsCsv('cathedral');
                 }
-                if (in_array($this->role, ['Admin', 'Cathedral Admin'])) {
+                if (in_array($this->role, ['Admin', 'Cathedral Admin'], true)) {
                     $chapelFilter = (isset($_GET['chapel_id']) && $_GET['chapel_id'] !== '')
                         ? (int)$_GET['chapel_id']
                         : ((isset($_GET['chapel']) && $_GET['chapel'] !== '') ? (int)$_GET['chapel'] : null);
                 } else {
-                    $chapelFilter = ($this->chapelId !== null && (int)$this->chapelId > 0) ? (int)$this->chapelId : null;
+                    $chapelFilter = ($this->chapelId !== null && (int)$this->chapelId > 0) ? (int)$this->chapelId : 0;
                 }
-                $data = array_merge($data, $this->sacramental->getRecordsViewData('cathedral', $chapelFilter));
+                $data = array_merge($data, $this->sacramental()->getRecordsViewData('cathedral', $chapelFilter));
                 $data['selected_chapel_id'] = $chapelFilter;
                 break;
 
@@ -555,12 +558,12 @@ class DashboardController extends BaseController
                 if (($_GET['export'] ?? '') === 'records_csv') {
                     $this->exportRecordsCsv('chapel');
                 }
-                if (in_array($this->role, ['Admin', 'Cathedral Admin'])) {
+                if (in_array($this->role, ['Admin', 'Cathedral Admin'], true)) {
                     $chapelFilter = !empty($_GET['chapel_id']) ? (int)$_GET['chapel_id'] : (!empty($_GET['chapel']) ? (int)$_GET['chapel'] : null);
                 } else {
-                    $chapelFilter = $this->chapelId ? (int)$this->chapelId : null;
+                    $chapelFilter = ($this->chapelId !== null && (int)$this->chapelId > 0) ? (int)$this->chapelId : -1;
                 }
-                $data = array_merge($data, $this->sacramental->getRecordsViewData('chapel', $chapelFilter));
+                $data = array_merge($data, $this->sacramental()->getRecordsViewData('chapel', $chapelFilter));
                 $data['selected_chapel_id'] = $chapelFilter;
                 break;
 
@@ -599,10 +602,10 @@ class DashboardController extends BaseController
 
                 if ($activeTab === 'users') {
                     if (!$p['can_manage_users']) return $this->loadViewData('events');
-                    $data = array_merge($data, $this->admin->getAdminViewData('users'));
+                    $data = array_merge($data, $this->admin()->getAdminViewData('users'));
                 } elseif ($activeTab === 'chapels') {
                     if (!$p['can_manage_chapels']) return $this->loadViewData('events');
-                    $data = array_merge($data, $this->admin->getAdminViewData('chapels'));
+                    $data = array_merge($data, $this->admin()->getAdminViewData('chapels'));
                 } elseif ($activeTab === 'services') {
                     if (!$p['can_manage_services']) return $this->loadViewData('events');
                     require_once __DIR__ . '/../models/ServiceModel.php';
@@ -631,25 +634,25 @@ class DashboardController extends BaseController
                 if (!$p['can_manage_users'])
                     return $this->loadViewData('events');
                 $data['settings_tab'] = 'users';
-                $data = array_merge($data, $this->admin->getAdminViewData('users'));
+                $data = array_merge($data, $this->admin()->getAdminViewData('users'));
                 break;
 
             case 'chapels':
                 if (!$p['can_manage_chapels'])
                     return $this->loadViewData('events');
                 $data['settings_tab'] = 'chapels';
-                $data = array_merge($data, $this->admin->getAdminViewData('chapels'));
+                $data = array_merge($data, $this->admin()->getAdminViewData('chapels'));
                 break;
 
             case 'event_requests':
                 if (!$p['can_approve_events'])
                     return $this->loadViewData('events');
-                $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin']) ? $this->chapelId : null;
+                $chapelFilter = $this->resolveScopedChapelFilter();
                 $page = max(1, (int)($_GET['page'] ?? 1));
                 $limit = 50;
 
                 $reqFilters = [
-                    'status'     => $_GET['status'] ?? 'all',
+                    'status'     => $_GET['status'] ?? 'pending',
                     'search'     => trim($_GET['search'] ?? ''),
                     'event_type' => trim($_GET['event_type'] ?? ''),
                     'timeframe'  => trim($_GET['timeframe'] ?? ''),
@@ -672,7 +675,7 @@ class DashboardController extends BaseController
             case 'public_inquiries':
                 if (!$p['can_manage_inquiries'] && !$this->isMember)
                     return $this->loadViewData('events');
-                $data = array_merge($data, $this->inquiry->getInquiryViewData('public_inquiries'));
+                $data = array_merge($data, $this->inquiry()->getInquiryViewData('public_inquiries'));
                 break;
 
             case 'services':
@@ -687,16 +690,12 @@ class DashboardController extends BaseController
 
             case 'request_event':
                 $data = $this->sectionDataService->loadRequestEventSectionData($data, $this->userId);
-                require_once __DIR__ . '/../models/ServiceModel.php';
-                $srvModel = new ServiceModel($this->conn);
-                $data['services_catalog'] = $srvModel->getFullCatalog(true);
                 break;
 
             case 'request_certificate':
                 $data = $this->sectionDataService->loadRequestCertificateSectionData($data, $this->userId);
                 require_once __DIR__ . '/../models/ServiceModel.php';
                 $srvModel = new ServiceModel($this->conn);
-                $data['services_catalog'] = $srvModel->getFullCatalog(true);
                 $data['certificate_types'] = $srvModel->getCertificateTypes();
                 break;
 
@@ -709,6 +708,8 @@ class DashboardController extends BaseController
 
             case 'priest_schedule':
             case 'pastor_schedule':
+                if (!in_array($this->role, ['Admin', 'Cathedral Admin', 'Priest', 'Pastor'], true))
+                    return $this->loadViewData('events');
                 $data = $this->sectionDataService->loadPriestScheduleSectionData($data, $this->userId);
                 break;
 
@@ -716,7 +717,7 @@ class DashboardController extends BaseController
                 if (!$p['can_reports'] && !$p['can_finance_reports'])
                     return $this->loadViewData('events');
                 $data['settings_tab'] = 'reports';
-                $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin'], true) ? ($this->chapelId !== null ? (int)$this->chapelId : null) : null;
+                $chapelFilter = $this->resolveScopedChapelFilter();
                 try {
                     $data = $this->sectionDataService->loadReportsSectionData($data, $chapelFilter);
                 } catch (InvalidArgumentException | RuntimeException $e) {
@@ -738,16 +739,13 @@ class DashboardController extends BaseController
                 $data['settings_tab'] = 'backups';
                 break;
 
-            case 'insights':
-                return $this->loadViewData('reports');
-
             case 'schedule_audit':
                 if (!$p['can_audit_health'])
                     return $this->loadViewData('events');
                 $data = $this->loadViewData('events');
                 $data['active_section'] = 'schedule_audit';
                 $auditScope = in_array($this->role, ['Admin', 'Cathedral Admin', 'Priest']) ? null : 'chapel';
-                $roleFilter = !in_array($this->role, ['Admin', 'Cathedral Admin'], true) ? ($this->chapelId !== null ? (int)$this->chapelId : null) : null;
+                $roleFilter = $this->resolveScopedChapelFilter();
                 $data['stale_events'] = $this->eventM->getStaleConfirmedEvents($auditScope, $roleFilter);
                 $data['blocked_requests'] = $this->eventM->getOverduePendingRequests($roleFilter);
                 $data['schedule_conflicts'] = $this->eventM->getScheduleConflicts($roleFilter);
@@ -760,20 +758,14 @@ class DashboardController extends BaseController
                 if (!$p['can_cathedral_sched'])
                     return $this->loadViewData('events');
                 $data = $this->sectionDataService->loadScheduleSectionData($data, 'cathedral');
-                require_once __DIR__ . '/../models/ServiceModel.php';
-                $srvModel = new ServiceModel($this->conn);
-                $data['services_catalog'] = $srvModel->getFullCatalog(true);
                 break;
 
             case 'chapel':
             case 'schedule_chapel':
                 if (!$p['can_chapel_sched'])
                     return $this->loadViewData('events');
-                $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin']) ? $this->chapelId : null;
+                $chapelFilter = $this->resolveScopedChapelFilter();
                 $data = $this->sectionDataService->loadScheduleSectionData($data, 'chapel', $chapelFilter);
-                require_once __DIR__ . '/../models/ServiceModel.php';
-                $srvModel = new ServiceModel($this->conn);
-                $data['services_catalog'] = $srvModel->getFullCatalog(true);
                 break;
         }
 
@@ -786,7 +778,7 @@ class DashboardController extends BaseController
     private function exportReportCsv()
     {
         try {
-            $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin'], true) ? ($this->chapelId !== null ? (int)$this->chapelId : null) : null;
+            $chapelFilter = $this->resolveScopedChapelFilter();
             $this->exportService->streamReportCsv($_GET['from'] ?? '', $_GET['to'] ?? '', $chapelFilter);
         } catch (InvalidArgumentException | RuntimeException $e) {
             $this->flash('error', $e->getMessage());
@@ -801,7 +793,13 @@ class DashboardController extends BaseController
 
     private function exportRecordsCsv(string $scope)
     {
-        $chapelFilter = in_array($this->role, ['Admin', 'Cathedral Admin']) ? null : $this->chapelId;
+        if (in_array($this->role, ['Admin', 'Cathedral Admin'], true)) {
+            $chapelFilter = null;
+        } elseif ($scope === 'cathedral') {
+            $chapelFilter = ($this->chapelId !== null && (int)$this->chapelId > 0) ? (int)$this->chapelId : 0;
+        } else {
+            $chapelFilter = ($this->chapelId !== null && (int)$this->chapelId > 0) ? (int)$this->chapelId : -1;
+        }
         $this->exportService->streamRecordsCsv($scope, $this->recordM->exportByScope($scope, $chapelFilter));
     }
 

@@ -30,6 +30,9 @@ try {
     $perms = $base->getPermissions();
     $role = $base->getRole();
     $chapelId = $base->getChapelId();
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
 
     // Clean up Admin/Cathedral Admin to see everything
     $chapelFilter = in_array($role, ['Admin', 'Cathedral Admin']) ? null : $chapelId;
@@ -46,7 +49,7 @@ try {
     // Only check stale if user has permission (mapped to role in front-end)
     if ($canApproveEvents) {
         $auditScope = ($role === 'Chapel Admin') ? 'chapel' : null;
-        $stale_events = count($eventM->getStaleConfirmedEvents($auditScope, $chapelFilter));
+        $stale_events = $eventM->countStaleConfirmedEvents($auditScope, $chapelFilter);
     }
 
     header('Content-Type: application/json');

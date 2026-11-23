@@ -270,6 +270,7 @@ $voidedCount = count($voided_donations ?? []);
                         <option value="GCash" <?php echo (($_GET['don_method']??'')==='GCash')?'selected':''; ?>>GCash</option>
                         <option value="Bank Transfer" <?php echo (($_GET['don_method']??'')==='Bank Transfer')?'selected':''; ?>>Bank Transfer</option>
                         <option value="Maya" <?php echo (($_GET['don_method']??'')==='Maya')?'selected':''; ?>>Maya</option>
+                        <option value="Check" <?php echo (($_GET['don_method']??'')==='Check')?'selected':''; ?>>Check</option>
                         <option value="Other" <?php echo (($_GET['don_method']??'')==='Other')?'selected':''; ?>>Other</option>
                     </select>
 
@@ -410,6 +411,7 @@ $voidedCount = count($voided_donations ?? []);
                         'tab' => 'ledger',
                         'don_from' => $_GET['don_from'] ?? '',
                         'don_to' => $_GET['don_to'] ?? '',
+                        'don_timeframe' => $_GET['don_timeframe'] ?? '',
                         'don_method' => $_GET['don_method'] ?? '',
                         'don_chapel' => $_GET['don_chapel'] ?? '',
                     ], static fn($v) => $v !== ''));

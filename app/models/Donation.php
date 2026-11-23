@@ -95,18 +95,29 @@ class Donation {
         return $res && $affected > 0;
     }
 
+    private function applyChapelScope(array &$where, string &$types, array &$params, int|string|null $chapelFilter): void {
+        if ($chapelFilter === null) {
+            return;
+        }
+        if ($chapelFilter === 'cathedral' || (int)$chapelFilter === 0) {
+            $where[] = '(d.chapel_id IS NULL OR d.chapel_id = 0)';
+        } elseif ((int)$chapelFilter < 0) {
+            $where[] = '1 = 0';
+        } else {
+            $where[] = 'd.chapel_id = ?';
+            $types  .= 'i';
+            $params[] = (int)$chapelFilter;
+        }
+    }
+
     /** Fetch voided (archived) donations for admin review tab. */
-    public function getVoided(?int $chapelFilter = null, int $limit = 200): array {
+    public function getVoided(int|string|null $chapelFilter = null, int $limit = 200): array {
         $this->ensureVoidColumns();
-        $where = ['d.is_archived = 1'];
+        $where = ['d.is_archived = 1', 'd.voided_at IS NOT NULL'];
         $types = '';
         $params = [];
 
-        if ($chapelFilter !== null) {
-            $where[] = 'd.chapel_id = ?';
-            $types  .= 'i';
-            $params[] = $chapelFilter;
-        }
+        $this->applyChapelScope($where, $types, $params, $chapelFilter);
         $types   .= 'i';
         $params[] = max(1, $limit);
 
@@ -164,16 +175,12 @@ class Donation {
         return $ref;
     }
 
-    public function countFiltered(?int $chapelFilter = null, array $filters = []): int {
+    public function countFiltered(int|string|null $chapelFilter = null, array $filters = []): int {
         $where = ['d.is_archived = 0'];
         $types = '';
         $params = [];
 
-        if ($chapelFilter !== null) {
-            $where[] = 'd.chapel_id = ?';
-            $types  .= 'i';
-            $params[] = $chapelFilter;
-        }
+        $this->applyChapelScope($where, $types, $params, $chapelFilter);
         if (!empty($filters['don_timeframe'])) {
             if ($filters['don_timeframe'] === 'recently_added' || $filters['don_timeframe'] === 'recently_added_30') {
                 $where[] = 'd.date_received >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
@@ -219,7 +226,7 @@ class Donation {
         return (int)$res;
     }
 
-    public function getPaginated(int $page = 1, int $perPage = 20, ?int $chapelFilter = null, array $filters = []): array {
+    public function getPaginated(int $page = 1, int $perPage = 20, int|string|null $chapelFilter = null, array $filters = []): array {
         $total = $this->countFiltered($chapelFilter, $filters);
         $pages = (int) ceil($total / $perPage);
         $page = max(1, min($page, $pages ?: 1));
@@ -235,18 +242,14 @@ class Donation {
         ];
     }
 
-    public function getAll(int $limit = 100, ?int $chapelFilter = null, array $filters = [], int $offset = 0): array {
+    public function getAll(int $limit = 100, int|string|null $chapelFilter = null, array $filters = [], int $offset = 0): array {
         $donations = [];
 
         $where = ['d.is_archived = 0'];
         $types = '';
         $params = [];
 
-        if ($chapelFilter !== null) {
-            $where[] = 'd.chapel_id = ?';
-            $types  .= 'i';
-            $params[] = $chapelFilter;
-        }
+        $this->applyChapelScope($where, $types, $params, $chapelFilter);
         if (!empty($filters['don_timeframe'])) {
             if ($filters['don_timeframe'] === 'recently_added' || $filters['don_timeframe'] === 'recently_added_30') {
                 $where[] = 'd.date_received >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
@@ -351,15 +354,16 @@ class Donation {
         return $found;
     }
 
-    public function getStats(?int $chapelFilter = null) {
+    public function getStats(int|string|null $chapelFilter = null) {
         $stats = ['total_amount' => 0, 'total_count' => 0, 'this_month' => 0];
 
-        // Total all-time
-        if ($chapelFilter !== null) {
-            $s1 = $this->conn->prepare("SELECT COALESCE(SUM(amount),0) as total, COUNT(*) as cnt FROM donations WHERE chapel_id = ? AND is_archived = 0");
-            $s1->bind_param('i', $chapelFilter);
-        } else {
-            $s1 = $this->conn->prepare("SELECT COALESCE(SUM(amount),0) as total, COUNT(*) as cnt FROM donations WHERE is_archived = 0");
+        $whereAll = ['d.is_archived = 0'];
+        $typesAll = '';
+        $paramsAll = [];
+        $this->applyChapelScope($whereAll, $typesAll, $paramsAll, $chapelFilter);
+        $s1 = $this->conn->prepare("SELECT COALESCE(SUM(d.amount),0) as total, COUNT(*) as cnt FROM donations d WHERE " . implode(' AND ', $whereAll));
+        if ($typesAll && $paramsAll) {
+            $s1->bind_param($typesAll, ...$paramsAll);
         }
         $s1->execute();
         $r = $s1->get_result()->fetch_assoc();
@@ -368,11 +372,13 @@ class Donation {
         $stats['total_count']  = $r['cnt']   ?? 0;
 
         // This month only
-        if ($chapelFilter !== null) {
-            $s2 = $this->conn->prepare("SELECT COALESCE(SUM(amount),0) as m FROM donations WHERE YEAR(date_received)=YEAR(NOW()) AND MONTH(date_received)=MONTH(NOW()) AND chapel_id = ? AND is_archived = 0");
-            $s2->bind_param('i', $chapelFilter);
-        } else {
-            $s2 = $this->conn->prepare("SELECT COALESCE(SUM(amount),0) as m FROM donations WHERE YEAR(date_received)=YEAR(NOW()) AND MONTH(date_received)=MONTH(NOW()) AND is_archived = 0");
+        $whereM = ['YEAR(d.date_received)=YEAR(NOW())', 'MONTH(d.date_received)=MONTH(NOW())', 'd.is_archived = 0'];
+        $typesM = '';
+        $paramsM = [];
+        $this->applyChapelScope($whereM, $typesM, $paramsM, $chapelFilter);
+        $s2 = $this->conn->prepare("SELECT COALESCE(SUM(d.amount),0) as m FROM donations d WHERE " . implode(' AND ', $whereM));
+        if ($typesM && $paramsM) {
+            $s2->bind_param($typesM, ...$paramsM);
         }
         $s2->execute();
         $stats['this_month'] = $s2->get_result()->fetch_assoc()['m'] ?? 0;

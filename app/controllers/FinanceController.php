@@ -130,7 +130,7 @@ class FinanceController extends BaseController {
             ];
         }
 
-        $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin']) ? $this->chapelId : null;
+        $chapelFilter = $this->resolveScopedChapelFilter();
         $stats = $this->donationModel->getStats($chapelFilter);
 
         $page = (int)($_GET['page'] ?? 1);
@@ -157,10 +157,9 @@ class FinanceController extends BaseController {
         $salesRes = $this->merchModel->getSalesPaginated($page, $perPage);
         $sales = $salesRes['records'];
 
-        $totalMerch = 0;
-        // We use all sales for the summary, not just the page
-        $allSales = $this->merchModel->getSales();
-        foreach ($allSales as $s) $totalMerch += $s['total_price'];
+        $totalMerch = (in_array($this->role, ['Admin', 'Cathedral Admin'], true) || $chapelFilter === 'cathedral')
+            ? $this->merchModel->getTotalSalesRevenue()
+            : 0.0;
 
         // Voided records visible only to Admin/Cathedral Admin
         $voidedDonations = in_array($this->role, ['Admin', 'Cathedral Admin'])
@@ -188,12 +187,11 @@ class FinanceController extends BaseController {
     }
 
     public function getSummary() {
-        $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin']) ? $this->chapelId : null;
+        $chapelFilter = $this->resolveScopedChapelFilter();
         $stats = $this->donationModel->getStats($chapelFilter);
-        $sales = $this->merchModel->getSales();
-        
-        $totalMerch = 0;
-        foreach ($sales as $s) $totalMerch += $s['total_price'];
+        $totalMerch = (in_array($this->role, ['Admin', 'Cathedral Admin'], true) || $chapelFilter === 'cathedral')
+            ? $this->merchModel->getTotalSalesRevenue()
+            : 0.0;
 
         return [
             'total_donations' => $stats['total_amount'],
@@ -216,7 +214,9 @@ class FinanceController extends BaseController {
     }
 
     public function getMerchandiseReceipt(int $id) {
-        if (!in_array($this->role, ['Admin','Cathedral Admin','Staff', 'Chapel Admin'], true)) {
+        $isGlobalAdmin = in_array($this->role, ['Admin', 'Cathedral Admin'], true);
+        $isCathedralStaff = ($this->role === 'Staff' && ((int)($this->chapelId ?? 0) === 0));
+        if (!$isGlobalAdmin && !$isCathedralStaff) {
             return null;
         }
         $sale = $this->merchModel->getSaleById($id);
@@ -240,8 +240,8 @@ class FinanceController extends BaseController {
             $this->redirect('dashboard.php?section=donations');
         }
 
-        $purpose  = mb_substr(trim((string)($_POST['purpose'] ?? '')), 0, 255);
-        $donor    = mb_substr(trim((string)($_POST['donor_name'] ?? '')), 0, 150);
+        $purpose  = mb_substr(trim((string)($_POST['purpose'] ?? '')), 0, 100);
+        $donor    = mb_substr(trim((string)($_POST['donor_name'] ?? '')), 0, 100);
         if ($donor === '') {
             $donor = 'Anonymous';
         }
@@ -258,9 +258,9 @@ class FinanceController extends BaseController {
         $refId    = $this->donationModel->generateRefId();
 
         $id = $this->donationModel->log($chapelId, $amount, $purpose, $donor, $date, $refId, $this->userId, $method, $donorRef);
-        // Capture new donation snapshot
-        $newDonation = $this->donationModel->getById($id);
         if ($id) {
+            // Capture new donation snapshot
+            $newDonation = $this->donationModel->getById((int)$id);
             AuditLogger::logFromSession(
                 $this->conn,
                 'created',
@@ -270,7 +270,9 @@ class FinanceController extends BaseController {
                 $newDonation
             );
             $this->flash('success', 'Donation logged successfully.');
-            $_SESSION['new_donation_id'] = $id; // For receipt link
+            $_SESSION['new_donation_id'] = (int)$id; // For receipt link
+        } else {
+            $this->flash('error', 'Could not log donation. Please verify inputs and try again.');
         }
         $this->redirect('dashboard.php?section=donations');
     }
@@ -444,7 +446,7 @@ class FinanceController extends BaseController {
         }
 
         // Capture old merchandise state before restoration
-        $before = $this->merchModel->getById($id);
+        $before = $this->merchModel->getItem($id, true);
         if ($this->merchModel->restoreItem($id)) {
             // Capture new merchandise state after restoration
             $after = $this->merchModel->getById($id);
@@ -483,10 +485,44 @@ class FinanceController extends BaseController {
             $this->redirect('dashboard.php?section=merchandise');
         }
 
-        $res = $this->merchModel->recordSale($id, $buyer, $qty, $this->userId);
-        if ($res === true) {
-            // Capture old merchandise state before sale
-            $before = $this->merchModel->getById($id);
+        $before = $this->merchModel->getById($id);
+
+        if ($inquiryId > 0) {
+            require_once BASE_PATH . '/app/models/Inquiry.php';
+            $inquiryModel = new Inquiry($this->conn);
+            $inq = null;
+            $res = true;
+
+            $this->conn->begin_transaction();
+            try {
+                $lockStmt = $this->conn->prepare("SELECT id, email, full_name, phone, service_category, status, is_archived FROM public_inquiries WHERE id = ? FOR UPDATE");
+                if ($lockStmt) {
+                    $lockStmt->bind_param('i', $inquiryId);
+                    $lockStmt->execute();
+                    $inq = $lockStmt->get_result()->fetch_assoc();
+                    $lockStmt->close();
+                }
+                if (!$inq || ($inq['status'] ?? '') === 'Completed' || !empty($inq['is_archived'])) {
+                    throw new RuntimeException('Reservation #' . $inquiryId . ' has already been fulfilled or does not exist.');
+                }
+
+                $res = $this->merchModel->recordSale($id, $buyer, $qty, $this->userId, false);
+                if ($res !== true) {
+                    throw new RuntimeException($res ?: 'Sale failed.');
+                }
+
+                if (!$inquiryModel->updateStatus($inquiryId, 'Completed', "Fulfillment: Sale recorded & stock deducted via Merchandise Ledger.")
+                    || !$inquiryModel->archive($inquiryId)) {
+                    throw new RuntimeException('Failed to mark reservation completed.');
+                }
+                $this->conn->commit();
+            } catch (Throwable $e) {
+                $this->conn->rollback();
+                $this->flash('error', $e->getMessage());
+                $this->redirect('dashboard.php?section=merchandise');
+                return;
+            }
+
             AuditLogger::logFromSession(
                 $this->conn,
                 'created',
@@ -495,39 +531,49 @@ class FinanceController extends BaseController {
                 $before,
                 ['sale_qty' => $qty, 'buyer' => $buyer]
             );
-            
-            // Auto complete and archive the inquiry if it exists
-            if ($inquiryId > 0) {
-                require_once BASE_PATH . '/app/models/Inquiry.php';
-                $inquiryModel = new Inquiry($this->conn);
-                $inq = $inquiryModel->getById($inquiryId);
-                if ($inq) {
-                    $inquiryModel->updateStatus($inquiryId, 'Completed', "Fulfillment: Sale recorded & stock deducted via Merchandise Ledger.");
-                    $inquiryModel->archive($inquiryId);
-                    
-                    // Trigger notifications for the completed inquiry
-                    require_once BASE_PATH . '/app/mail/InquiryMailer.php';
-                    $mailSent = InquiryMailer::sendStatusUpdate($inq['email'], $inq['full_name'], $inq['service_category'], 'Completed', 'Your reservation has been processed and is now marked as picked up. Thank you!');
-                    
-                    require_once BASE_PATH . '/app/services/SmsService.php';
-                    $smsSent = SmsService::sendInquiryUpdated($this->conn, $inquiryId, 'Completed');
-                    
-                    $notif = [];
-                    if (!empty($inq['email'])) $notif[] = $mailSent ? 'Email sent' : 'Email failed';
-                    if (!empty($inq['phone'])) $notif[] = $smsSent ? 'SMS sent' : 'SMS failed';
-                    $notifStr = !empty($notif) ? ' (' . implode(', ', $notif) . ')' : '';
-                    
-                    $this->flash('success', "Sale recorded and linked reservation #{$inquiryId} automatically completed & archived.{$notifStr}");
-                } else {
-                    $this->flash('success', 'Sale recorded.');
-                }
-            } else {
-                $this->flash('success', 'Sale recorded.');
-            }
+
+            // Trigger notifications for the completed inquiry
+            require_once BASE_PATH . '/app/mail/InquiryMailer.php';
+            $mailSent = !empty($inq['email'])
+                ? InquiryMailer::sendStatusUpdate($inq['email'], $inq['full_name'], $inq['service_category'], 'Completed', 'Your reservation has been processed and is now marked as picked up. Thank you!')
+                : false;
+
+            require_once BASE_PATH . '/app/services/SmsService.php';
+            $smsSent = !empty($inq['phone'])
+                ? SmsService::sendInquiryUpdated($this->conn, $inquiryId, 'Completed')
+                : false;
+
+            $notif = [];
+            if (!empty($inq['email'])) $notif[] = $mailSent ? 'Email sent' : 'Email failed';
+            if (!empty($inq['phone'])) $notif[] = $smsSent ? 'SMS sent' : 'SMS failed';
+            $notifStr = !empty($notif) ? ' (' . implode(', ', $notif) . ')' : '';
+
+            $this->flash('success', "Sale recorded and linked reservation #{$inquiryId} automatically completed & archived.{$notifStr}");
         } else {
-            $this->flash('error', $res ?: 'Sale failed.');
+            $res = $this->merchModel->recordSale($id, $buyer, $qty, $this->userId);
+            if ($res === true) {
+                AuditLogger::logFromSession(
+                    $this->conn,
+                    'created',
+                    'Finance',
+                    "Sale: {$qty}x Item ID {$id} to {$buyer}",
+                    $before,
+                    ['sale_qty' => $qty, 'buyer' => $buyer]
+                );
+                $this->flash('success', 'Sale recorded.');
+            } else {
+                $this->flash('error', $res ?: 'Sale failed.');
+            }
         }
         $this->redirect('dashboard.php?section=merchandise');
+    }
+
+    private function sanitizeCsvCell($value): string {
+        $str = (string) ($value ?? '');
+        if ($str !== '' && preg_match('/^[=+\-@\t\r]/', $str)) {
+            return "'" . $str;
+        }
+        return $str;
     }
 
     public function exportDonations() {
@@ -536,7 +582,7 @@ class FinanceController extends BaseController {
             $this->redirect('dashboard.php?section=donations');
         }
 
-        $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin']) ? $this->chapelId : null;
+        $chapelFilter = $this->resolveScopedChapelFilter();
         $data = $this->donationModel->getAll(1000, $chapelFilter);
 
         header('Content-Type: text/csv; charset=utf-8');
@@ -547,13 +593,13 @@ class FinanceController extends BaseController {
         
         foreach ($data as $row) {
             fputcsv($output, [
-                $row['reference_id'],
-                $row['donor_name'],
+                $this->sanitizeCsvCell($row['reference_id'] ?? ''),
+                $this->sanitizeCsvCell($row['donor_name'] ?? ''),
                 $row['amount'],
-                $row['purpose'],
+                $this->sanitizeCsvCell($row['purpose'] ?? ''),
                 $row['date_received'],
-                $row['payment_method'],
-                $row['chapel_name'] ?? 'Cathedral'
+                $this->sanitizeCsvCell($row['payment_method'] ?? ''),
+                $this->sanitizeCsvCell($row['chapel_name'] ?? 'Cathedral')
             ]);
         }
         fclose($output);
@@ -563,6 +609,11 @@ class FinanceController extends BaseController {
     public function exportSales() {
         if (!$this->permissions['can_finance_reports']) {
             $this->flash('error', 'Unauthorized to export sales data.');
+            $this->redirect('dashboard.php?section=merchandise');
+        }
+        $scopeFilter = $this->resolveScopedChapelFilter();
+        if ($scopeFilter !== null && $scopeFilter !== 'cathedral') {
+            $this->flash('error', 'Unauthorized to export parish merchandise sales.');
             $this->redirect('dashboard.php?section=merchandise');
         }
 
@@ -577,8 +628,8 @@ class FinanceController extends BaseController {
         foreach ($data as $row) {
             fputcsv($output, [
                 $row['id'],
-                $row['item_name'],
-                $row['buyer_name'],
+                $this->sanitizeCsvCell($row['item_name'] ?? ''),
+                $this->sanitizeCsvCell($row['buyer_name'] ?? ''),
                 $row['quantity'],
                 $row['total_price'],
                 $row['sale_date']

@@ -424,14 +424,8 @@ class SacramentalController extends BaseController {
         if ($id <= 0) return false;
         $record = $this->recordModel->getById($id);
         if (!$record) return false;
-        
-        // Super/Cathedral Admin can access all records
-        if (in_array($this->role, ['Admin', 'Cathedral Admin'], true)) return true;
-        
-        // Chapel Admin can only access records belonging to their assigned chapel
-        return $this->chapelId !== null 
-            && ($record['chapel_id'] ?? null) !== null 
-            && (int)$this->chapelId === (int)$record['chapel_id'];
+
+        return $this->checkChapelAccess($record['chapel_id'] ?? null);
     }
 
     /**
@@ -440,7 +434,7 @@ class SacramentalController extends BaseController {
      */
     public function handleIntakePage(string $sacramentType): void {
         // 1. Role Authorization
-        if (!in_array($this->role, ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff', 'Priest', 'Pastor'], true)) {
+        if (!in_array($this->role, ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff'], true)) {
             header('Location: dashboard.php?error=unauthorized');
             exit();
         }

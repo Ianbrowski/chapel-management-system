@@ -145,7 +145,7 @@ class AuthController extends BaseController {
         if ($this->supportsLoginLocking()) {
             $select .= ', login_attempts, locked_until';
         }
-        $select .= ' FROM users WHERE LOWER(TRIM(user)) = LOWER(?) OR LOWER(TRIM(COALESCE(email, \'\'))) = LOWER(?) LIMIT 1';
+        $select .= ' FROM users WHERE user = ? OR email = ? LIMIT 1';
 
         $stmt = $this->conn->prepare($select);
         if (!$stmt) {
@@ -326,24 +326,27 @@ class AuthController extends BaseController {
 
     // ─── SESSION FINGERPRINT ─────────────────────────────────────────────────
     /**
-     * Resolves the real client IP across reverse proxies, Cloudflare, and load balancers.
+     * Resolves client IP safely. Only trusts proxy forwarding headers when explicitly
+     * opted in via TRUST_PROXY_HEADERS === true.
      */
     public static function getClientIp(): string {
-        $headers = [
-            'HTTP_CF_CONNECTING_IP',
-            'HTTP_X_FORWARDED_FOR',
-            'HTTP_X_REAL_IP',
-            'REMOTE_ADDR'
-        ];
-        foreach ($headers as $h) {
-            if (!empty($_SERVER[$h])) {
-                $raw = trim($_SERVER[$h]);
-                if (strpos($raw, ',') !== false) {
-                    $parts = explode(',', $raw);
-                    $raw = trim($parts[0]);
-                }
-                if (filter_var($raw, FILTER_VALIDATE_IP)) {
-                    return $raw;
+        $trustProxies = defined('TRUST_PROXY_HEADERS') && TRUST_PROXY_HEADERS === true;
+        if ($trustProxies) {
+            $headers = [
+                'HTTP_CF_CONNECTING_IP',
+                'HTTP_X_FORWARDED_FOR',
+                'HTTP_X_REAL_IP',
+            ];
+            foreach ($headers as $h) {
+                if (!empty($_SERVER[$h])) {
+                    $raw = trim($_SERVER[$h]);
+                    if (strpos($raw, ',') !== false) {
+                        $parts = explode(',', $raw);
+                        $raw = trim($parts[0]);
+                    }
+                    if (filter_var($raw, FILTER_VALIDATE_IP)) {
+                        return $raw;
+                    }
                 }
             }
         }

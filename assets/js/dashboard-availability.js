@@ -154,7 +154,7 @@ async function renderAvailabilityTimeline(venue, datetime, scope, eventType, dur
         let afternoonEvent = null;
 
         events.forEach(ev => {
-            const evDate = new Date(ev.start_time);
+            const evDate = new Date(String(ev.start_time || '').replace(' ', 'T'));
             const hr = evDate.getHours();
             if (hr < 12) {
                 morningEvent = ev;
@@ -363,7 +363,9 @@ window.selectModalSlot = function(scope, shift, timeStr) {
     const dtInput = document.getElementById(`field-datetime-${scope}`);
     if (!dateInput || !dtInput) return;
 
-    const dateVal = dateInput.value || new Date().toISOString().substring(0, 10);
+    const nowLocal = new Date();
+    const todayLocalYmd = nowLocal.getFullYear() + '-' + String(nowLocal.getMonth() + 1).padStart(2, '0') + '-' + String(nowLocal.getDate()).padStart(2, '0');
+    const dateVal = dateInput.value || todayLocalYmd;
     dtInput.value = `${dateVal}T${timeStr}`;
 
     const pill = document.getElementById(`active-slot-pill-${scope}`);

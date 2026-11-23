@@ -52,23 +52,24 @@ try {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/fonts.css?v=<?= time() ?>">
+<?php $ver = static fn(string $rel): int => @filemtime(BASE_PATH . '/' . ltrim($rel, '/')) ?: 1; ?>
+    <link rel="stylesheet" href="assets/css/fonts.css?v=<?= $ver('assets/css/fonts.css') ?>">
     <link rel="stylesheet" href="assets/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/theme.css?v=<?= time() ?>">
-    <link rel="stylesheet" href="assets/css/utilities.css?v=<?= time() ?>">
-    <link rel="stylesheet" href="assets/css/layout.css?v=<?= time() ?>">
-    <link rel="stylesheet" href="assets/css/components.css?v=<?= time() ?>">
-    <link rel="stylesheet" href="assets/css/dashboard.css?v=<?= time() ?>">
-    <link rel="stylesheet" href="assets/css/skeleton.css?v=<?= time() ?>">
-    <link rel="stylesheet" href="assets/css/workspace.css?v=<?= time() ?>">
-    <link rel="stylesheet" href="assets/css/liquid-sidebar.css?v=<?= time() ?>">
+    <link rel="stylesheet" href="assets/css/theme.css?v=<?= $ver('assets/css/theme.css') ?>">
+    <link rel="stylesheet" href="assets/css/utilities.css?v=<?= $ver('assets/css/utilities.css') ?>">
+    <link rel="stylesheet" href="assets/css/layout.css?v=<?= $ver('assets/css/layout.css') ?>">
+    <link rel="stylesheet" href="assets/css/components.css?v=<?= $ver('assets/css/components.css') ?>">
+    <link rel="stylesheet" href="assets/css/dashboard.css?v=<?= $ver('assets/css/dashboard.css') ?>">
+    <link rel="stylesheet" href="assets/css/skeleton.css?v=<?= $ver('assets/css/skeleton.css') ?>">
+    <link rel="stylesheet" href="assets/css/workspace.css?v=<?= $ver('assets/css/workspace.css') ?>">
+    <link rel="stylesheet" href="assets/css/liquid-sidebar.css?v=<?= $ver('assets/css/liquid-sidebar.css') ?>">
     <?php if (in_array($role ?? '', ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Priest', 'Pastor', 'Staff'], true)): ?>
-    <link rel="stylesheet" href="assets/css/parish-chat.css?v=<?= time() ?>">
+    <link rel="stylesheet" href="assets/css/parish-chat.css?v=<?= $ver('assets/css/parish-chat.css') ?>">
     <?php endif; ?>
     <script src="assets/js/chart.umd.min.js"></script>
-    <script src="assets/js/skeleton-loader.js?v=<?= time() ?>"></script>
-    <script src="assets/js/dashboard-records.js?v=<?= time() ?>"></script>
-    <script src="assets/js/liquid-sidebar.js?v=<?= time() ?>"></script>
+    <script src="assets/js/skeleton-loader.js?v=<?= $ver('assets/js/skeleton-loader.js') ?>"></script>
+    <script src="assets/js/dashboard-records.js?v=<?= $ver('assets/js/dashboard-records.js') ?>"></script>
+    <script src="assets/js/liquid-sidebar.js?v=<?= $ver('assets/js/liquid-sidebar.js') ?>"></script>
 </head>
 
 <body>
@@ -351,7 +352,7 @@ try {
                     <div class="nav-section-label">Administration</div>
 
                     <?php if ($can_manage_users || $can_manage_chapels || $can_parish_info || $can_manage_services || !empty($can_reports) || !empty($can_finance_reports) || in_array($role, ['Admin', 'Cathedral Admin'])): ?>
-                        <a class="nav-item <?php echo in_array($active_section, ['settings', 'users', 'chapels', 'services', 'parish_info', 'backups', 'reports', 'insights']) ? 'active' : ''; ?>"
+                        <a class="nav-item <?php echo in_array($active_section, ['settings', 'users', 'chapels', 'services', 'parish_info', 'backups', 'reports']) ? 'active' : ''; ?>"
                             data-section="settings" data-tooltip="Settings" href="dashboard/settings">
                             <i class="fa-solid fa-gears"></i> <span>Settings</span>
                             <?php if (!empty($pending_count)): ?>
@@ -527,8 +528,7 @@ try {
                     $flash_text = str_replace(['✅', '❌'], ['sent', 'not sent'], $flash_text);
                     $flash_text = str_replace('Notifications sent', 'Notifications checked', $flash_text);
                 }
-                // Allow safe HTML spans for status coloring (e.g. notification summaries)
-                $flash_safe = strip_tags($flash_text, '<span><strong><em><i>');
+                $flash_safe = htmlspecialchars($flash_text, ENT_QUOTES, 'UTF-8');
                 ?>
                 <div class="flash flash-<?php echo ($flash_type === 'error') ? 'error' : 'success'; ?>" onclick="this.remove()" title="Click to dismiss">
                     <i class="fa-solid <?php echo ($flash_type === 'error') ? 'fa-circle-exclamation' : 'fa-circle-check'; ?>"></i>
@@ -731,18 +731,20 @@ try {
     </button>
 
     <!-- ── MODULAR SCRIPTS ── -->
-    <script src="assets/js/dashboard-core.js?v=<?= time() ?>"></script>
-    <script src="assets/js/search-autocomplete.js?v=<?= time() ?>"></script>
-    <script src="assets/js/ph-geo-data.js?v=<?= time() ?>"></script>
-    <script src="assets/js/dashboard-nav.js?v=<?= time() ?>"></script>
-    <script src="assets/js/dashboard-availability.js?v=<?= time() ?>"></script>
-    <script src="assets/js/dashboard-modals.js?v=<?= time() ?>"></script>
-    <script src="assets/js/dashboard-calendar.js?v=<?= time() ?>"></script>
-    <script src="assets/js/dashboard-profile.js?v=<?= time() ?>"></script>
-    <script src="assets/js/notifications.js?v=<?= time() ?>"></script>
-    <script src="assets/js/inbox-dropdown.js?v=<?= time() ?>"></script>
+    <script src="assets/js/dashboard-core.js?v=<?= $ver('assets/js/dashboard-core.js') ?>"></script>
+    <script src="assets/js/search-autocomplete.js?v=<?= $ver('assets/js/search-autocomplete.js') ?>"></script>
+    <script src="assets/js/ph-geo-data.js?v=<?= $ver('assets/js/ph-geo-data.js') ?>"></script>
+    <script src="assets/js/dashboard-nav.js?v=<?= $ver('assets/js/dashboard-nav.js') ?>"></script>
+    <script src="assets/js/dashboard-availability.js?v=<?= $ver('assets/js/dashboard-availability.js') ?>"></script>
+    <script src="assets/js/dashboard-modals.js?v=<?= $ver('assets/js/dashboard-modals.js') ?>"></script>
+    <script src="assets/js/dashboard-calendar.js?v=<?= $ver('assets/js/dashboard-calendar.js') ?>"></script>
+    <script src="assets/js/dashboard-profile.js?v=<?= $ver('assets/js/dashboard-profile.js') ?>"></script>
+    <?php if (!$isGuest): ?>
+    <script src="assets/js/notifications.js?v=<?= $ver('assets/js/notifications.js') ?>"></script>
+    <?php endif; ?>
+    <script src="assets/js/inbox-dropdown.js?v=<?= $ver('assets/js/inbox-dropdown.js') ?>"></script>
     <?php if (in_array($role ?? '', $internalChatRoles, true)): ?>
-    <script src="assets/js/parish-chat.js?v=<?= time() ?>"></script>
+    <script src="assets/js/parish-chat.js?v=<?= $ver('assets/js/parish-chat.js') ?>"></script>
     <?php endif; ?>
     <script>
         const currentSec = '<?php echo $active_section; ?>';

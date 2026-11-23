@@ -205,9 +205,12 @@ function openChapelHubModal(chapel) {
     document.getElementById('hub-chapel-name').textContent = chapel.chapel_name || 'Chapel';
     const patronEl = document.getElementById('hub-patron-saint');
     if (patronEl) {
-        patronEl.innerHTML = chapel.patron_saint 
-            ? `<i class="fa-solid fa-cross"></i> Patron: ${chapel.patron_saint}` 
-            : `<i class="fa-solid fa-church"></i> Vicariate Sub-Parish`;
+        if (chapel.patron_saint) {
+            patronEl.innerHTML = '<i class="fa-solid fa-cross"></i> Patron: ';
+            patronEl.appendChild(document.createTextNode(chapel.patron_saint));
+        } else {
+            patronEl.innerHTML = '<i class="fa-solid fa-church"></i> Vicariate Sub-Parish';
+        }
     }
 
     const locEl = document.getElementById('hub-location');
@@ -1724,102 +1727,6 @@ function openChapelHubModal(chapel) {
     </div>
 </div>
 
-<!-- MODAL: New Support Ticket -->
-<div class="modal-overlay" id="modal-new-ticket">
-    <div class="modal">
-        <div class="modal-header">
-            <div class="modal-title">New Support Ticket</div>
-            <button class="modal-close" onclick="closeModal('modal-new-ticket')">×</button>
-        </div>
-        <form id="form-new-ticket" method="POST">
-            <input type="hidden" name="form_section" value="tickets">
-            <input type="hidden" name="action" value="create">
-            <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-            <div class="modal-body">
-                <div class="form-grid">
-                    <div class="form-group" style="grid-column:1/-1;">
-                        <label>Subject</label>
-                        <input name="subject" placeholder="e.g. Broken AC in Chapel, Website Error" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Category</label>
-                        <select name="category">
-                            <option>General</option>
-                            <option>Maintenance</option>
-                            <option>Technical Support</option>
-                            <option>Event Query</option>
-                            <option>Financial</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Priority</label>
-                        <select name="priority">
-                            <option>Low</option>
-                            <option>Medium</option>
-                            <option>High</option>
-                            <option>Urgent</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="grid-column:1/-1;">
-                        <label>Description</label>
-                        <textarea name="description" rows="4" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--bg2); color:var(--text1);" placeholder="Describe the issue in detail..."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Requester Name</label>
-                        <input name="name" placeholder="e.g. Juan Dela Cruz">
-                    </div>
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" name="email" placeholder="juan@email.com">
-                    </div>
-                    <div class="form-group" style="grid-column:1/-1;">
-                        <label>Mobile Number <span style="color:var(--text2);font-weight:400;font-size:11px;">(for SMS when resolved)</span></label>
-                        <input type="tel" name="phone" placeholder="0912-345-6789" maxlength="15" pattern="[0-9\+\s\-]{10,20}" title="Enter valid mobile number (e.g. 0912-345-6789 or 09171234567)">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="submit" class="btn btn-primary">Submit Ticket</button>
-                <button type="button" class="btn btn-gray" onclick="closeModal('modal-new-ticket')">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- MODAL: Send Ticket Report -->
-<div class="modal-overlay" id="modal-send-ticket">
-    <div class="modal" style="max-width: 450px;">
-        <div class="modal-header">
-            <div class="modal-title">Send Ticket Report</div>
-            <button class="modal-close" onclick="closeModal('modal-send-ticket')">×</button>
-        </div>
-        <form id="form-send-ticket" method="POST">
-            <input type="hidden" name="form_section" value="tickets">
-            <input type="hidden" name="action" value="send_report">
-            <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-            <input type="hidden" name="ticket_id" id="send-report-ticket-id">
-            <div class="modal-body">
-                <div style="text-align:center; margin-bottom:20px;">
-                    <i class="fa-solid fa-paper-plane" style="font-size:3rem; color:var(--accent); opacity:0.8;"></i>
-                    <p style="margin-top:10px; font-weight:600;">Dispatching Report for Ticket #<span id="send-report-no">...</span></p>
-                </div>
-                <div class="form-group">
-                    <label>Recipient Email Address</label>
-                    <input type="email" name="recipient_email" placeholder="e.g. administrator@cathedral.org" required>
-                </div>
-                <div class="form-group">
-                    <label>Message / Note <span class="text-muted text-sm">(optional)</span></label>
-                    <textarea name="message" rows="3" placeholder="Add a custom note to the recipient..." style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--bg2); color:var(--text1);"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="submit" class="btn btn-primary">Send Report</button>
-                <button type="button" class="btn btn-gray" onclick="closeModal('modal-send-ticket')">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <!-- MODAL: Logout Confirmation -->
 <div class="modal-overlay" id="modal-logout">
     <div class="modal" style="max-width: 400px; text-align: center;">
@@ -1839,53 +1746,7 @@ function openChapelHubModal(chapel) {
     </div>
 </div>
 
-<!-- MODAL: View Ticket Details & Conversations -->
-<div class="modal-overlay" id="modal-view-ticket">
-    <div class="modal modal-lg" style="max-height:90vh;">
-        <div class="modal-header">
-            <div class="modal-title" id="vt-ticket-no">Ticket Details</div>
-            <button class="modal-close" onclick="closeModal('modal-view-ticket')">×</button>
-        </div>
-        <div class="modal-body" style="padding:0; display:flex; flex-direction:column; height: 75vh;">
-            <div style="padding: 24px; border-bottom:1px solid var(--border); background:var(--bg3);">
-                <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:12px;">
-                    <div>
-                        <h3 id="vt-subject" style="font-size:18px; margin-bottom:4px;">...</h3>
-                        <p id="vt-meta" style="font-size:12px; color:var(--text2);">...</p>
-                    </div>
-                    <div style="text-align:right;">
-                        <span id="vt-status" class="status-pill">...</span>
-                        <div id="vt-priority" style="margin-top:8px; font-size:11px; font-weight:600; text-transform:uppercase; display:flex; align-items:center; justify-content:flex-end;">
-                            <span class="priority-dot" id="vt-priority-dot"></span>
-                            <span id="vt-priority-text">...</span>
-                        </div>
-                    </div>
-                </div>
-                <div id="vt-description" style="padding:15px; background:var(--bg2); border:1px solid var(--border); border-radius:10px; font-size:13px; color:var(--text); line-height:1.6; white-space:pre-wrap; max-height:120px; overflow-y:auto;">
-                    ...
-                </div>
-            </div>
-
-            <!-- Conversation/Comments Area -->
-            <div style="flex:1; overflow-y:auto; padding:24px; background:var(--bg2);" id="vt-comments-container">
-                <!-- Comments injected here -->
-            </div>
-
-            <div style="padding: 20px 24px; background:var(--bg3); border-top:1px solid var(--border);">
-                <form id="form-ticket-comment" method="POST">
-                    <input type="hidden" name="form_section" value="tickets">
-                    <input type="hidden" name="action" value="add_comment">
-                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                    <input type="hidden" name="ticket_id" id="vt-submit-id">
-                    
-                    <div style="display:flex; gap:12px; align-items:flex-end;">
-                        <div style="flex:1;">
-                            <textarea name="comment" rows="2" placeholder="Write a response or internal note..." style="width:100%; min-height:80px; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-family:inherit; resize:none;"></textarea>
-                            <label style="font-size:11px; color:var(--text2); display:flex; align-items:center; gap:6px; margin-top:8px; cursor:pointer;">
-                                <input type="checkbox" name="is_internal" value="1"> Internal Staff Note (Requester won't see this)
-                            </label>
-                        </div>
-                        <button type="submit" class="btn btn-primary" style="height:48px; padding:0<?php if ($can_manage_inquiries): ?>
+<?php if ($can_manage_inquiries): ?>
 <!-- Inquiry Management Modal -->
 <div id="modal-manage-inquiry" class="modal-overlay" style="position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:9999; background:rgba(0,0,0,0.5); backdrop-filter:blur(5px); align-items:center; justify-content:center; padding:20px;">
     <div class="modal-box modal" style="max-width:520px; width:100%; max-height:90vh; background:var(--bg2); color:var(--text); display:flex; flex-direction:column; border-radius:12px; box-shadow:none; border:1px solid var(--border); overflow:hidden;">
@@ -2001,8 +1862,6 @@ function openChapelHubModal(chapel) {
                 </button>
 
                 <button type="submit" class="btn btn-primary" style="padding:8px 18px; font-size:12px;">Update Record</button>
-            </div>
-        </form>ne; border-radius:10px; box-shadow:0 8px 16px var(--accent-glow); cursor:pointer;">Update Record</button>
             </div>
         </form>
 

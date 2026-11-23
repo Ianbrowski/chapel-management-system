@@ -17,12 +17,27 @@ $customDuration = isset($_GET['custom_duration']) && (int)$_GET['custom_duration
 
 $role = $_SESSION['role'] ?? 'Staff';
 $sessionChapelId = $_SESSION['chapel_id'] ?? null;
-$isAdmin = in_array($role, ['Admin', 'Cathedral Admin'], true);
+$isGlobalAdmin = in_array($role, ['Admin', 'Cathedral Admin'], true);
+$isStaffOrClergy = in_array($role, ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff', 'Priest', 'Pastor'], true);
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
 $requestedChapelId = ($chapelId === null || $chapelId === '' || $chapelId === '0' || $chapelId === 'null') ? null : (int)$chapelId;
 
 // Allow all authenticated users to check priest availability for any chapel/Cathedral scope during event planning
 $eventM   = new Event($conn);
 $response = $eventM->getAvailablePriests($event_type, $datetime, $excludeId, $customDuration, $requestedChapelId);
+
+$reqCidInt = $requestedChapelId ?? 0;
+$canViewConflictTitle = $isGlobalAdmin || ($isStaffOrClergy && (($sessionChapelId === null || (int)$sessionChapelId === 0) ? $reqCidInt === 0 : (int)$sessionChapelId === $reqCidInt));
+if (!$canViewConflictTitle) {
+    foreach ($response as &$p) {
+        if (!empty($p['conflict_reason']) && ($p['conflict_status'] ?? '') !== 'Off-Duty') {
+            $p['conflict_reason'] = 'Time slot unavailable';
+        }
+    }
+    unset($p);
+}
 
 header('Content-Type: application/json');
 echo json_encode($response);

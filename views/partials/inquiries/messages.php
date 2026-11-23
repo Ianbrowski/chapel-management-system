@@ -136,21 +136,6 @@
                 </div>
 
                 <div class="panel-body" style="padding: 0; overflow-y: auto; flex: 1; min-height: 0;">
-                    <?php if ($isMember): ?>
-                    <div style="margin: 10px 12px; padding: 12px 14px; background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.25); border-radius: 8px; display: flex; align-items: flex-start; gap: 10px;">
-                        <i class="fa-solid fa-bell" style="color: var(--accent); font-size: 15px; margin-top: 2px;"></i>
-                        <div style="flex: 1; font-size: 12px; line-height: 1.45;">
-                            <div style="font-weight: 700; color: var(--accent); margin-bottom: 2px; display: flex; align-items: center; justify-content: space-between;">
-                                <span>Parish Office Notification</span>
-                                <span style="font-size: 10px; font-weight: 600; color: var(--text2);">Official Notice</span>
-                            </div>
-                            <div style="color: var(--text);">
-                                "Your requested Baptismal Certificate (Ref #BC-2026-0814) has been certified by the Parish Secretariat. It is ready for pickup at the Rectory Office (Mon–Sat, 8:30 AM – 4:30 PM)."
-                            </div>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-
                     <?php if (empty($inquiries)): ?>
                         <div style="padding: 40px 20px; text-align: center; color: var(--text2);">
                             <i class="fa-solid fa-inbox" style="font-size: 44px; opacity: 0.3; margin-bottom: 12px; display: block;"></i>
@@ -411,6 +396,15 @@ const canManageInquiries = <?php echo $can_manage_inquiries ? 'true' : 'false'; 
 const inqCsrf = '<?php echo $csrf; ?>';
 const isArchivedInbox = <?php echo $isArchived ? 'true' : 'false'; ?>;
 
+function escInqHtml(v) {
+    return String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function showWorkspaceInquiryDetails(inq, rowElement) {
     if (inq instanceof HTMLElement) {
         rowElement = inq;
@@ -457,8 +451,8 @@ function showWorkspaceInquiryDetails(inq, rowElement) {
         merchBlockHtml = `
             <div style="background: var(--bg3); border: 1px solid var(--border); padding: 8px; border-radius: 6px; font-size: 12px;">
                 <div style="font-weight: 700; color: var(--accent); margin-bottom: 4px;"><i class="fa-solid fa-store"></i> Merchandise Reservation</div>
-                <div style="color: var(--text); font-weight: 600;">${itemName}</div>
-                <div style="color: var(--text2); font-size: 11px; margin-top: 2px;">Qty: <strong>${itemQty}</strong></div>
+                <div style="color: var(--text); font-weight: 600;">${escInqHtml(itemName)}</div>
+                <div style="color: var(--text2); font-size: 11px; margin-top: 2px;">Qty: <strong>${escInqHtml(itemQty)}</strong></div>
                 ${canManageInquiries ? `<button type="button" class="btn btn-primary btn-sm" onclick="transferInquiryToMerch()" style="width:100%; margin-top:6px; justify-content:center; font-size:11px; height:26px;"><i class="fa-solid fa-basket-shopping"></i> Process Stock Sale</button>` : ''}
             </div>`;
     }
@@ -554,34 +548,34 @@ function showWorkspaceInquiryDetails(inq, rowElement) {
             <div style="border-top:1px solid var(--border); padding-top:10px; margin-top:4px;">
                 <div class="inbox-detail-label" style="margin-bottom:4px;">Office Response</div>
                 <div style="background:var(--bg); border:1px solid var(--border); padding:8px; border-radius:6px; font-size:12px; color:var(--text); line-height:1.4;">
-                    ${inq.admin_note || 'No administrative response yet. Your request is being reviewed.'}
+                    ${escInqHtml(inq.admin_note || 'No administrative response yet. Your request is being reviewed.')}
                 </div>
             </div>`;
     }
 
     const contactInfo = `
-        ${inq.email ? `<div><i class="fa-regular fa-envelope" style="color:var(--accent); margin-right:4px;"></i>${inq.email}</div>` : ''}
-        ${inq.phone ? `<div style="margin-top:3px;"><i class="fa-solid fa-phone" style="color:var(--accent); margin-right:4px;"></i>${inq.phone}</div>` : ''}
+        ${inq.email ? `<div><i class="fa-regular fa-envelope" style="color:var(--accent); margin-right:4px;"></i>${escInqHtml(inq.email)}</div>` : ''}
+        ${inq.phone ? `<div style="margin-top:3px;"><i class="fa-solid fa-phone" style="color:var(--accent); margin-right:4px;"></i>${escInqHtml(inq.phone)}</div>` : ''}
     `;
 
     inspector.innerHTML = `
         <div class="inbox-detail-card">
             <div style="display:flex; justify-content:space-between; align-items:start; gap:10px; border-bottom:1px solid var(--border); padding-bottom:8px;">
-                <div style="font-weight:700; font-size:0.95rem; color:var(--text);">Request #${String(inq.inquiry_id).padStart(4,'0')}</div>
-                <span class="badge ${statusBadgeClass}" style="font-size:11.5px; padding:2px 7px;">${inq.status || 'Pending'}</span>
+                <div style="font-weight:700; font-size:0.95rem; color:var(--text);">Request #${escInqHtml(String(inq.inquiry_id).padStart(4,'0'))}</div>
+                <span class="badge ${statusBadgeClass}" style="font-size:11.5px; padding:2px 7px;">${escInqHtml(inq.status || 'Pending')}</span>
             </div>
 
             <div class="inbox-detail-item">
                 <div class="inbox-detail-label">Parishioner</div>
-                <div class="inbox-detail-value" style="font-weight:700; color:var(--accent2);">${inq.full_name}</div>
+                <div class="inbox-detail-value" style="font-weight:700; color:var(--accent2);">${escInqHtml(inq.full_name)}</div>
                 <div style="font-size:11px; color:var(--text2); margin-top:2px;">${contactInfo}</div>
             </div>
 
             <div class="inbox-detail-item">
                 <div class="inbox-detail-label">Request Type</div>
                 <div class="inbox-detail-value">
-                    <strong>${inq.service_category || 'Other'}</strong>
-                    <span class="badge" style="font-size:11.5px; background:var(--bg3); padding:2px 6px; margin-left:4px;">${inq.request_type}</span>
+                    <strong>${escInqHtml(inq.service_category || 'Other')}</strong>
+                    <span class="badge" style="font-size:11.5px; background:var(--bg3); padding:2px 6px; margin-left:4px;">${escInqHtml(inq.request_type)}</span>
                 </div>
             </div>
 
@@ -589,18 +583,18 @@ function showWorkspaceInquiryDetails(inq, rowElement) {
                 <div class="inbox-detail-label">Target / Event Date</div>
                 <div class="inbox-detail-value" style="font-weight:600;">
                     <i class="fa-regular fa-calendar" style="color:var(--accent); margin-right:4px;"></i>
-                    ${formatDate(inq.target_date)}
+                    ${escInqHtml(formatDate(inq.target_date))}
                 </div>
             </div>
 
             <div class="inbox-detail-item">
                 <div class="inbox-detail-label">Chapel Scope</div>
-                <div class="inbox-detail-value">${inq.chapel_name || 'General Cathedral'}</div>
+                <div class="inbox-detail-value">${escInqHtml(inq.chapel_name || 'General Cathedral')}</div>
             </div>
 
             <div class="inbox-detail-item" style="border-bottom:none; padding-bottom:0;">
                 <div class="inbox-detail-label">Message Details</div>
-                <div class="inbox-detail-value" style="font-size:0.8rem; color:var(--text2); white-space:pre-wrap; line-height:1.5;">${inq.details || 'No message provided.'}</div>
+                <div class="inbox-detail-value" style="font-size:0.8rem; color:var(--text2); white-space:pre-wrap; line-height:1.5;">${escInqHtml(inq.details || 'No message provided.')}</div>
             </div>
 
             ${merchBlockHtml}

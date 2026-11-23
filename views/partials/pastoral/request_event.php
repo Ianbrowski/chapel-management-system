@@ -26,7 +26,6 @@ $activeReqView = $isTableFilterActive ? 'table' : 'form';
 $isGuest = ($role === 'Guest') || empty($user_id) || !empty($isGuest);
 $defaultTab = $_GET['tab'] ?? ($isGuest ? 'catalog' : ($totalReqs > 0 ? 'requests' : 'catalog'));
 ?>
-<link rel="stylesheet" href="assets/css/workspace.css?v=2.5">
 
 <div class="workspace req-workspace-root" style="min-height: 100%; flex: 1; display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 1680px; margin: 0 auto; padding: 14px clamp(16px, 1.8vw, 24px) 24px; box-sizing: border-box;">
 
@@ -438,7 +437,7 @@ $defaultTab = $_GET['tab'] ?? ($isGuest ? 'catalog' : ($totalReqs > 0 ? 'request
                                     <i class="fa-solid fa-eye"></i>
                                 </button>
                                 <?php if (!$isGuest): ?>
-                                <button type="button" class="btn-action-icon" onclick="if (window.ParishChat) ParishChat.toggleChat(true);" title="Chat Parish Office">
+                                <button type="button" class="btn-action-icon" onclick="if (window.ParishChat) { ParishChat.toggleChat(true); } else if (typeof navigateToSection === 'function') { navigateToSection('public_inquiries', true); } else { window.location.href = 'dashboard.php?section=public_inquiries'; }" title="Message Parish Office">
                                     <i class="fa-solid fa-comments"></i>
                                 </button>
                                 <?php endif; ?>
@@ -1182,27 +1181,19 @@ function handleServiceCatalogChange(selectEl) {
     
     const isCert = (foundService.code === 'certificates' || foundService.name.toLowerCase().includes('certificate'));
     
-    // Switch between Altar/Sanctuary Event and Office Document Request
+    // Redirect Ecclesiastical Certificates directly to the dedicated Certificate Portal
     if (isCert) {
-        if (sanctuaryGroup) sanctuaryGroup.style.display = 'none';
-        if (officeGroup) officeGroup.style.display = 'block';
-        if (venueSelect) {
-            venueSelect.removeAttribute('required');
-            venueSelect.value = '0';
+        if (typeof closeModal === 'function') closeModal('modal-request-event');
+        if (typeof navigateToSection === 'function') {
+            navigateToSection('request_certificate', true, 'tab=apply');
+        } else {
+            window.location.href = 'dashboard.php?section=request_certificate&tab=apply';
         }
-        if (dateInput) dateInput.removeAttribute('required');
-        if (scopeSelect) scopeSelect.value = 'cathedral';
-        if (durationHidden) durationHidden.value = '0';
-        if (pickupDateInput) {
-            pickupDateInput.setAttribute('required', 'required');
-            syncPickupDate(pickupDateInput.value);
-        }
-        if (certPersonNameInput) certPersonNameInput.setAttribute('required', 'required');
-        if (titleLabel) titleLabel.textContent = 'Document Subject / Person Name';
-        if (submitBtn) {
-            submitBtn.innerHTML = '<i class="fa-solid fa-file-signature"></i> Submit Document Application';
-        }
-    } else {
+        return;
+    }
+
+    // Sanctuary / Liturgical Event scheduling
+    if (true) {
         if (sanctuaryGroup) sanctuaryGroup.style.display = 'block';
         if (officeGroup) officeGroup.style.display = 'none';
         if (venueSelect) venueSelect.setAttribute('required', 'required');

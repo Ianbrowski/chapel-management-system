@@ -41,11 +41,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $waitMins = max(1, (int)ceil(RateLimiter::availableIn($rateKey, 300) / 60));
         $errorMessage = "Too many registration attempts. Please wait $waitMins minute(s) before trying again.";
     } else {
-        RateLimiter::hit($rateKey, 300);
         $csrf = $_POST['csrf'] ?? '';
         if (!$base->validateCsrf($csrf)) {
             $errorMessage = "Security validation failed. Please refresh the page and try again.";
         } else {
+        RateLimiter::hit($rateKey, 300);
         $fullName = trim($_POST['full_name'] ?? '');
         $username = strtolower(trim($_POST['user'] ?? ''));
         $email    = strtolower(trim($_POST['email'] ?? ''));

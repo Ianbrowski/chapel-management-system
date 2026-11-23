@@ -3,6 +3,7 @@
 class BackupService
 {
     private const BACKUP_FILE_PATTERN = '/^[a-zA-Z0-9_-]+_\d{8}_\d{6}(?:_\d+)?\.zip$/';
+    private const RESTORE_ALLOWED_STORAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'pdf', 'txt', 'json', 'csv'];
 
     private mysqli $conn;
     private string $basePath;
@@ -150,12 +151,45 @@ class BackupService
         }
     }
 
+    private function isAllowedArchiveEntry(string $entryName): bool
+    {
+        $normalized = str_replace('\\', '/', $entryName);
+        if ($normalized === '' || strpos($normalized, "\0") !== false || $normalized[0] === '/' || preg_match('/^[A-Za-z]:/', $normalized)) {
+            return false;
+        }
+        $segments = explode('/', rtrim($normalized, '/'));
+        foreach ($segments as $seg) {
+            if ($seg === '..' || $seg === '.') {
+                return false;
+            }
+        }
+        // Directory entry inside archive
+        if (substr($normalized, -1) === '/') {
+            return $segments[0] === 'storage';
+        }
+        if (in_array($normalized, ['database.sql', 'metadata.json'], true)) {
+            return true;
+        }
+        if (strpos($normalized, 'storage/') === 0) {
+            $ext = strtolower((string)pathinfo($normalized, PATHINFO_EXTENSION));
+            return $ext !== '' && in_array($ext, self::RESTORE_ALLOWED_STORAGE_EXTENSIONS, true);
+        }
+        return false;
+    }
+
     private function extractArchive(string $zipPath, string $targetDir): void
     {
         if (class_exists('ZipArchive')) {
             $zip = new ZipArchive();
             if ($zip->open($zipPath) !== true) {
                 throw new RuntimeException('Unable to open backup archive.');
+            }
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $name = (string)$zip->getNameIndex($i);
+                if (!$this->isAllowedArchiveEntry($name)) {
+                    $zip->close();
+                    throw new RuntimeException('Unsafe or disallowed entry found in backup archive: ' . basename($name));
+                }
             }
             if (!$zip->extractTo($targetDir)) {
                 $zip->close();
@@ -316,29 +350,37 @@ class BackupService
             throw new RuntimeException('Database name is missing for backup.');
         }
 
-        $args = [
-            $bin,
-            '--single-transaction',
-            '--routines',
-            '--triggers',
-            '--events',
-            '--host=' . $host,
-            '--port=' . (string)$port,
-            '--user=' . $user,
-            '--result-file=' . $outputFile,
-        ];
-
-        foreach ($this->buildSslArgs($host) as $sslArg) {
-            $args[] = $sslArg;
-        }
-
+        $defaultsFile = null;
         if ($pass !== '') {
-            $args[] = '--password=' . $pass;
+            $defaultsFile = $this->createMysqlDefaultsFile($pass);
         }
 
-        $args[] = $db;
+        try {
+            $args = [$bin];
+            if ($defaultsFile !== null) {
+                $args[] = '--defaults-extra-file=' . $defaultsFile;
+            }
+            $args[] = '--single-transaction';
+            $args[] = '--routines';
+            $args[] = '--triggers';
+            $args[] = '--events';
+            $args[] = '--host=' . $host;
+            $args[] = '--port=' . (string)$port;
+            $args[] = '--user=' . $user;
+            $args[] = '--result-file=' . $outputFile;
 
-        $result = $this->runProcess($args);
+            foreach ($this->buildSslArgs($host) as $sslArg) {
+                $args[] = $sslArg;
+            }
+
+            $args[] = $db;
+
+            $result = $this->runProcess($args);
+        } finally {
+            if ($defaultsFile !== null && is_file($defaultsFile)) {
+                @unlink($defaultsFile);
+            }
+        }
         $code = $result['code'];
         if ($code === 0 && is_file($outputFile) && filesize($outputFile) > 0) {
             return;
@@ -434,24 +476,32 @@ class BackupService
             throw new RuntimeException('Database name is missing for restore.');
         }
 
-        $args = [
-            $bin,
-            '--host=' . $host,
-            '--port=' . (string)$port,
-            '--user=' . $user,
-        ];
-
-        foreach ($this->buildSslArgs($host) as $sslArg) {
-            $args[] = $sslArg;
-        }
-
+        $defaultsFile = null;
         if ($pass !== '') {
-            $args[] = '--password=' . $pass;
+            $defaultsFile = $this->createMysqlDefaultsFile($pass);
         }
 
-        $args[] = $db;
+        try {
+            $args = [$bin];
+            if ($defaultsFile !== null) {
+                $args[] = '--defaults-extra-file=' . $defaultsFile;
+            }
+            $args[] = '--host=' . $host;
+            $args[] = '--port=' . (string)$port;
+            $args[] = '--user=' . $user;
 
-        $result = $this->runProcess($args, $sqlFile);
+            foreach ($this->buildSslArgs($host) as $sslArg) {
+                $args[] = $sslArg;
+            }
+
+            $args[] = $db;
+
+            $result = $this->runProcess($args, $sqlFile);
+        } finally {
+            if ($defaultsFile !== null && is_file($defaultsFile)) {
+                @unlink($defaultsFile);
+            }
+        }
         $code = $result['code'];
         if ($code === 0) {
             return;
@@ -564,6 +614,24 @@ class BackupService
         }
 
         return $plain;
+    }
+
+    private function createMysqlDefaultsFile(string $password): ?string
+    {
+        $tmpDir = $this->basePath . DIRECTORY_SEPARATOR . 'backups';
+        $this->ensureDir($tmpDir);
+        $path = @tempnam($tmpDir, 'mycnf_');
+        if ($path === false) {
+            throw new RuntimeException('Unable to prepare secure MySQL credentials file.');
+        }
+        $escaped = str_replace(['\\', '"'], ['\\\\', '\\"'], $password);
+        $content = "[client]\npassword=\"{$escaped}\"\n";
+        if (@file_put_contents($path, $content) === false) {
+            @unlink($path);
+            throw new RuntimeException('Unable to write secure MySQL credentials file.');
+        }
+        @chmod($path, 0600);
+        return $path;
     }
 
     private function runProcess(array $args, ?string $stdinFile = null): array
@@ -745,7 +813,15 @@ class BackupService
 
         $toDelete = array_slice($files, $keepLatest);
         foreach ($toDelete as $oldFile) {
-            @unlink($oldFile);
+            $deletedName = basename($oldFile);
+            if (@unlink($oldFile)) {
+                $delStmt = $this->conn->prepare("DELETE FROM backup_logs WHERE backup_file = ?");
+                if ($delStmt) {
+                    $delStmt->bind_param('s', $deletedName);
+                    $delStmt->execute();
+                    $delStmt->close();
+                }
+            }
         }
     }
 
@@ -765,6 +841,10 @@ class BackupService
             if ($item->isDir()) {
                 $this->ensureDir($destPath);
             } else {
+                $ext = strtolower((string)pathinfo($srcPath, PATHINFO_EXTENSION));
+                if ($ext === '' || !in_array($ext, self::RESTORE_ALLOWED_STORAGE_EXTENSIONS, true)) {
+                    continue;
+                }
                 $parent = dirname($destPath);
                 $this->ensureDir($parent);
                 copy($srcPath, $destPath);

@@ -35,8 +35,10 @@ if (in_array($role, ['Admin', 'Cathedral Admin', 'Priest', 'Pastor'], true)) {
     } else {
         $chapelId = null;
     }
-} elseif (!empty($userChapelId)) {
+} elseif (!empty($userChapelId) && (int)$userChapelId > 0) {
     $chapelId = (int)$userChapelId;
+} elseif ($role === 'Chapel Admin') {
+    $chapelId = -1;
 } else {
     $cathedralOnly = true;
     $chapelId = null;
@@ -646,9 +648,9 @@ if ($mode === 'prefill') {
                             <td class="col-recipient"><?php echo htmlspecialchars($r['recipients']); ?></td>
                             <td class="col-attendance col-center col-editable" contenteditable="true"><?php echo htmlspecialchars($r['attendance']); ?></td>
                             <td class="col-communicants col-center col-editable" contenteditable="true"><?php echo htmlspecialchars($r['communicants']); ?></td>
-                            <td class="col-offerings col-right col-editable" contenteditable="true"><?php echo htmlspecialchars($r['offerings']); ?></td>
-                            <td class="col-pledges col-right col-editable" contenteditable="true"><?php echo htmlspecialchars($r['pledges']); ?></td>
-                            <td class="col-receipts col-center col-editable" contenteditable="true"><?php echo htmlspecialchars($r['receipts']); ?></td>
+                            <td class="col-offerings col-right"><?php echo htmlspecialchars($r['offerings']); ?></td>
+                            <td class="col-pledges col-right"><?php echo htmlspecialchars($r['pledges']); ?></td>
+                            <td class="col-receipts col-center"><?php echo htmlspecialchars($r['receipts']); ?></td>
                             <td class="col-celebrant"><?php echo htmlspecialchars($r['celebrant']); ?></td>
                             <td class="col-signature"></td>
                             <td class="col-remarks col-editable" contenteditable="true"><?php echo htmlspecialchars($r['remarks']); ?></td>

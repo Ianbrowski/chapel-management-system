@@ -442,7 +442,14 @@ function openRequirementsModal(srv) {
     if (srv.requirements && srv.requirements.length > 0) {
         srv.requirements.forEach(r => {
             const li = document.createElement('li');
-            li.innerHTML = `<strong>${r.requirement}</strong>${r.description ? ` <span>— ${r.description}</span>` : ''}`;
+            const strong = document.createElement('strong');
+            strong.textContent = r.requirement || '';
+            li.appendChild(strong);
+            if (r.description) {
+                const span = document.createElement('span');
+                span.textContent = ' — ' + r.description;
+                li.appendChild(span);
+            }
             list.appendChild(li);
         });
     } else {

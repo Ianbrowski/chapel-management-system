@@ -70,6 +70,31 @@ class SmsService
     }
 
     /**
+     * Notify user that a pending event or certificate request was received.
+     */
+    public static function sendEventReceived(mysqli $conn, int $eventId, bool $isCert = false): bool
+    {
+        self::$lastError = '';
+        $event = self::fetchEvent($conn, $eventId);
+        $phone = $event ? self::resolveSmsRecipientPhone($event) : '';
+        if (!$event || $phone === '') {
+            self::$lastError = 'No requester phone number on event.';
+            return false;
+        }
+
+        $name = self::resolveSmsRecipientName($event);
+        $title = $event['title'];
+        $date = $isCert
+            ? date('M d, Y', strtotime($event['start_time']))
+            : date('M d, Y @ h:i A', strtotime($event['start_time']));
+        $noun = $isCert ? 'certificate application' : 'event request';
+
+        $msg = "Hi {$name}! We received your {$noun} '{$title}' ({$date}). You will be notified once the Parish Office reviews it.";
+
+        return self::send($phone, $msg);
+    }
+
+    /**
      * Notify user of Event Approval
      */
     public static function sendEventApproved(mysqli $conn, int $eventId, string $pastorName = ''): bool

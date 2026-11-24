@@ -135,6 +135,8 @@ class EventController extends BaseController {
                         if ($notifSummary !== '') {
                             $notifMsg = ' ' . $notifSummary;
                         }
+                    } elseif ($status === 'Pending' && (trim((string)$email) !== '' || trim((string)$phone) !== '' || !empty($requestedBy))) {
+                        $notifMsg = ' ' . $this->sendPendingAcknowledgmentNotifications((int)$createdEventId, false);
                     }
                     $this->flash('success', 'Event created.' . $notifMsg);
                 } else {
@@ -573,7 +575,7 @@ class EventController extends BaseController {
             // Automated Acknowledgment or Confirmation Notifications
             $notifMsg = '';
             if ($status === 'Pending') {
-                EventRequestMailer::sendAcknowledgment($this->conn, (int)$eventId);
+                $notifMsg = ' ' . $this->sendPendingAcknowledgmentNotifications((int)$eventId, $isCertSection);
 
                 // Trigger Member-specific In-App Notification
                 if ($this->userId > 0) {
@@ -598,7 +600,9 @@ class EventController extends BaseController {
                 }
             }
 
-            $msg = ($status === 'Confirmed') ? ('Event created and confirmed.' . $notifMsg) : ($isCertSection ? 'Certificate application submitted successfully. The Parish Office will review and prepare your documents for pickup.' : 'Event request submitted.');
+            $msg = ($status === 'Confirmed')
+                ? ('Event created and confirmed.' . $notifMsg)
+                : (($isCertSection ? 'Certificate application submitted successfully. The Parish Office will review and prepare your documents for pickup.' : 'Event request submitted.') . $notifMsg);
             $this->flash('success', $msg);
         } else {
             $this->conn->rollback();
@@ -1018,6 +1022,13 @@ class EventController extends BaseController {
         return $this->formatEventNotificationSummary($event, $mailSent, $smsSent);
     }
 
+    private function sendPendingAcknowledgmentNotifications(int $eventId, bool $isCertSection): string
+    {
+        $mailSent = EventRequestMailer::sendAcknowledgment($this->conn, $eventId);
+        $smsSent = SmsService::sendEventReceived($this->conn, $eventId, $isCertSection);
+        return $this->formatEventNotificationSummary(null, $mailSent, $smsSent);
+    }
+
     private function formatEventNotificationSummary(?array $event, bool $mailSent, bool $smsSent): string
     {
         if ($mailSent) {
@@ -1027,7 +1038,8 @@ class EventController extends BaseController {
             $emailStatus = $err !== '' ? "failed ({$err})" : 'skipped (no email)';
         }
         if ($smsSent) {
-            $smsStatus = 'sent';
+            $smsProv = class_exists('SmsService') ? trim((string) SmsService::getLastProvider()) : '';
+            $smsStatus = ($smsProv === 'mock') ? 'mock-logged (SMS env not configured)' : 'sent';
         } else {
             $smsErr = class_exists('SmsService') ? trim((string) SmsService::getLastError()) : '';
             $smsStatus = $smsErr !== '' ? "failed ({$smsErr})" : 'skipped (no phone)';

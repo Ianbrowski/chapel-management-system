@@ -8,6 +8,19 @@
  */
 class SmsService
 {
+    private static string $lastError = '';
+    private static string $lastProvider = '';
+
+    public static function getLastError(): string
+    {
+        return self::$lastError;
+    }
+
+    public static function getLastProvider(): string
+    {
+        return self::$lastProvider;
+    }
+
     private static function getLogPath(): string
     {
         return (defined('BASE_PATH') ? BASE_PATH : (__DIR__ . '/../..')) . '/storage/logs/sms_preview.log';
@@ -18,10 +31,20 @@ class SmsService
      */
     public static function send(string $to, string $message): bool
     {
-        if (empty($to)) return false;
+        self::$lastError = '';
+        $provider = strtolower(trim((string) self::getConfig('sms_provider', 'mock')));
+        self::$lastProvider = $provider;
 
-        $provider = self::getConfig('sms_provider', 'mock');
+        if (trim($to) === '') {
+            self::$lastError = 'No recipient phone number provided.';
+            return false;
+        }
+
         $normalizedNumber = self::normalizePhoneNumber($to);
+        if ($normalizedNumber === '') {
+            self::$lastError = 'Invalid recipient phone number format.';
+            return false;
+        }
 
         if ($provider === 'semaphore') {
             return self::sendViaSemaphore($normalizedNumber, $message);
@@ -39,7 +62,11 @@ class SmsService
             mkdir($dir, 0755, true);
         }
 
-        return file_put_contents(self::getLogPath(), $logEntry, FILE_APPEND) !== false;
+        $ok = file_put_contents(self::getLogPath(), $logEntry, FILE_APPEND) !== false;
+        if (!$ok) {
+            self::$lastError = 'Failed to write SMS preview log.';
+        }
+        return $ok;
     }
 
     /**
@@ -47,8 +74,13 @@ class SmsService
      */
     public static function sendEventApproved(mysqli $conn, int $eventId, string $pastorName = ''): bool
     {
+        self::$lastError = '';
         $event = self::fetchEvent($conn, $eventId);
-        if (!$event || empty($event['requester_phone'])) return false;
+        $phone = $event ? self::resolveSmsRecipientPhone($event) : '';
+        if (!$event || $phone === '') {
+            self::$lastError = 'No requester phone number on event.';
+            return false;
+        }
 
         $name = self::resolveSmsRecipientName($event);
         $title = $event['title'];
@@ -56,7 +88,7 @@ class SmsService
         
         $msg = "Hi {$name}! Great news, your request for '{$title}' on {$date} has been APPROVED by the Cathedral Admin. See you there!";
         
-        return self::send($event['requester_phone'], $msg);
+        return self::send($phone, $msg);
     }
 
     /**
@@ -64,8 +96,13 @@ class SmsService
      */
     public static function sendEventRejected(mysqli $conn, int $eventId, string $reason = ''): bool
     {
+        self::$lastError = '';
         $event = self::fetchEvent($conn, $eventId);
-        if (!$event || empty($event['requester_phone'])) return false;
+        $phone = $event ? self::resolveSmsRecipientPhone($event) : '';
+        if (!$event || $phone === '') {
+            self::$lastError = 'No requester phone number on event.';
+            return false;
+        }
 
         $name = self::resolveSmsRecipientName($event);
         $title = $event['title'];
@@ -73,7 +110,7 @@ class SmsService
 
         $msg = "Hello {$name}. Regretfully, your request for '{$title}' was NOT approved at this time.{$reasonText} Please contact the office for details.";
 
-        return self::send($event['requester_phone'], $msg);
+        return self::send($phone, $msg);
     }
 
     /**
@@ -90,13 +127,21 @@ class SmsService
      */
     public static function sendInquiryUpdated(mysqli $conn, int $inquiryId, string $status): bool
     {
+        self::$lastError = '';
         $stmt = $conn->prepare("SELECT full_name, phone, service_category FROM public_inquiries WHERE inquiry_id = ? LIMIT 1");
-        if (!$stmt) return false;
+        if (!$stmt) {
+            self::$lastError = 'Failed to load inquiry phone record.';
+            return false;
+        }
         $stmt->bind_param('i', $inquiryId);
         $stmt->execute();
         $inq = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
         
-        if (!$inq || empty($inq['phone'])) return false;
+        if (!$inq || empty($inq['phone'])) {
+            self::$lastError = 'No phone number on inquiry.';
+            return false;
+        }
 
         $name = trim($inq['full_name'] ?: 'Parishioner');
         $cat = $inq['service_category'] ?: 'request';
@@ -105,6 +150,20 @@ class SmsService
         $msg = "Hi {$name}! Your {$cat} inquiry at our Parish Office is now {$statusLabel}. Thank you!";
         
         return self::send($inq['phone'], $msg);
+    }
+
+    private static function resolveSmsRecipientPhone(array $event): string
+    {
+        $phone = trim((string)($event['requester_phone'] ?? ''));
+        if ($phone !== '') {
+            return $phone;
+        }
+        $staffRoles = ['Admin', 'Cathedral Admin', 'Chapel Admin', 'Staff'];
+        $isStaffEncoded = in_array((string)($event['role'] ?? ''), $staffRoles, true);
+        if (!$isStaffEncoded && !empty($event['user_phone'])) {
+            return trim((string)$event['user_phone']);
+        }
+        return '';
     }
 
     private static function resolveSmsRecipientName(array $event): string
@@ -129,6 +188,7 @@ class SmsService
         $stmt = $conn->prepare(
             "SELECT e.*,
                     u.role,
+                    u.phone AS user_phone,
                     COALESCE(NULLIF(u.full_name, ''), u.user) AS account_name
              FROM events e
              LEFT JOIN users u ON u.id = e.requested_by
@@ -137,13 +197,20 @@ class SmsService
         if (!$stmt) return null;
         $stmt->bind_param('i', $eventId);
         $stmt->execute();
-        return $stmt->get_result()->fetch_assoc();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return $row ?: null;
     }
 
     private static function sendViaSemaphore(string $to, string $message): bool
     {
-        $apiKey = (string) self::getConfig('sms_api_key', '');
-        if ($apiKey === '' || !function_exists('curl_init')) {
+        $apiKey = trim((string) self::getConfig('sms_api_key', ''));
+        if ($apiKey === '') {
+            self::$lastError = 'Semaphore SMS API key is empty.';
+            return false;
+        }
+        if (!function_exists('curl_init')) {
+            self::$lastError = 'cURL extension is not available.';
             return false;
         }
 
@@ -152,6 +219,7 @@ class SmsService
 
         $ch = curl_init();
         if ($ch === false) {
+            self::$lastError = 'Failed to initialize cURL session.';
             return false;
         }
 
@@ -168,29 +236,50 @@ class SmsService
             CURLOPT_POSTFIELDS => $payload,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 15,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
         ]);
 
         $response = curl_exec($ch);
         $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr = curl_error($ch);
         curl_close($ch);
 
-        if ($response === false || $httpCode < 200 || $httpCode >= 300) {
+        if ($response === false) {
+            self::$lastError = 'Semaphore cURL error: ' . ($curlErr ?: 'Request failed');
+            error_log($selfErr = 'Semaphore SMS failed: ' . self::$lastError);
+            return false;
+        }
+
+        if ($httpCode < 200 || $httpCode >= 300) {
+            self::$lastError = "Semaphore API returned HTTP {$httpCode}.";
+            error_log('Semaphore SMS failed: ' . self::$lastError);
             return false;
         }
 
         $decoded = json_decode($response, true);
         if (!is_array($decoded) || !isset($decoded[0]['status'])) {
+            self::$lastError = 'Semaphore API returned an unexpected response.';
             return false;
         }
 
-        return in_array(strtolower((string) $decoded[0]['status']), ['queued', 'pending', 'sent'], true);
+        $ok = in_array(strtolower((string) $decoded[0]['status']), ['queued', 'pending', 'sent'], true);
+        if (!$ok) {
+            self::$lastError = 'Semaphore status: ' . (string) $decoded[0]['status'];
+        }
+        return $ok;
     }
 
     private static function sendViaIprogTech(string $to, string $message): bool
     {
-        $apiKey = (string) self::getConfig('sms_api_key', '');
-        if ($apiKey === '' || !function_exists('curl_init')) {
+        $apiKey = trim((string) self::getConfig('sms_api_key', ''));
+        if ($apiKey === '') {
+            self::$lastError = 'IPROG SMS API key is empty.';
+            return false;
+        }
+        if (!function_exists('curl_init')) {
+            self::$lastError = 'cURL extension is not available.';
             return false;
         }
 
@@ -198,6 +287,7 @@ class SmsService
 
         $ch = curl_init();
         if ($ch === false) {
+            self::$lastError = 'Failed to initialize cURL session.';
             return false;
         }
 
@@ -224,8 +314,10 @@ class SmsService
 
         $response = curl_exec($ch);
         $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr = curl_error($ch);
         if ($response === false) {
-            error_log("IPROG SMS CURL Error: " . curl_error($ch));
+            self::$lastError = 'IPROG SMS cURL error: ' . ($curlErr ?: 'Request failed');
+            error_log("IPROG SMS CURL Error: " . $curlErr);
             curl_close($ch);
             return false;
         }
@@ -233,6 +325,7 @@ class SmsService
 
         $decoded = json_decode($response, true);
         if (!is_array($decoded)) {
+            self::$lastError = "IPROG SMS HTTP {$httpCode}: Invalid JSON response.";
             error_log("IPROG SMS Error: Invalid JSON response: " . $response);
             return false;
         }
@@ -240,7 +333,9 @@ class SmsService
         // IPROG returns { "status": 200, "message": "...", "message_id": "..." }
         $status = (int)($decoded['status'] ?? 0);
         if ($status !== 200 && $status !== 201) {
-            error_log("IPROG SMS Error: Status {$status} - " . ($decoded['message'] ?? 'Unknown Error'));
+            $apiMsg = (string)($decoded['message'] ?? 'Unknown Error');
+            self::$lastError = "IPROG SMS rejected (status {$status}): {$apiMsg}";
+            error_log("IPROG SMS Error: Status {$status} - " . $apiMsg);
             return false;
         }
         return true;

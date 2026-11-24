@@ -101,15 +101,23 @@ class InquiryController extends BaseController {
         if ($method === 'email' && !empty($inq['email'])) {
             require_once BASE_PATH . '/app/mail/InquiryMailer.php';
             $sent = InquiryMailer::sendStatusUpdate($inq['email'], $inq['full_name'], $inq['service_category'], 'Pending Review', 'Hello! We are confirming the receipt of your request. We will review it and get back to you shortly.');
-            if ($sent) $this->flash('success', 'Auto-Email sent successfully.');
-            else $this->flash('error', 'Failed to send Auto-Email.');
+            if ($sent) {
+                $this->flash('success', 'Auto-Email sent successfully.');
+            } else {
+                $err = trim((string)($GLOBALS['lastMailError'] ?? ''));
+                $this->flash('error', 'Failed to send Auto-Email' . ($err !== '' ? ": {$err}" : '.'));
+            }
         } elseif ($method === 'sms' && !empty($inq['phone'])) {
             require_once BASE_PATH . '/app/services/SmsService.php';
             $cat = $inq['service_category'] ?: 'request';
             $msg = "Hi " . trim($inq['full_name'] ?: 'Parishioner') . "! We have received your {$cat} and our office will review it shortly. Thank you!";
             $sent = SmsService::send($inq['phone'], $msg);
-            if ($sent) $this->flash('success', 'Auto-SMS sent successfully.');
-            else $this->flash('error', 'Failed to send Auto-SMS.');
+            if ($sent) {
+                $this->flash('success', 'Auto-SMS sent successfully.');
+            } else {
+                $smsErr = trim((string) SmsService::getLastError());
+                $this->flash('error', 'Failed to send Auto-SMS' . ($smsErr !== '' ? ": {$smsErr}" : '.'));
+            }
         } else {
             $this->flash('error', 'Missing contact information to send ' . strtoupper($method) . '.');
         }
@@ -291,8 +299,14 @@ class InquiryController extends BaseController {
         }
 
         $notif = [];
-        if (!empty($inq['email'])) $notif[] = $mailSent ? 'Email sent' : 'Email failed';
-        if (!empty($inq['phone']) && in_array($status, $smsStatuses, true)) $notif[] = $smsSent ? 'SMS sent' : 'SMS failed';
+        if (!empty($inq['email'])) {
+            $mailErr = trim((string)($GLOBALS['lastMailError'] ?? ''));
+            $notif[] = $mailSent ? 'Email sent' : ('Email failed' . ($mailErr !== '' ? ": {$mailErr}" : ''));
+        }
+        if (!empty($inq['phone']) && in_array($status, $smsStatuses, true)) {
+            $smsErr = trim((string) SmsService::getLastError());
+            $notif[] = $smsSent ? 'SMS sent' : ('SMS failed' . ($smsErr !== '' ? ": {$smsErr}" : ''));
+        }
         
         return !empty($notif) ? '(' . implode(', ', $notif) . ')' : '';
     }

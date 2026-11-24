@@ -130,7 +130,7 @@ class EventController extends BaseController {
                         ]
                     );
                     $notifMsg = '';
-                    if ($status === 'Confirmed' && (trim((string)$email) !== '' || trim((string)$phone) !== '')) {
+                    if ($status === 'Confirmed' && (trim((string)$email) !== '' || trim((string)$phone) !== '' || !empty($requestedBy))) {
                         $notifSummary = $this->sendConfirmedNotifications((int)$createdEventId, $pastor, false);
                         if ($notifSummary !== '') {
                             $notifMsg = ' ' . $notifSummary;
@@ -591,7 +591,7 @@ class EventController extends BaseController {
                         (int)$eventId
                     );
                 }
-            } elseif ($status === 'Confirmed' && (trim((string)$email) !== '' || trim((string)$phone) !== '')) {
+            } elseif ($status === 'Confirmed' && (trim((string)$email) !== '' || trim((string)$phone) !== '' || $this->userId > 0)) {
                 $notifSummary = $this->sendConfirmedNotifications((int)$eventId, $pastor, false);
                 if ($notifSummary !== '') {
                     $notifMsg = ' ' . $notifSummary;
@@ -670,9 +670,7 @@ class EventController extends BaseController {
             );
             if ($event) {
                 $mailSent = EventRequestMailer::sendRejected($this->conn, $id, $note);
-                if (!empty($event['requester_phone'])) {
-                    $smsSent = SmsService::sendEventRejected($this->conn, $id, $note);
-                }
+                $smsSent = SmsService::sendEventRejected($this->conn, $id, $note);
 
                 // Member-specific in-app notification
                 $reqUserId = (int)($event['requested_by'] ?? 0);
@@ -958,6 +956,7 @@ class EventController extends BaseController {
                     : 'During Parish Office Hours (Tue–Sun, 8:00 AM – 5:00 PM)';
 
                 $toEmail = trim((string)($event['requester_email'] ?? ''));
+                $toPhone = trim((string)($event['requester_phone'] ?? ''));
                 $recipientName = trim((string)($event['requester_name'] ?? ''))
                     ?: trim((string)($event['cert_person_name'] ?? ''))
                     ?: 'Parishioner';
@@ -972,6 +971,9 @@ class EventController extends BaseController {
                             if ($toEmail === '') {
                                 $toEmail = trim((string)($reqUser['email'] ?? ''));
                             }
+                            if ($toPhone === '') {
+                                $toPhone = trim((string)($reqUser['phone'] ?? ''));
+                            }
                         }
                     }
                 }
@@ -979,8 +981,8 @@ class EventController extends BaseController {
                 if ($toEmail !== '' && filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
                     $mailSent = DocumentReadyMailer::sendPickupNotification($toEmail, $recipientName, $docLabel, $pickupDateFmt);
                 }
-                if (!empty($event['requester_phone'])) {
-                    $smsSent = SmsService::sendPickupNotice((string)$event['requester_phone'], $recipientName, $docLabel);
+                if ($toPhone !== '') {
+                    $smsSent = SmsService::sendPickupNotice($toPhone, $recipientName, $docLabel);
                 }
                 if ($notifyInApp && $reqUserId > 0) {
                     require_once __DIR__ . '/../models/SystemNotification.php';
@@ -995,9 +997,7 @@ class EventController extends BaseController {
                 }
             } else {
                 $mailSent = EventRequestMailer::sendApproved($this->conn, $eventId, $pastorName);
-                if (!empty($event['requester_phone'])) {
-                    $smsSent = SmsService::sendEventApproved($this->conn, $eventId, $pastorName);
-                }
+                $smsSent = SmsService::sendEventApproved($this->conn, $eventId, $pastorName);
 
                 if ($notifyInApp && $reqUserId > 0) {
                     require_once __DIR__ . '/../models/SystemNotification.php';
@@ -1020,8 +1020,18 @@ class EventController extends BaseController {
 
     private function formatEventNotificationSummary(?array $event, bool $mailSent, bool $smsSent): string
     {
-        $emailStatus = $mailSent ? '<span class="text-success">sent</span>' : '<span class="text-muted">skipped/failed</span>';
-        $smsStatus   = $smsSent ? '<span class="text-success">sent</span>' : '<span class="text-muted">skipped/failed</span>';
+        if ($mailSent) {
+            $emailStatus = 'sent';
+        } else {
+            $err = trim((string)($GLOBALS['lastMailError'] ?? ''));
+            $emailStatus = $err !== '' ? "failed ({$err})" : 'skipped (no email)';
+        }
+        if ($smsSent) {
+            $smsStatus = 'sent';
+        } else {
+            $smsErr = class_exists('SmsService') ? trim((string) SmsService::getLastError()) : '';
+            $smsStatus = $smsErr !== '' ? "failed ({$smsErr})" : 'skipped (no phone)';
+        }
 
         return "Notifications: Email {$emailStatus}, SMS {$smsStatus}";
     }

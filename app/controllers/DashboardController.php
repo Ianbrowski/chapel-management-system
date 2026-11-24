@@ -844,10 +844,21 @@ class DashboardController extends BaseController
                 'Records',
                 "Sent pickup notification for {$documentType} to {$email}" . ($phone ? " and {$phone}" : "")
             );
-            $msg = "Pickup notification sent (Email: " . ($sent ? '✅' : '❌') . ", SMS: " . ($smsSent ? '✅' : '❌') . ")";
+            $mailErr = trim((string)($GLOBALS['lastMailError'] ?? ''));
+            $smsErr = trim((string) SmsService::getLastError());
+            $emailPart = $sent ? 'sent' : ('failed' . ($mailErr !== '' ? ": {$mailErr}" : ''));
+            $smsPart = $smsSent ? 'sent' : ($phone !== '' ? ('failed' . ($smsErr !== '' ? ": {$smsErr}" : '')) : 'not sent');
+            $msg = "Pickup notification processed (Email: {$emailPart}, SMS: {$smsPart})";
             $this->flash('success', $msg);
         } else {
-            $this->flash('error', 'Notification could not be sent. Please verify settings.');
+            $mailErr = trim((string)($GLOBALS['lastMailError'] ?? ''));
+            $smsErr = trim((string) SmsService::getLastError());
+            $reasons = array_filter([
+                $mailErr !== '' ? "Email: {$mailErr}" : '',
+                $smsErr !== '' ? "SMS: {$smsErr}" : '',
+            ]);
+            $reason = !empty($reasons) ? ' (' . implode(' | ', $reasons) . ')' : '. Please check Parish Info -> Outgoing Mail Server settings.';
+            $this->flash('error', 'Notification could not be sent' . $reason);
         }
 
         $this->redirect($redirectUrl);

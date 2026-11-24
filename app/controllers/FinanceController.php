@@ -544,8 +544,14 @@ class FinanceController extends BaseController {
                 : false;
 
             $notif = [];
-            if (!empty($inq['email'])) $notif[] = $mailSent ? 'Email sent' : 'Email failed';
-            if (!empty($inq['phone'])) $notif[] = $smsSent ? 'SMS sent' : 'SMS failed';
+            if (!empty($inq['email'])) {
+                $mailErr = trim((string)($GLOBALS['lastMailError'] ?? ''));
+                $notif[] = $mailSent ? 'Email sent' : ('Email failed' . ($mailErr !== '' ? ": {$mailErr}" : ''));
+            }
+            if (!empty($inq['phone'])) {
+                $smsErr = trim((string) SmsService::getLastError());
+                $notif[] = $smsSent ? 'SMS sent' : ('SMS failed' . ($smsErr !== '' ? ": {$smsErr}" : ''));
+            }
             $notifStr = !empty($notif) ? ' (' . implode(', ', $notif) . ')' : '';
 
             $this->flash('success', "Sale recorded and linked reservation #{$inquiryId} automatically completed & archived.{$notifStr}");

@@ -170,19 +170,17 @@ function sendViaEmailApi(string $provider, string $apiKey, array $params, string
     return true;
 }
 
-function sendViaEmailWebhook($webhookUrl, $secret, array $payload) {
-    $webhookUrl = trim((string)$webhookUrl);
-    if ($webhookUrl === '' || !filter_var($webhookUrl, FILTER_VALIDATE_URL)) {
-        $GLOBALS['lastMailError'] = 'Invalid Email Webhook URL.';
-        error_log('Church webhook mailer skipped: invalid URL.');
+function isPublicHttpsWebhookUrl(string $url, ?string &$errorMsg = null): bool {
+    $url = trim($url);
+    if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+        $errorMsg = 'Invalid Email Webhook URL.';
         return false;
     }
 
-    $scheme = strtolower((string)parse_url($webhookUrl, PHP_URL_SCHEME));
-    $host = strtolower((string)parse_url($webhookUrl, PHP_URL_HOST));
+    $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+    $host = strtolower((string)parse_url($url, PHP_URL_HOST));
     if ($scheme !== 'https' || $host === '') {
-        $GLOBALS['lastMailError'] = 'Email Webhook URL must use https://.';
-        error_log('Church webhook mailer skipped: HTTPS required.');
+        $errorMsg = 'Email Webhook URL must use https://.';
         return false;
     }
 
@@ -205,10 +203,22 @@ function sendViaEmailWebhook($webhookUrl, $secret, array $payload) {
     }
     foreach (array_unique($resolvedIps) as $ip) {
         if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
-            $GLOBALS['lastMailError'] = 'Email Webhook URL cannot target private or internal network addresses.';
+            $errorMsg = 'Email Webhook URL cannot target private or internal network addresses.';
             error_log('Church webhook mailer blocked SSRF target IP: ' . $ip);
             return false;
         }
+    }
+
+    return true;
+}
+
+function sendViaEmailWebhook($webhookUrl, $secret, array $payload) {
+    $webhookUrl = trim((string)$webhookUrl);
+    $validationErr = null;
+    if (!isPublicHttpsWebhookUrl($webhookUrl, $validationErr)) {
+        $GLOBALS['lastMailError'] = $validationErr ?: 'Invalid Email Webhook URL.';
+        error_log('Church webhook mailer skipped: ' . $GLOBALS['lastMailError']);
+        return false;
     }
 
     if (!function_exists('curl_init')) {
@@ -221,38 +231,69 @@ function sendViaEmailWebhook($webhookUrl, $secret, array $payload) {
         $payload['secret'] = $secret;
     }
 
-    $ch = curl_init();
-    if ($ch === false) {
-        $GLOBALS['lastMailError'] = 'Failed to initialize cURL session.';
-        return false;
-    }
-
     $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
-    curl_setopt_array($ch, [
-        CURLOPT_URL            => $webhookUrl,
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => $json,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_FOLLOWLOCATION => false,
-        CURLOPT_TIMEOUT        => 20,
-        CURLOPT_CONNECTTIMEOUT => 8,
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_SSL_VERIFYHOST => 2,
-        CURLOPT_HTTPHEADER     => [
-            'Content-Type: application/json',
-            'Accept: application/json',
-        ],
-    ]);
+    $currentUrl = $webhookUrl;
+    $method = 'POST';
+    $response = false;
+    $httpCode = 0;
 
-    $response = curl_exec($ch);
-    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlErr  = curl_error($ch);
-    curl_close($ch);
+    // Manually validate each redirect target so Google Apps Script 302 -> script.googleusercontent.com works without SSRF risk
+    for ($hop = 0; $hop <= 3; $hop++) {
+        $ch = curl_init();
+        if ($ch === false) {
+            $GLOBALS['lastMailError'] = 'Failed to initialize cURL session.';
+            return false;
+        }
 
-    if ($response === false) {
-        $GLOBALS['lastMailError'] = 'Webhook cURL error: ' . ($curlErr ?: 'Request failed');
-        error_log('Church webhook mail failed: ' . $GLOBALS['lastMailError']);
-        return false;
+        $opts = [
+            CURLOPT_URL            => $currentUrl,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_TIMEOUT        => 20,
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+        ];
+        if ($method === 'POST') {
+            $opts[CURLOPT_POST] = true;
+            $opts[CURLOPT_POSTFIELDS] = $json;
+            $opts[CURLOPT_HTTPHEADER][] = 'Content-Type: application/json';
+        } else {
+            $opts[CURLOPT_HTTPGET] = true;
+        }
+
+        curl_setopt_array($ch, $opts);
+        $response = curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $redirectUrl = (string)curl_getinfo($ch, CURLINFO_REDIRECT_URL);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+
+        if ($response === false) {
+            $GLOBALS['lastMailError'] = 'Webhook cURL error: ' . ($curlErr ?: 'Request failed');
+            error_log('Church webhook mail failed: ' . $GLOBALS['lastMailError']);
+            return false;
+        }
+
+        if (in_array($httpCode, [301, 302, 303, 307, 308], true) && $redirectUrl !== '') {
+            if ($hop >= 3) {
+                $GLOBALS['lastMailError'] = 'Webhook exceeded maximum safe redirect limit.';
+                error_log('Church webhook mail failed: ' . $GLOBALS['lastMailError']);
+                return false;
+            }
+            $redirErr = null;
+            if (!isPublicHttpsWebhookUrl($redirectUrl, $redirErr)) {
+                $GLOBALS['lastMailError'] = $redirErr ?: 'Webhook redirect target blocked.';
+                error_log('Church webhook mail failed: blocked redirect URL');
+                return false;
+            }
+            $method = in_array($httpCode, [307, 308], true) ? 'POST' : 'GET';
+            $currentUrl = $redirectUrl;
+            continue;
+        }
+
+        break;
     }
 
     if ($httpCode < 200 || $httpCode >= 400) {
@@ -332,7 +373,7 @@ function sendChurchEmail($recipientEmail, $recipientName, $subject, $body, $chap
             }
             if (!empty($row['smtp_host']) && !empty($row['smtp_user'])) {
                 $config['host'] = $row['smtp_host'];
-                $config['port'] = (int)$row['smtp_port'];
+                $config['port'] = ((int)$row['smtp_port'] > 0) ? (int)$row['smtp_port'] : ($config['port'] ?: 587);
                 $config['user'] = $row['smtp_user'];
                 if (!empty($row['smtp_pass'])) $config['pass'] = $row['smtp_pass'];
                 $config['secure'] = $row['smtp_secure'] ?: 'tls';
@@ -358,7 +399,7 @@ function sendChurchEmail($recipientEmail, $recipientName, $subject, $body, $chap
             if ($row && !empty($row['smtp_host']) && !empty($row['smtp_user']) && !empty($row['smtp_pass'])) {
                 $config['enabled']    = true;
                 $config['host']       = $row['smtp_host'];
-                $config['port']       = (int)$row['smtp_port'];
+                $config['port']       = ((int)$row['smtp_port'] > 0) ? (int)$row['smtp_port'] : 587;
                 $config['user']       = $row['smtp_user'];
                 $config['pass']       = $row['smtp_pass'];
                 $config['secure']     = $row['smtp_secure'] ?: 'tls';

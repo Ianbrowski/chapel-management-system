@@ -25,16 +25,23 @@ class ParishInfo {
     public function updateEmailSettings($data) {
         $this->ensureEmailWebhookColumns();
 
+        $cntRes = $this->conn->query("SELECT COUNT(*) AS c FROM parish_contact_info");
+        $cntRow = $cntRes ? $cntRes->fetch_assoc() : null;
+        if ((int)($cntRow['c'] ?? 0) === 0) {
+            @$this->conn->query("INSERT INTO parish_contact_info (parish_name, email) VALUES ('Cathedral of St. Michael the Archangel', 'cathedral@ifi.org.ph')");
+        }
+
         $webhookUrl = trim((string)($data['email_webhook_url'] ?? ''));
         $emailProvider = strtolower(trim((string)($data['email_provider'] ?? '')));
+        $smtpPort = ((int)($data['smtp_port'] ?? 0) > 0) ? (int)$data['smtp_port'] : 587;
         $stmt = $this->conn->prepare("UPDATE parish_contact_info SET 
             smtp_host=?, smtp_port=?, smtp_user=?, smtp_secure=?, 
             from_email=?, from_name=?, email_webhook_url=?, email_provider=? 
             WHERE info_id = (SELECT info_id FROM (SELECT info_id FROM parish_contact_info ORDER BY info_id DESC LIMIT 1) as t)");
         
         if (!$stmt) return false;
-        $stmt->bind_param("sissssss", 
-            $data['smtp_host'], $data['smtp_port'], $data['smtp_user'], 
+        $stmt->bind_param("sissssss",
+            $data['smtp_host'], $smtpPort, $data['smtp_user'],
             $data['smtp_secure'], $data['from_email'], $data['from_name'], $webhookUrl, $emailProvider);
         
         $res = $stmt->execute();

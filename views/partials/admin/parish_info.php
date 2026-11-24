@@ -887,14 +887,17 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
       return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "Missing recipient or subject" }))
         .setMimeType(ContentService.MimeType.JSON);
     }
-    MailApp.sendEmail({
+    var mailOpts = {
       to: data.to,
       subject: data.subject,
       htmlBody: data.html || "",
       body: data.text || "",
-      name: data.from_name || "IFI Cathedral System",
-      replyTo: data.reply_to || ""
-    });
+      name: data.from_name || "IFI Cathedral System"
+    };
+    if (data.reply_to &amp;&amp; String(data.reply_to).trim()) {
+      mailOpts.replyTo = String(data.reply_to).trim();
+    }
+    MailApp.sendEmail(mailOpts);
     return ContentService.createTextOutput(JSON.stringify({ ok: true, message: "Sent" }))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {

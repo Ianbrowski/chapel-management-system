@@ -942,6 +942,12 @@ function openChapelHubModal(chapel) {
                     <div class="form-group" style="grid-column:1/2;"><label>Username</label><input name="user" minlength="3" maxlength="50" required></div>
                     <div class="form-group" style="grid-column:2/3;"><label>Full Name</label><input name="full_name" maxlength="100" placeholder="Juan Dela Cruz"></div>
                     <div class="form-group" style="grid-column:1/-1;"><label>Password</label><input type="password" name="password" minlength="6" maxlength="72" required></div>
+                    <div class="form-group" style="grid-column:1/-1; margin-top:-6px;">
+                        <label style="display:flex; align-items:center; gap:8px; font-weight:500; cursor:pointer; font-size:0.86rem;">
+                            <input type="checkbox" name="force_password_change" value="1" checked style="width:auto; margin:0;">
+                            <span>Require password change on first sign-in</span>
+                        </label>
+                    </div>
                     <div class="form-group" style="grid-column:1/-1;"><label>Email</label><input type="email" name="email" maxlength="100" placeholder="user@email.com"></div>
                     <div class="form-group" style="grid-column:1/-1;"><label>Role</label>
                         <select name="role" required>
@@ -996,6 +1002,12 @@ function openChapelHubModal(chapel) {
                     <div class="form-group" style="grid-column:1/2;"><label>Username</label><input name="user" id="edit-user-name" minlength="3" maxlength="50" required></div>
                     <div class="form-group" style="grid-column:2/3;"><label>Full Name</label><input name="full_name" id="edit-user-fullname" maxlength="100" placeholder="Juan Dela Cruz"></div>
                     <div class="form-group" style="grid-column:1/-1;"><label>Password <span style="color:var(--text2);font-weight:400;">(leave blank to keep)</span></label><input type="password" name="password" minlength="6" maxlength="72"></div>
+                    <div class="form-group" style="grid-column:1/-1; margin-top:-6px;">
+                        <label style="display:flex; align-items:center; gap:8px; font-weight:500; cursor:pointer; font-size:0.86rem;">
+                            <input type="checkbox" name="force_password_change" value="1" style="width:auto; margin:0;">
+                            <span>Require password change on next login (if setting a temporary password)</span>
+                        </label>
+                    </div>
                     <div class="form-group" style="grid-column:1/-1;"><label>Email</label><input type="email" name="email" id="edit-user-email" maxlength="100" placeholder="user@email.com"></div>
                     <div class="form-group" style="grid-column:1/-1;"><label>Role</label>
                         <select name="role" id="edit-user-role" required>

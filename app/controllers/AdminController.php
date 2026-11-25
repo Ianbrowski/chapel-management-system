@@ -151,8 +151,12 @@ class AdminController extends BaseController {
                 if ($this->userModel->exists($user)) {
                     $this->flash('error', 'Username already exists.');
                 } else {
-                    $hashed = password_hash($pass, PASSWORD_DEFAULT);
+                    $hashed = password_hash($pass, PASSWORD_BCRYPT, ['cost' => 12]);
                     if ($this->userModel->create($user, $hashed, $role, $email, $chapelId, $fullName)) {
+                        if (!empty($_POST['force_password_change'])) {
+                            $newUid = (int)$this->conn->insert_id;
+                            if ($newUid > 0) $this->setMustChangePasswordFlag($newUid, true);
+                        }
                         $newData = [
                             'username' => $user,
                             'role' => $role,
@@ -174,9 +178,12 @@ class AdminController extends BaseController {
                 }
                 
                 $oldData = $this->userModel->getById($id);
-                $hashed = !empty($pass) ? password_hash($pass, PASSWORD_DEFAULT) : null;
+                $hashed = !empty($pass) ? password_hash($pass, PASSWORD_BCRYPT, ['cost' => 12]) : null;
                 
                 if ($this->userModel->update($id, $user, $role, $hashed, $email, $chapelId, $fullName)) {
+                    if ($hashed !== null && !empty($_POST['force_password_change'])) {
+                        $this->setMustChangePasswordFlag($id, true);
+                    }
                     $newData = [
                         'username' => $user,
                         'role' => $role,
@@ -716,26 +723,37 @@ class AdminController extends BaseController {
             $profilePicPath = $this->handleImageUpload('profile_pic', 'uploads/profiles/', '', 2 * 1024 * 1024, $uploadMsg);
 
             // Handle password change
-            $curPwd = $_POST['current_password'] ?? '';
-            $newPwd = $_POST['new_password'] ?? '';
+            $curPwd     = trim((string)($_POST['current_password'] ?? ''));
+            $newPwd     = trim((string)($_POST['new_password'] ?? ''));
+            $confirmPwd = isset($_POST['confirm_password']) ? trim((string)$_POST['confirm_password']) : null;
 
-            if (!empty($newPwd)) {
+            if ($newPwd !== '') {
                 if (mb_strlen($newPwd) < 6 || mb_strlen($newPwd) > 72) {
                     $this->flash('error', 'New password must be between 6 and 72 characters.');
                     $this->redirect('dashboard.php?section=my_profile');
                     return;
                 }
+                if ($confirmPwd !== null && $confirmPwd !== $newPwd) {
+                    $this->flash('error', 'New password and confirm password do not match.');
+                    $this->redirect('dashboard.php?section=my_profile');
+                    return;
+                }
                 $hash = $this->userModel->getMyPasswordHash($this->userId);
-                if ($curPwd && password_verify($curPwd, $hash)) {
-                    $newHash = password_hash($newPwd, PASSWORD_DEFAULT);
+                if ($curPwd !== '' && $hash && password_verify($curPwd, $hash)) {
+                    $newHash = password_hash($newPwd, PASSWORD_BCRYPT, ['cost' => 12]);
                     $this->userModel->updateProfileAndPassword($this->userId, $name, $profilePicPath, $newHash);
+                    $this->setMustChangePasswordFlag((int)$this->userId, false);
+                    unset($_SESSION['must_change_password']);
                     if (session_status() === PHP_SESSION_ACTIVE) {
                         session_regenerate_id(true);
                     }
+                    AuditLogger::logFromSession($this->conn, 'password_changed', 'Auth', "User updated their own password");
                     $this->flash('success', 'Profile and password updated.' . $uploadMsg);
                 } else {
                     $this->flash('error', 'Current password is incorrect.');
                 }
+            } elseif (!empty($_SESSION['must_change_password'])) {
+                $this->flash('error', 'Please enter and confirm a new password before continuing.');
             } else {
                 $this->userModel->updateProfile($this->userId, $name, $profilePicPath);
                 $this->flash('success', 'Profile updated.' . $uploadMsg);
@@ -745,6 +763,21 @@ class AdminController extends BaseController {
         }
 
         $this->redirect('dashboard.php?section=my_profile');
+    }
+
+    private function setMustChangePasswordFlag(int $targetUserId, bool $required): void {
+        require_once __DIR__ . '/AuthController.php';
+        $auth = new AuthController($this->conn);
+        if (!$auth->supportsMustChangePassword()) {
+            return;
+        }
+        $val = $required ? 1 : 0;
+        $stmt = $this->conn->prepare('UPDATE users SET must_change_password = ? WHERE id = ?');
+        if ($stmt) {
+            $stmt->bind_param('ii', $val, $targetUserId);
+            $stmt->execute();
+            $stmt->close();
+        }
     }
 
     private function handleImageUpload(string $field, string $relativeDir, string $prefix, int $maxBytes, string &$uploadMsg): ?string {

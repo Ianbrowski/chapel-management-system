@@ -1052,19 +1052,59 @@ document.addEventListener('keydown', function(e) {
                 </p>
                 <div>
                     <?php if (empty($history_items)): ?>
-                        <div class="timeline-item">
-                            <div class="timeline-year">ESTABLISHED</div>
-                            <div class="timeline-title">Founding of the Cathedral Mission</div>
-                            <p style="font-size:0.85rem; color:var(--text-dim); margin:0;">A congregation founded on the gospel of Christ and the historic pursuit of religious autonomy.</p>
+                        <div class="timeline-item" style="display:flex; align-items:flex-start; gap:14px; border-radius:var(--radius-md); border:1px solid var(--border); border-left:3.5px solid var(--accent);">
+                            <div style="width:42px; height:42px; border-radius:10px; background:rgba(197,160,89,0.14); border:1px solid rgba(197,160,89,0.3); color:var(--gold); display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; margin-top:2px;">
+                                <i class="fa-solid fa-landmark"></i>
+                            </div>
+                            <div style="flex:1; min-width:0;">
+                                <div class="timeline-year" style="display:inline-block; padding:2px 10px; border-radius:999px; background:rgba(197,160,89,0.14); border:1px solid rgba(197,160,89,0.28); margin-bottom:6px;">ESTABLISHED</div>
+                                <div class="timeline-title">Founding of the Cathedral Mission</div>
+                                <p style="font-size:0.85rem; color:var(--text-dim); margin:0;">A congregation founded on the gospel of Christ and the historic pursuit of religious autonomy.</p>
+                            </div>
                         </div>
                     <?php else: ?>
-                        <?php foreach($history_items as $hi): ?>
-                        <div class="timeline-item" data-history="<?php echo htmlspecialchars(json_encode($hi, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>" onclick="openHistoryModal(this)" style="cursor:pointer;">
-                            <div class="timeline-year"><?php echo htmlspecialchars($hi['year']); ?></div>
-                            <div class="timeline-title"><?php echo htmlspecialchars($hi['title']); ?></div>
-                            <?php if(!empty($hi['description'])): ?>
-                                <p style="font-size:0.85rem; color:var(--text-dim); line-height:1.55; margin:0;"><?php echo htmlspecialchars($hi['description']); ?></p>
-                            <?php endif; ?>
+                        <?php
+                        $totalHistory = count($history_items);
+                        foreach ($history_items as $hIdx => $hi):
+                            $hHay = strtolower(trim(($hi['year'] ?? '') . ' ' . ($hi['title'] ?? '') . ' ' . ($hi['description'] ?? '')));
+                            $hIcon = 'fa-solid fa-landmark';
+                            if (strpos($hHay, 'digital') !== false || strpos($hHay, 'modern') !== false || strpos($hHay, 'system') !== false || strpos($hHay, 'tech') !== false) {
+                                $hIcon = 'fa-solid fa-laptop-code';
+                            } elseif (strpos($hHay, 'restor') !== false || strpos($hHay, 'renovat') !== false || strpos($hHay, 'rebuild') !== false || strpos($hHay, 'expand') !== false) {
+                                $hIcon = 'fa-solid fa-compass-drafting';
+                            } elseif (strpos($hHay, 'built') !== false || strpos($hHay, 'cathedral') !== false || strpos($hHay, 'chapel') !== false || strpos($hHay, 'sanctuary') !== false) {
+                                $hIcon = 'fa-solid fa-church';
+                            } elseif (strpos($hHay, 'found') !== false || strpos($hHay, 'establish') !== false || strpos($hHay, 'origin') !== false) {
+                                $hIcon = 'fa-solid fa-scroll';
+                            }
+                            $hiPayload = array_merge($hi, [
+                                'icon'  => $hIcon,
+                                'index' => $hIdx,
+                                'total' => $totalHistory,
+                            ]);
+                        ?>
+                        <div class="timeline-item history-milestone-card"
+                             data-history-index="<?php echo $hIdx; ?>"
+                             data-history="<?php echo htmlspecialchars(json_encode($hiPayload, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
+                             onclick="openHistoryModal(this)"
+                             style="cursor:pointer; display:flex; align-items:flex-start; gap:14px; border-radius:var(--radius-md); border:1px solid var(--border); border-left:3.5px solid var(--accent);">
+                            <div style="width:42px; height:42px; border-radius:10px; background:rgba(197,160,89,0.14); border:1px solid rgba(197,160,89,0.3); color:var(--gold); display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; margin-top:2px;">
+                                <i class="<?php echo $hIcon; ?>"></i>
+                            </div>
+                            <div style="flex:1; min-width:0;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:5px;">
+                                    <span class="timeline-year" style="display:inline-flex; align-items:center; gap:5px; padding:2px 10px; border-radius:999px; background:rgba(197,160,89,0.14); border:1px solid rgba(197,160,89,0.28); margin:0;">
+                                        <i class="fa-regular fa-clock" style="font-size:0.7rem;"></i> <?php echo htmlspecialchars($hi['year']); ?>
+                                    </span>
+                                    <span style="font-size:0.72rem; font-weight:600; color:var(--text-dim); opacity:0.8; display:inline-flex; align-items:center; gap:4px;">
+                                        View <i class="fa-solid fa-chevron-right" style="font-size:0.65rem; color:var(--gold);"></i>
+                                    </span>
+                                </div>
+                                <div class="timeline-title"><?php echo htmlspecialchars($hi['title']); ?></div>
+                                <?php if(!empty($hi['description'])): ?>
+                                    <p style="font-size:0.85rem; color:var(--text-dim); line-height:1.55; margin:0;"><?php echo htmlspecialchars($hi['description']); ?></p>
+                                <?php endif; ?>
+                            </div>
                         </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -1120,9 +1160,9 @@ document.addEventListener('keydown', function(e) {
 
                     <?php if (!empty($diocesanClergy)): ?>
                     <div style="margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--border); text-align:center;">
-                        <a href="#diocesan-clergy" style="display:inline-flex; align-items:center; gap:6px; font-size:0.78rem; font-weight:600; color:var(--accent); text-decoration:none; padding:7px 14px; border-radius:var(--radius-sm); background:var(--bg-surface); border:1px solid var(--border); transition:var(--transition);">
-                            <i class="fa-solid fa-cross"></i> View Diocesan Clergy (<?php echo count($diocesanClergy); ?> Parishes) <i class="fa-solid fa-arrow-down" style="font-size:0.7rem;"></i>
-                        </a>
+                        <button type="button" onclick="openDiocesanClergyModal()" style="display:inline-flex; align-items:center; gap:7px; font-size:0.78rem; font-weight:600; color:var(--accent); text-decoration:none; padding:7px 14px; border-radius:var(--radius-sm); background:var(--bg-surface); border:1px solid var(--border); cursor:pointer; transition:var(--transition);">
+                            <i class="fa-solid fa-cross"></i> View Diocesan Clergy (<?php echo count($diocesanClergy); ?> Parishes) <i class="fa-solid fa-up-right-from-square" style="font-size:0.68rem;"></i>
+                        </button>
                     </div>
                     <?php endif; ?>
                 </div>
@@ -1186,50 +1226,6 @@ document.addEventListener('keydown', function(e) {
                             <?php endforeach; ?>
                             <?php endif; ?>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Diocesan Clergy (Cavite Parishes & Missions) - FULL WIDTH & FULL EXPANDED VIEW -->
-                <div id="diocesan-clergy" style="background:var(--bg-surface); padding:1.75rem 2rem; border-radius:var(--radius-md); border:1px solid var(--border); box-shadow:0 4px 20px rgba(0,0,0,0.04); scroll-margin-top:100px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:1.5rem; padding-bottom:1rem; border-bottom:1px solid var(--border);">
-                        <div>
-                            <div style="display:inline-flex; align-items:center; gap:8px; margin-bottom:4px;">
-                                <span style="display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:6px; background:rgba(197,160,89,0.15); color:var(--gold); font-size:13px;">
-                                    <i class="fa-solid fa-cross"></i>
-                                </span>
-                                <h4 style="font-size:1.05rem; font-weight:800; text-transform:uppercase; color:var(--gold); letter-spacing:0.06em; margin:0;">
-                                    Diocesan Clergy
-                                </h4>
-                            </div>
-                            <p style="margin:0; font-size:0.82rem; color:var(--text-dim); line-height:1.4;">Diocese of Cavite · Parishes, Mission Stations &amp; Assigned Pastoral Clergy</p>
-                        </div>
-                        <span style="font-size:0.8rem; font-weight:700; color:var(--text-main); background:var(--bg-card); border:1px solid var(--border); padding:6px 16px; border-radius:999px; display:inline-flex; align-items:center; gap:8px;">
-                            <i class="fa-solid fa-church" style="color:var(--gold); font-size:12px;"></i> <?php echo count($diocesanClergy); ?> Parishes &amp; Missions
-                        </span>
-                    </div>
-
-                    <!-- Full Grid Display (No inner scrolling, fully expanded responsive columns) -->
-                    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:12px;">
-                        <?php foreach($diocesanClergy as $dc): ?>
-                        <div class="dir-item clergy-card-tile" data-leader="<?php echo htmlspecialchars(json_encode($dc, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>" onclick="openLeaderModal(this)" 
-                             style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--bg-card); border-radius:var(--radius-sm); border:1px solid var(--border); cursor:pointer;">
-                            <div class="clergy-card-icon" style="width:40px; height:40px; border-radius:10px; background:rgba(197,160,89,0.12); border:1px solid rgba(197,160,89,0.25); color:var(--gold); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;">
-                                <i class="fa-solid fa-church"></i>
-                            </div>
-                            <div style="min-width:0; flex:1;">
-                                <span style="font-size:0.75rem; color:var(--gold); font-weight:800; display:block; line-height:1.35; margin-bottom:3px;">
-                                    <?php echo htmlspecialchars($dc['subtitle'] ?: $dc['title']); ?>
-                                </span>
-                                <span style="font-size:0.92rem; font-weight:700; color:var(--text-main); display:block; line-height:1.3; margin-bottom:2px;">
-                                    <?php echo htmlspecialchars($dc['name']); ?>
-                                </span>
-                                <span style="font-size:0.75rem; color:var(--text-dim); font-weight:600; display:inline-block;">
-                                    <?php echo htmlspecialchars($dc['title']); ?>
-                                </span>
-                            </div>
-                            <i class="fa-solid fa-chevron-right clergy-card-chevron" style="font-size:0.75rem; color:var(--gold); opacity:0.4; flex-shrink:0; margin-left:6px;"></i>
-                        </div>
-                        <?php endforeach; ?>
                     </div>
                 </div>
             </div>
@@ -1463,29 +1459,160 @@ document.addEventListener('keydown', function(e) {
     </div>
 </div>
 
-<!-- ── LEADER / CLERGY DETAIL MODAL ── -->
-<div id="leaderModal" class="login-overlay" onclick="if(event.target===this) closeLeaderModal()">
-    <div class="login-inner" style="max-width:420px; text-align:center;">
-        <img id="modalImg" src="assets/img/2323.png" alt="Leader Photo" style="width:84px; height:84px; border-radius:50%; object-fit:cover; border:3px solid var(--accent); margin:0 auto 12px; box-shadow:var(--shadow-sm);">
-        <h3 id="modalName" style="font-family:var(--font-family); font-size:1.2rem; font-weight:700; color:var(--text-main); margin-bottom:4px;">Leader Name</h3>
-        <p id="modalSubtitle" style="color:var(--gold); font-weight:700; font-size:0.82rem; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; display:none;"></p>
-        <p id="modalTitle" style="color:var(--text-dim); font-weight:600; font-size:0.8rem; margin-bottom:16px;">Role / Ministry</p>
-        <div style="background:var(--bg-surface); padding:14px 18px; border-radius:var(--radius-md); border:1px solid var(--border); margin-bottom:18px;">
-            <p style="font-size:0.88rem; color:var(--text-dim); line-height:1.55; margin:0;">Serving with dedication in the Diocese of Cavite ministry and spiritual family.</p>
+<!-- ── DIOCESAN CLERGY DIRECTORY MODAL POPUP ── -->
+<div id="diocesanClergyModal" class="login-overlay bulletin-modal-overlay" onclick="if(event.target===this) closeDiocesanClergyModal()" role="dialog" aria-modal="true" aria-labelledby="diocesanClergyModalTitle">
+    <div class="bulletin-modal-container" style="max-width: 1020px; width: min(94vw, 1020px); max-height: 90vh;">
+        <div class="bmodal-header-accent"></div>
+        <div class="bmodal-topbar" style="padding: 1.15rem 1.65rem 0.95rem;">
+            <div class="bmodal-crest-wrap" style="gap: 12px;">
+                <img src="assets/img/2323.png" alt="Cathedral Seal" class="bmodal-crest" style="width: 40px; height: 40px;">
+                <div>
+                    <span class="bmodal-diocese">Diocese of Cavite · <?php echo count($diocesanClergy); ?> Parishes &amp; Missions</span>
+                    <span id="diocesanClergyModalTitle" class="bmodal-parish" style="font-size: 1.1rem;">Diocesan Clergy Directory</span>
+                </div>
+            </div>
+            <button type="button" onclick="closeDiocesanClergyModal()" class="bmodal-close-btn" aria-label="Close Diocesan Clergy Directory">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
         </div>
-        <button type="button" onclick="closeLeaderModal()" class="btn-outline" style="width:100%; border-radius:var(--radius-md);">Close Profile</button>
+        <div style="padding: 0.95rem 1.65rem; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; background: var(--bg-surface);">
+            <div style="position: relative; flex: 1 1 280px;">
+                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 0.85rem;"></i>
+                <input type="search" id="diocesanClergySearch" placeholder="Search parish, mission, or priest name..." oninput="filterDiocesanClergy(this.value)"
+                       style="width: 100%; padding: 9px 14px 9px 38px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 0.88rem; box-sizing: border-box;">
+            </div>
+            <span id="diocesanClergyCount" style="font-size: 0.8rem; font-weight: 700; color: var(--text-dim); background: var(--bg-card); border: 1px solid var(--border); padding: 6px 14px; border-radius: 999px;">
+                Showing <?php echo count($diocesanClergy); ?> of <?php echo count($diocesanClergy); ?>
+            </span>
+        </div>
+        <div style="padding: 1.35rem 1.65rem 1.65rem; overflow-y: auto; flex: 1; background: var(--bg-surface);">
+            <div id="diocesanClergyGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 14px;">
+                <?php foreach($diocesanClergy as $dc):
+                    $dcSearch = strtolower(trim(($dc['subtitle'] ?? '') . ' ' . ($dc['name'] ?? '') . ' ' . ($dc['title'] ?? '')));
+                    $dcImg = !empty($dc['image_path']) ? 'storage/' . $dc['image_path'] : '';
+                ?>
+                <div class="dir-item clergy-card-tile diocesan-clergy-card"
+                     data-search="<?php echo htmlspecialchars($dcSearch, ENT_QUOTES, 'UTF-8'); ?>"
+                     data-leader="<?php echo htmlspecialchars(json_encode($dc, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
+                     onclick="openLeaderModal(this)"
+                     style="display:flex; align-items:center; gap:14px; padding:15px 18px; min-height:94px; background:var(--bg-card); border-radius:10px; border:1px solid var(--border); box-shadow:0 2px 8px rgba(0,0,0,0.04); cursor:pointer;">
+                    <?php if ($dcImg !== ''): ?>
+                    <img src="<?php echo htmlspecialchars($dcImg, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($dc['name'], ENT_QUOTES, 'UTF-8'); ?>"
+                         style="width:48px; height:48px; border-radius:10px; object-fit:cover; border:1.5px solid rgba(197,160,89,0.45); flex-shrink:0;">
+                    <?php else: ?>
+                    <div class="clergy-card-icon" style="width:48px; height:48px; border-radius:10px; background:rgba(197,160,89,0.12); border:1px solid rgba(197,160,89,0.28); color:var(--gold); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">
+                        <i class="fa-solid fa-church"></i>
+                    </div>
+                    <?php endif; ?>
+                    <div style="min-width:0; flex:1;">
+                        <span style="font-size:0.76rem; color:var(--gold); font-weight:800; display:block; line-height:1.35; margin-bottom:4px;">
+                            <?php echo htmlspecialchars($dc['subtitle'] ?: $dc['title']); ?>
+                        </span>
+                        <span style="font-size:0.98rem; font-weight:700; color:var(--text-main); display:block; line-height:1.3; margin-bottom:6px;">
+                            <?php echo htmlspecialchars($dc['name']); ?>
+                        </span>
+                        <span style="font-size:0.72rem; color:var(--text-dim); font-weight:600; display:inline-block; padding:2px 10px; border-radius:999px; background:var(--bg-surface); border:1px solid var(--border);">
+                            <?php echo htmlspecialchars($dc['title']); ?>
+                        </span>
+                    </div>
+                    <i class="fa-solid fa-chevron-right clergy-card-chevron" style="font-size:0.8rem; color:var(--gold); opacity:0.5; flex-shrink:0; margin-left:6px;"></i>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <div id="diocesanClergyEmpty" style="display:none; text-align:center; padding: 2.5rem 1rem; color: var(--text-dim); font-size: 0.9rem;">
+                No matching parish or clergy found.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── LEADER / CLERGY DETAIL MODAL (ID CARD) ── -->
+<div id="leaderModal" class="login-overlay bulletin-modal-overlay" style="z-index: 10010;" onclick="if(event.target===this) closeLeaderModal()" role="dialog" aria-modal="true" aria-labelledby="modalName">
+    <div class="bulletin-modal-container" style="max-width: 500px; width: min(94vw, 500px); text-align: center;">
+        <div class="bmodal-header-accent"></div>
+        <div class="bmodal-topbar" style="padding: 1rem 1.4rem 0.8rem;">
+            <div class="bmodal-crest-wrap">
+                <img src="assets/img/2323.png" alt="IFI Seal" class="bmodal-crest">
+                <div style="text-align: left;">
+                    <span class="bmodal-diocese">Iglesia Filipina Independiente</span>
+                    <span class="bmodal-parish">Clergy &amp; Ministry ID Card</span>
+                </div>
+            </div>
+            <button type="button" onclick="closeLeaderModal()" class="bmodal-close-btn" aria-label="Close Profile">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div style="padding: 1.75rem 2rem 1.85rem; overflow-y: auto;">
+            <img id="modalImg" src="assets/img/2323.png" alt="Leader Photo" style="width:120px; height:120px; border-radius:50%; object-fit:cover; border:3.5px solid var(--accent); margin:0 auto 16px; display:block; box-shadow:0 10px 26px rgba(0,0,0,0.16); background:var(--bg-surface);">
+            <p id="modalSubtitle" style="display:none; margin:0 auto 10px; padding:4px 14px; border-radius:999px; background:rgba(197,160,89,0.14); border:1px solid rgba(197,160,89,0.35); color:var(--gold); font-weight:800; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em; line-height:1.4;"></p>
+            <h3 id="modalName" style="font-family:var(--font-family); font-size:1.45rem; font-weight:800; color:var(--text-main); margin:0 0 6px; line-height:1.25;">Leader Name</h3>
+            <p id="modalTitle" style="color:var(--text-dim); font-weight:600; font-size:0.92rem; margin:0 0 18px;">Role / Ministry</p>
+            <div style="background:var(--bg-surface); padding:14px 18px; border-radius:10px; border:1px solid var(--border); margin-bottom:20px; text-align:left; display:grid; gap:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:0.82rem; padding-bottom:8px; border-bottom:1px solid var(--border);">
+                    <span style="color:var(--text-dim); font-weight:600;"><i class="fa-solid fa-church" style="color:var(--gold); margin-right:6px;"></i>Jurisdiction</span>
+                    <span style="color:var(--text-main); font-weight:700;">Diocese of Cavite</span>
+                </div>
+                <p style="font-size:0.86rem; color:var(--text-dim); line-height:1.55; margin:0;">Serving with dedication in the Diocese of Cavite ministry and spiritual family.</p>
+            </div>
+            <button type="button" onclick="closeLeaderModal()" class="btn-outline" style="width:100%; padding:11px 18px; font-size:0.9rem; font-weight:700; border-radius:var(--radius-md); cursor:pointer;">Close Profile</button>
+        </div>
     </div>
 </div>
 
 <!-- ── HISTORY DETAIL MODAL ── -->
 <div id="historyModal" class="login-overlay" onclick="if(event.target===this) closeHistoryModal()">
-    <div class="login-inner" style="max-width:480px; text-align:center;">
-        <span id="hModalYear" style="font-size:0.78rem; font-weight:800; color:var(--accent); letter-spacing:0.1em; text-transform:uppercase;">Year</span>
-        <h2 id="hModalTitle" style="font-family:var(--font-family); font-weight:700; margin:8px 0 16px; font-size:1.3rem; color:var(--text-main);">Era Milestone</h2>
-        <div style="background:var(--bg-surface); padding:18px 22px; border-radius:var(--radius-md); text-align:left; border:1px solid var(--border);">
-             <p id="hModalDesc" style="font-size:0.9rem; line-height:1.65; color:var(--text-main); margin:0;">Details about this historical milestone in the life of our parish.</p>
+    <div class="bulletin-modal-container" style="max-width:560px; width:min(94vw, 560px); padding:0; overflow:hidden; text-align:left;">
+        <div class="bmodal-header-accent"></div>
+        <div class="bmodal-topbar">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div class="bmodal-crest-wrap" style="display:flex; align-items:center; justify-content:center;">
+                    <i class="fa-solid fa-landmark" style="color:var(--accent); font-size:1.05rem;" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <span class="bmodal-diocese">Cathedral Chronicle &amp; Heritage</span>
+                    <span class="bmodal-parish">Iglesia Filipina Independiente</span>
+                </div>
+            </div>
+            <button type="button" class="bmodal-close-btn" onclick="closeHistoryModal()" aria-label="Close modal">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
         </div>
-        <button type="button" onclick="closeHistoryModal()" class="btn-outline" style="margin-top:20px; width:100%; border-radius:var(--radius-md);">Close</button>
+
+        <div style="padding:26px 28px 24px;">
+            <div style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; margin-bottom:20px;">
+                <div id="hModalIconWrap" style="width:68px; height:68px; border-radius:50%; background:linear-gradient(135deg, rgba(212,175,55,0.22), rgba(212,175,55,0.06)); border:2px solid rgba(212,175,55,0.45); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 20px rgba(0,0,0,0.08);">
+                    <i id="hModalIcon" class="fa-solid fa-landmark" style="font-size:1.75rem; color:var(--accent);" aria-hidden="true"></i>
+                </div>
+                <div style="display:inline-flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px;">
+                    <span style="display:inline-flex; align-items:center; gap:6px; background:rgba(212,175,55,0.14); border:1px solid rgba(212,175,55,0.35); color:var(--accent); padding:4px 12px; border-radius:999px; font-size:0.78rem; font-weight:800; letter-spacing:0.08em; text-transform:uppercase;">
+                        <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                        <span id="hModalYear">Year</span>
+                    </span>
+                    <span id="hModalStep" style="display:inline-flex; align-items:center; background:var(--bg-surface); border:1px solid var(--border); color:var(--text-muted); padding:4px 10px; border-radius:999px; font-size:0.74rem; font-weight:600;">Milestone</span>
+                </div>
+                <h2 id="hModalTitle" style="font-family:var(--font-family); font-weight:700; margin:2px 0 0; font-size:1.42rem; line-height:1.25; color:var(--text-main);">Era Milestone</h2>
+            </div>
+
+            <div style="background:var(--bg-surface); padding:20px 22px; border-radius:var(--radius-md); text-align:left; border:1px solid var(--border); border-left:4px solid var(--accent); margin-bottom:20px;">
+                <div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-book-open" style="color:var(--accent);" aria-hidden="true"></i>
+                    <span>Historical Account</span>
+                </div>
+                <p id="hModalDesc" style="font-size:0.95rem; line-height:1.7; color:var(--text-main); margin:0;">Details about this historical milestone in the life of our parish.</p>
+            </div>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; padding-top:16px; border-top:1px solid var(--border);">
+                <div id="hModalNavGroup" style="display:flex; align-items:center; gap:8px;">
+                    <button type="button" id="hModalPrevBtn" onclick="stepHistoryModal(-1)" class="btn-outline" style="padding:8px 14px; font-size:0.84rem; border-radius:var(--radius-md); display:inline-flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-chevron-left" style="font-size:0.75rem;" aria-hidden="true"></i> Previous
+                    </button>
+                    <button type="button" id="hModalNextBtn" onclick="stepHistoryModal(1)" class="btn-outline" style="padding:8px 14px; font-size:0.84rem; border-radius:var(--radius-md); display:inline-flex; align-items:center; gap:6px;">
+                        Next <i class="fa-solid fa-chevron-right" style="font-size:0.75rem;" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <button type="button" onclick="closeHistoryModal()" class="btn-outline" style="padding:8px 18px; font-size:0.84rem; border-radius:var(--radius-md);">Close</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1565,7 +1692,13 @@ document.addEventListener('keydown', function(e) {
                 </div>
 
                 <div class="modal-form-group">
-                    <label for="modalPassword" class="modal-form-label">Password</label>
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
+                        <label for="modalPassword" class="modal-form-label" style="margin-bottom:0;">Password</label>
+                        <button type="button" id="modalForgotTrigger" onclick="toggleForgotPasswordMode(true)"
+                                style="background:none; border:none; padding:0; font-size:0.78rem; font-weight:600; color:var(--gold, #c5a059); cursor:pointer; text-decoration:none;">
+                            Forgot Password?
+                        </button>
+                    </div>
                     <div class="modal-input-wrap">
                         <i class="fa-solid fa-lock modal-input-icon"></i>
                         <input 
@@ -1588,6 +1721,46 @@ document.addEventListener('keydown', function(e) {
                     <span id="modalSubmitText">Sign In to Portal</span>
                     <i class="fa-solid fa-arrow-right" id="modalSubmitIcon"></i>
                 </button>
+            </form>
+
+            <!-- Inline Forgot Password Form (Cathedral Admin, Chapel Admin, Staff, Priest & Member) -->
+            <form id="modalForgotForm" method="POST" action="forgot_password.php" style="display:none;" autocomplete="on">
+                <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf ?? ''); ?>">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf ?? ''); ?>">
+
+                <div class="modal-form-group">
+                    <label for="forgotIdentity" class="modal-form-label">Username or Registered Email</label>
+                    <div class="modal-input-wrap">
+                        <i class="fa-solid fa-envelope modal-input-icon"></i>
+                        <input
+                            type="text"
+                            id="forgotIdentity"
+                            name="identity"
+                            class="modal-form-input"
+                            placeholder="Enter your username or email"
+                            required
+                            maxlength="100"
+                            autocomplete="username"
+                            spellcheck="false"
+                        >
+                    </div>
+                    <p style="font-size:0.76rem; color:var(--text-dim); margin:7px 0 0; line-height:1.45;">
+                        Reset links are sent only to your verified account email and expire in 15 minutes.
+                    </p>
+                </div>
+
+                <button type="submit" class="btn-modal-login-submit" id="forgotSubmitBtn">
+                    <span id="forgotSubmitText">Send Reset Link</span>
+                    <i class="fa-solid fa-paper-plane" id="forgotSubmitIcon"></i>
+                </button>
+
+                <div style="text-align:center; margin-top:12px;">
+                    <button type="button" onclick="toggleForgotPasswordMode(false)"
+                            style="background:none; border:none; padding:4px 8px; font-size:0.82rem; font-weight:600; color:var(--text-dim); cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-arrow-left"></i>
+                        <span>Back to Sign In</span>
+                    </button>
+                </div>
             </form>
 
             <!-- Quick Action Links -->
@@ -1622,7 +1795,10 @@ document.addEventListener('keydown', function(e) {
     </div>
 </footer>
 
-<!-- ── FLOATING THEME SWITCHER (BOTTOM RIGHT) ── -->
+<!-- ── FLOATING QUICK BACK-TO-TOP ARROW & THEME SWITCHER (BOTTOM RIGHT) ── -->
+<button type="button" id="scrollTopBtn" class="floating-scroll-top" title="Back to Top" aria-label="Scroll back to top">
+    <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+</button>
 <button type="button" id="themeToggleBtn" class="floating-theme-toggle" title="Switch Theme (Light / Dark)" aria-label="Switch Theme">
     <i id="themeToggleIcon" class="fa-regular fa-sun"></i>
 </button>
@@ -1652,7 +1828,7 @@ document.addEventListener('keydown', function(e) {
         if (sub) {
             if (data.subtitle) {
                 sub.innerText = data.subtitle;
-                sub.style.display = 'block';
+                sub.style.display = 'inline-block';
             } else {
                 sub.style.display = 'none';
             }
@@ -1662,10 +1838,45 @@ document.addEventListener('keydown', function(e) {
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
     }
+    function openDiocesanClergyModal() {
+        const modal = document.getElementById('diocesanClergyModal');
+        if (!modal) return;
+        const searchEl = document.getElementById('diocesanClergySearch');
+        if (searchEl) {
+            searchEl.value = '';
+            filterDiocesanClergy('');
+        }
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeDiocesanClergyModal() {
+        const modal = document.getElementById('diocesanClergyModal');
+        if (modal) modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    function filterDiocesanClergy(query) {
+        const q = (query || '').trim().toLowerCase();
+        const cards = document.querySelectorAll('#diocesanClergyGrid .diocesan-clergy-card');
+        let shown = 0;
+        cards.forEach(card => {
+            const hay = card.getAttribute('data-search') || '';
+            const match = !q || hay.includes(q);
+            card.style.display = match ? 'flex' : 'none';
+            if (match) shown++;
+        });
+        const countEl = document.getElementById('diocesanClergyCount');
+        if (countEl) countEl.textContent = `Showing ${shown} of ${cards.length}`;
+        const emptyEl = document.getElementById('diocesanClergyEmpty');
+        if (emptyEl) emptyEl.style.display = shown === 0 ? 'block' : 'none';
+    }
+
     function closeLeaderModal() {
         const modal = document.getElementById('leaderModal');
         if (modal) modal.classList.remove('active');
-        document.body.style.overflow = '';
+        const clergyModal = document.getElementById('diocesanClergyModal');
+        if (!clergyModal || !clergyModal.classList.contains('active')) {
+            document.body.style.overflow = '';
+        }
     }
 
     function openMerchModal(item) {
@@ -1872,8 +2083,15 @@ document.addEventListener('keydown', function(e) {
     // Escape key to close modals
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
+            const leaderModal = document.getElementById('leaderModal');
+            if (leaderModal && leaderModal.classList.contains('active')) {
+                closeLeaderModal();
+                return;
+            }
+            closeDiocesanClergyModal();
             closeBulletinModal();
             closeChapelModal();
+            closeHistoryModal();
         }
     });
 
@@ -1929,8 +2147,13 @@ document.addEventListener('keydown', function(e) {
         document.body.style.overflow = '';
     }
 
+    let activeHistoryIndex = -1;
+
     function openHistoryModal(data) {
+        const cards = Array.from(document.querySelectorAll('.history-milestone-card'));
+        let clickedIdx = -1;
         if (data instanceof HTMLElement) {
+            clickedIdx = cards.indexOf(data);
             const raw = data.getAttribute('data-history');
             if (raw) {
                 try { data = JSON.parse(raw); } catch (e) { console.error('Error parsing history data:', e); return; }
@@ -1946,8 +2169,51 @@ document.addEventListener('keydown', function(e) {
         if (titleEl) titleEl.innerText = data.title || '';
         const descEl = document.getElementById('hModalDesc');
         if (descEl) descEl.innerText = data.description || 'This era marks a significant chapter in the building of our spiritual sanctuary.';
+        const iconEl = document.getElementById('hModalIcon');
+        if (iconEl) iconEl.className = data.icon || 'fa-solid fa-landmark';
+
+        const total = (typeof data.total === 'number' && data.total > 0) ? data.total : cards.length;
+        const idx = (typeof data.index === 'number') ? data.index : clickedIdx;
+        activeHistoryIndex = idx;
+
+        const stepEl = document.getElementById('hModalStep');
+        if (stepEl) {
+            if (idx >= 0 && total > 0) {
+                stepEl.innerText = `Milestone ${idx + 1} of ${total}`;
+                stepEl.style.display = 'inline-flex';
+            } else {
+                stepEl.style.display = 'none';
+            }
+        }
+
+        const navGroup = document.getElementById('hModalNavGroup');
+        const prevBtn = document.getElementById('hModalPrevBtn');
+        const nextBtn = document.getElementById('hModalNextBtn');
+        if (navGroup) {
+            navGroup.style.display = (total > 1 && idx >= 0) ? 'flex' : 'none';
+        }
+        if (prevBtn) {
+            const disablePrev = idx <= 0;
+            prevBtn.disabled = disablePrev;
+            prevBtn.style.opacity = disablePrev ? '0.45' : '1';
+            prevBtn.style.pointerEvents = disablePrev ? 'none' : 'auto';
+        }
+        if (nextBtn) {
+            const disableNext = idx < 0 || idx >= total - 1;
+            nextBtn.disabled = disableNext;
+            nextBtn.style.opacity = disableNext ? '0.45' : '1';
+            nextBtn.style.pointerEvents = disableNext ? 'none' : 'auto';
+        }
+
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
+    }
+    function stepHistoryModal(delta) {
+        const cards = Array.from(document.querySelectorAll('.history-milestone-card'));
+        const nextIndex = activeHistoryIndex + delta;
+        if (nextIndex >= 0 && nextIndex < cards.length) {
+            openHistoryModal(cards[nextIndex]);
+        }
     }
     function closeHistoryModal() {
         const modal = document.getElementById('historyModal');
@@ -1955,6 +2221,9 @@ document.addEventListener('keydown', function(e) {
         document.body.style.overflow = '';
     }
 
+    window.openDiocesanClergyModal = openDiocesanClergyModal;
+    window.closeDiocesanClergyModal = closeDiocesanClergyModal;
+    window.filterDiocesanClergy = filterDiocesanClergy;
     window.openLeaderModal = openLeaderModal;
     window.closeLeaderModal = closeLeaderModal;
     window.openMerchModal = openMerchModal;
@@ -1963,7 +2232,12 @@ document.addEventListener('keydown', function(e) {
     window.openChapelModal = openChapelModal;
     window.closeChapelModal = closeChapelModal;
     window.openHistoryModal = openHistoryModal;
+    window.stepHistoryModal = stepHistoryModal;
     window.closeHistoryModal = closeHistoryModal;
+
+    if (window.location.hash === '#diocesan-clergy') {
+        setTimeout(openDiocesanClergyModal, 120);
+    }
 
     // Scroll Reveal Effect
     const reveal = () => {
@@ -1976,17 +2250,31 @@ document.addEventListener('keydown', function(e) {
     window.addEventListener('scroll', reveal);
     window.addEventListener('load', reveal);
 
-    // Navbar Scroll Shadow
-    window.addEventListener('scroll', () => {
+    // Navbar Scroll Shadow & Back-to-Top Floating Arrow
+    (function initScrollHelpers() {
         const header = document.querySelector('.header');
-        if (header) {
-            if (window.scrollY > 15) {
-                header.classList.add('scrolled');
-            } else {
-                header.classList.remove('scrolled');
+        const scrollTopBtn = document.getElementById('scrollTopBtn');
+
+        const onScroll = () => {
+            const y = window.scrollY || window.pageYOffset || 0;
+            if (header) {
+                header.classList.toggle('scrolled', y > 15);
             }
+            if (scrollTopBtn) {
+                scrollTopBtn.classList.toggle('visible', y > 260);
+            }
+        };
+
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('load', onScroll);
+        onScroll();
+
+        if (scrollTopBtn) {
+            scrollTopBtn.addEventListener('click', () => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
         }
-    });
+    })();
 
     // Unified Theme Engine (Single toggle sync with inside dashboard)
     (function initUnifiedTheme() {
@@ -2052,6 +2340,8 @@ document.addEventListener('keydown', function(e) {
                     let msg = 'Notice: Please sign in with your credentials.';
                     if (notice === 'registration_submitted') msg = 'Registration submitted! The Parish Office will review and approve your account shortly.';
                     else if (notice === 'pending_approval') msg = 'Your account registration is awaiting verification by the Cathedral Parish Office.';
+                    else if (notice === 'password_reset_sent') msg = 'If an active eligible account matches that username or email, password reset instructions have been sent.';
+                    else if (notice === 'password_reset_success') msg = 'Your password has been updated. Please sign in with your new password.';
                     alertText.textContent = msg;
                     alertBox.style.background = 'rgba(197, 160, 89, 0.15)';
                     alertBox.style.borderColor = 'rgba(197, 160, 89, 0.35)';
@@ -2887,9 +3177,43 @@ document.addEventListener('keydown', function(e) {
         }
     }
 
+    function toggleForgotPasswordMode(showForgot) {
+        const loginForm = document.getElementById('modalLoginForm');
+        const forgotForm = document.getElementById('modalForgotForm');
+        const titleEl = document.getElementById('loginModalTitle');
+        const alertBox = document.getElementById('modalLoginAlert');
+        const userField = document.getElementById('modalUsername');
+        const forgotField = document.getElementById('forgotIdentity');
+
+        if (alertBox) {
+            alertBox.style.display = 'none';
+            alertBox.style.background = '';
+            alertBox.style.borderColor = '';
+            alertBox.style.color = '';
+        }
+
+        if (showForgot) {
+            if (loginForm) loginForm.style.display = 'none';
+            if (forgotForm) forgotForm.style.display = 'block';
+            if (titleEl) titleEl.innerHTML = '<span>Reset</span> Password';
+            if (forgotField) {
+                if (!forgotField.value && userField && userField.value) {
+                    forgotField.value = userField.value;
+                }
+                setTimeout(() => forgotField.focus(), 50);
+            }
+        } else {
+            if (forgotForm) forgotForm.style.display = 'none';
+            if (loginForm) loginForm.style.display = 'block';
+            if (titleEl) titleEl.innerHTML = '<span>Cathedral Portal</span> Sign In';
+            if (userField) setTimeout(() => userField.focus(), 50);
+        }
+    }
+
     function openLoginModal() {
         const modal = document.getElementById('cathedralLoginModal');
         if (!modal) return;
+        toggleForgotPasswordMode(false);
         modal.style.display = 'flex';
         requestAnimationFrame(() => {
             modal.classList.add('active');
@@ -3124,6 +3448,71 @@ document.addEventListener('keydown', function(e) {
             } catch (err) {
                 console.warn('AJAX login submission error, falling back to standard submit:', err);
                 form.submit();
+            }
+        });
+    })();
+
+    // Inline Forgot Password AJAX Handler
+    (function initModalAjaxForgotPassword() {
+        const form = document.getElementById('modalForgotForm');
+        if (!form) return;
+
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const alertBox = document.getElementById('modalLoginAlert');
+            const alertText = document.getElementById('modalAlertText');
+            const submitBtn = document.getElementById('forgotSubmitBtn');
+            const submitText = document.getElementById('forgotSubmitText');
+            const submitIcon = document.getElementById('forgotSubmitIcon');
+
+            if (alertBox) {
+                alertBox.style.display = 'none';
+                alertBox.style.background = '';
+                alertBox.style.borderColor = '';
+                alertBox.style.color = '';
+            }
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                if (submitText) submitText.textContent = 'Sending...';
+                if (submitIcon) submitIcon.className = 'fa-solid fa-spinner fa-spin';
+            }
+
+            const formData = new FormData(form);
+            formData.append('ajax', '1');
+
+            try {
+                const resp = await fetch('forgot_password.php', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                });
+                const data = await resp.json().catch(() => null);
+                const msg = (data && data.message)
+                    ? data.message
+                    : 'If an active eligible account matches that username or email, password reset instructions have been sent.';
+
+                if (alertBox && alertText) {
+                    alertText.textContent = msg;
+                    if (data && data.success) {
+                        alertBox.style.background = 'rgba(16, 185, 129, 0.12)';
+                        alertBox.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                        alertBox.style.color = '#10b981';
+                    }
+                    alertBox.style.display = 'flex';
+                }
+            } catch (err) {
+                console.warn('AJAX forgot password submission error, falling back to standard submit:', err);
+                form.submit();
+                return;
+            }
+
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                if (submitText) submitText.textContent = 'Send Reset Link';
+                if (submitIcon) submitIcon.className = 'fa-solid fa-paper-plane';
             }
         });
     })();

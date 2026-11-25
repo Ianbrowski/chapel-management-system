@@ -34,6 +34,14 @@ class AuthController extends BaseController {
     private const MAX_IDENTITY_LEN = 100;
     private const MAX_PASSWORD_LEN = 72;
 
+    // Self-service Forgot Password constraints (root 'Admin' stays excluded for security)
+    private const PASSWORD_RESET_ALLOWED_ROLES = ['Cathedral Admin', 'Chapel Admin', 'Staff', 'Priest', 'Member'];
+    private const PASSWORD_RESET_TTL_SECONDS   = 900;
+    private const PASSWORD_RESET_IP_MAX        = 5;
+    private const PASSWORD_RESET_ID_COOLDOWN   = 120;
+    private const PASSWORD_RESET_ID_MAX        = 3;
+    private const PASSWORD_RESET_VERIFY_MAX    = 10;
+
     public function __construct($conn) {
         parent::__construct($conn, false);
         $this->sendSecurityHeaders();
@@ -144,6 +152,9 @@ class AuthController extends BaseController {
         $select = 'SELECT id, user, password, role, status, full_name, chapel_id';
         if ($this->supportsLoginLocking()) {
             $select .= ', login_attempts, locked_until';
+        }
+        if ($this->supportsMustChangePassword()) {
+            $select .= ', must_change_password';
         }
         $select .= ' FROM users WHERE user = ? OR email = ? LIMIT 1';
 
@@ -262,6 +273,14 @@ class AuthController extends BaseController {
         }
         $ajaxRedirect = $destSection !== '' ? ('dashboard.php?section=' . urlencode($destSection)) : 'dashboard.php';
         $fullRedirect = $destSection !== '' ? ('../../dashboard.php?section=' . urlencode($destSection)) : '../../dashboard.php';
+
+        if (!empty($user['must_change_password'])) {
+            $_SESSION['must_change_password'] = 1;
+            $ajaxRedirect = 'dashboard.php?section=my_profile&notice=must_change_password';
+            $fullRedirect = '../../dashboard.php?section=my_profile&notice=must_change_password';
+        } else {
+            unset($_SESSION['must_change_password']);
+        }
 
         if ($this->isAjaxRequest()) {
             header('Content-Type: application/json; charset=utf-8');
@@ -421,6 +440,338 @@ class AuthController extends BaseController {
         if (empty($required['login_attempts'])) $clauses[] = 'ADD COLUMN login_attempts INT UNSIGNED NOT NULL DEFAULT 0';
         if (empty($required['locked_until']))   $clauses[] = 'ADD COLUMN locked_until DATETIME NULL DEFAULT NULL';
         if (!empty($clauses)) @$this->conn->query('ALTER TABLE users ' . implode(', ', $clauses));
+    }
+
+    private ?bool $supportsMustChangeFlag = null;
+
+    public function supportsMustChangePassword(): bool {
+        if ($this->supportsMustChangeFlag !== null) return $this->supportsMustChangeFlag;
+        $hasCol = false;
+        $res = @$this->conn->query("SHOW COLUMNS FROM users LIKE 'must_change_password'");
+        if ($res) {
+            $hasCol = $res->num_rows > 0;
+            $res->close();
+        }
+        if (!$hasCol) {
+            @$this->conn->query('ALTER TABLE users ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0');
+            $res2 = @$this->conn->query("SHOW COLUMNS FROM users LIKE 'must_change_password'");
+            if ($res2) {
+                $hasCol = $res2->num_rows > 0;
+                $res2->close();
+            }
+        }
+        $this->supportsMustChangeFlag = $hasCol;
+        return $this->supportsMustChangeFlag;
+    }
+
+    // ─── SELF-SERVICE FORGOT & RESET PASSWORD ────────────────────────────────
+
+    private function ensurePasswordResetTable(): bool {
+        $sql = "CREATE TABLE IF NOT EXISTS password_resets (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            token_hash CHAR(64) NOT NULL,
+            expires_at DATETIME NOT NULL,
+            used_at DATETIME NULL DEFAULT NULL,
+            requested_ip VARCHAR(45) NULL DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_pr_token_hash (token_hash),
+            INDEX idx_pr_user_id (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+        return (bool)@$this->conn->query($sql);
+    }
+
+    private function getTrustedAppBaseUrl(): string {
+        global $localConfig;
+        $envUrl = trim((string)(getenv('APP_URL') ?: ($localConfig['app_url'] ?? '')));
+        if ($envUrl !== '' && preg_match('#^https?://[a-z0-9.\-]+(:\d{1,5})?(/[^\s]*)?$#i', $envUrl)) {
+            return rtrim($envUrl, '/');
+        }
+        if (defined('BASE_URL')) {
+            $parsed = @parse_url((string)BASE_URL);
+            $scheme = strtolower((string)($parsed['scheme'] ?? 'http'));
+            $host   = (string)($parsed['host'] ?? '');
+            $port   = isset($parsed['port']) ? ':' . (int)$parsed['port'] : '';
+            $path   = rtrim((string)($parsed['path'] ?? ''), '/');
+            if (in_array($scheme, ['http', 'https'], true) && preg_match('/^[a-z0-9.\-]+$/i', $host)) {
+                return $scheme . '://' . $host . $port . $path;
+            }
+        }
+        return 'http://localhost/IFILOCAL';
+    }
+
+    private function respondResetRequest(bool $success, string $message, int $httpStatus = 200, string $redirectQuery = ''): void {
+        if ($this->isAjaxRequest()) {
+            header('Content-Type: application/json; charset=utf-8');
+            http_response_code($httpStatus);
+            echo json_encode(['success' => $success, 'message' => $message]);
+            exit();
+        }
+        $target = 'index.php?open_login=1';
+        if ($redirectQuery !== '') {
+            $target .= '&' . ltrim($redirectQuery, '&');
+        }
+        parent::redirect($target);
+    }
+
+    /**
+     * Handles Forgot Password submission cleanly with CSRF, RateLimiter,
+     * constant-response anti-enumeration, role restrictions, and SHA-256 token storage.
+     */
+    public function requestPasswordReset(): void {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            parent::redirect('index.php?open_login=1');
+            return;
+        }
+
+        if (!$this->validateCsrf($_POST['csrf'] ?? $_POST['csrf_token'] ?? '')) {
+            $this->respondResetRequest(false, 'Security session expired. Please refresh and try again.', 403, 'error=csrf');
+            return;
+        }
+        // Release session lock before external RateLimiter/SMTP I/O so other tabs aren't blocked
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
+        $rawIdentity = trim((string)($_POST['identity'] ?? $_POST['user'] ?? ''));
+        if ($rawIdentity === '') {
+            $this->respondResetRequest(false, 'Please enter your username or email address.', 422);
+            return;
+        }
+        if (mb_strlen($rawIdentity) > self::MAX_IDENTITY_LEN) {
+            $this->respondResetRequest(false, 'Username or email cannot exceed ' . self::MAX_IDENTITY_LEN . ' characters.', 422);
+            return;
+        }
+
+        require_once __DIR__ . '/../helpers/RateLimiter.php';
+        $ip = self::getClientIp();
+        $ipKey = 'pwreset_ip:' . $ip;
+        $idCoolKey = 'pwreset_cd:' . sha1(strtolower($rawIdentity));
+        $idMaxKey  = 'pwreset_id:' . sha1(strtolower($rawIdentity));
+
+        if (
+            RateLimiter::tooManyAttempts($ipKey, self::PASSWORD_RESET_IP_MAX, self::PASSWORD_RESET_TTL_SECONDS)
+            || RateLimiter::tooManyAttempts($idCoolKey, 1, self::PASSWORD_RESET_ID_COOLDOWN)
+            || RateLimiter::tooManyAttempts($idMaxKey, self::PASSWORD_RESET_ID_MAX, self::PASSWORD_RESET_TTL_SECONDS)
+        ) {
+            $this->respondResetRequest(false, 'Too many password reset requests. Please wait a few minutes before trying again.', 429);
+            return;
+        }
+
+        RateLimiter::hit($ipKey, self::PASSWORD_RESET_TTL_SECONDS);
+        RateLimiter::hit($idCoolKey, self::PASSWORD_RESET_ID_COOLDOWN);
+        RateLimiter::hit($idMaxKey, self::PASSWORD_RESET_TTL_SECONDS);
+
+        $genericMsg = 'If an active eligible account matches that username or email, password reset instructions have been sent to its registered email address.';
+
+        if (!$this->ensurePasswordResetTable()) {
+            $this->auditLog('password_reset_error', 'Failed to provision password_resets table.');
+            $this->respondResetRequest(true, $genericMsg, 200, 'notice=password_reset_sent');
+            return;
+        }
+
+        $stmt = $this->conn->prepare('SELECT id, user, full_name, email, role, status, chapel_id FROM users WHERE user = ? OR email = ? LIMIT 1');
+        $userRow = null;
+        if ($stmt) {
+            $stmt->bind_param('ss', $rawIdentity, $rawIdentity);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            if ($res && $res->num_rows === 1) {
+                $userRow = $res->fetch_assoc();
+            }
+            $stmt->close();
+        }
+
+        if ($userRow) {
+            $role = trim((string)($userRow['role'] ?? ''));
+            $status = strtolower(trim((string)($userRow['status'] ?? 'active')));
+            $email = trim((string)($userRow['email'] ?? ''));
+
+            if (strcasecmp($role, 'Admin') === 0) {
+                $this->auditLog('password_reset_blocked_admin', "Self-service reset blocked for Super Admin '{$userRow['user']}' from {$ip}");
+            } elseif ($status === 'active' && in_array($role, self::PASSWORD_RESET_ALLOWED_ROLES, true) && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $uid = (int)$userRow['id'];
+                $nowStr = date('Y-m-d H:i:s');
+                // Single active reset token per user at a time
+                $inv = $this->conn->prepare('UPDATE password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL');
+                if ($inv) {
+                    $inv->bind_param('si', $nowStr, $uid);
+                    $inv->execute();
+                    $inv->close();
+                }
+
+                $rawToken  = bin2hex(random_bytes(32));
+                $tokenHash = hash('sha256', $rawToken);
+                $expiresAt = date('Y-m-d H:i:s', time() + self::PASSWORD_RESET_TTL_SECONDS);
+
+                $ins = $this->conn->prepare('INSERT INTO password_resets (user_id, token_hash, expires_at, requested_ip) VALUES (?, ?, ?, ?)');
+                if ($ins) {
+                    $ins->bind_param('isss', $uid, $tokenHash, $expiresAt, $ip);
+                    $okIns = $ins->execute();
+                    $ins->close();
+
+                    if ($okIns) {
+                        require_once __DIR__ . '/../mail/mailer.php';
+                        $displayName = trim((string)($userRow['full_name'] ?: $userRow['user']));
+                        $resetLink   = $this->getTrustedAppBaseUrl() . '/reset_password.php?token=' . urlencode($rawToken);
+                        $subject     = 'IFI Cathedral — Password Reset Instructions';
+                        $body = "<p>Peace be with you, <strong>" . htmlspecialchars($displayName) . "</strong>.</p>"
+                              . "<p>A password reset was requested for your IFI Cathedral Portal account (<strong>" . htmlspecialchars($userRow['user']) . "</strong>).</p>"
+                              . "<p style=\"margin:20px 0;\"><a href=\"" . htmlspecialchars($resetLink) . "\" style=\"display:inline-block;background:#c5a059;color:#111111;padding:12px 22px;border-radius:8px;font-weight:700;text-decoration:none;\">Reset My Password</a></p>"
+                              . "<p style=\"font-size:13px;color:#555;\">Or copy this link into your browser:<br><a href=\"" . htmlspecialchars($resetLink) . "\">" . htmlspecialchars($resetLink) . "</a></p>"
+                              . "<p>This one-time link expires in <strong>15 minutes</strong>. If you did not request a password reset, you can safely ignore this email — your password will remain unchanged.</p>";
+
+                        $chapelArg = $userRow['chapel_id'] !== null ? (int)$userRow['chapel_id'] : null;
+                        $sent = sendChurchEmail($email, $displayName, $subject, $body, $chapelArg);
+                        if ($sent) {
+                            $this->auditLog('password_reset_requested', "Reset link sent to '{$userRow['user']}' ({$role}) from {$ip}");
+                        } else {
+                            $err = $GLOBALS['lastMailError'] ?? 'Unknown mailer error';
+                            $this->auditLog('password_reset_mail_failed', "Reset mail failed for '{$userRow['user']}': {$err}");
+                        }
+                    }
+                }
+            } else {
+                $this->auditLog('password_reset_ineligible', "Reset skipped for '{$userRow['user']}' (status={$status}, role={$role})");
+            }
+        }
+
+        $this->respondResetRequest(true, $genericMsg, 200, 'notice=password_reset_sent');
+    }
+
+    /**
+     * Validates a raw 64-char hex reset token against unexpired, unused DB rows and active eligible roles.
+     */
+    public function verifyResetToken(string $rawToken): ?array {
+        $rawToken = trim($rawToken);
+        if (!preg_match('/^[a-f0-9]{64}$/', $rawToken)) {
+            return null;
+        }
+        if (!$this->ensurePasswordResetTable()) {
+            return null;
+        }
+        $tokenHash = hash('sha256', $rawToken);
+        $sql = 'SELECT pr.id AS reset_id, pr.user_id, pr.expires_at, u.user, u.full_name, u.email, u.role, u.status, u.chapel_id
+                  FROM password_resets pr
+                  INNER JOIN users u ON u.id = pr.user_id
+                 WHERE pr.token_hash = ?
+                   AND pr.used_at IS NULL
+                 LIMIT 1';
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt) return null;
+        $stmt->bind_param('s', $tokenHash);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if (!$row) return null;
+        $expiresTs = strtotime((string)($row['expires_at'] ?? ''));
+        if ($expiresTs === false || $expiresTs <= time()) {
+            return null;
+        }
+        $role = trim((string)($row['role'] ?? ''));
+        $status = strtolower(trim((string)($row['status'] ?? 'active')));
+        if ($status !== 'active' || !in_array($role, self::PASSWORD_RESET_ALLOWED_ROLES, true)) {
+            return null;
+        }
+        return $row;
+    }
+
+    /**
+     * Completes password reset atomically: verifies CSRF, rate limit, token, password rules,
+     * burns token, clears lockouts, writes audit log, and sends confirmation notice.
+     */
+    public function completePasswordReset(): array {
+        if (!$this->validateCsrf($_POST['csrf'] ?? $_POST['csrf_token'] ?? '')) {
+            return ['success' => false, 'error' => 'Security session expired. Please refresh the page and try again.', 'code' => 'csrf'];
+        }
+
+        require_once __DIR__ . '/../helpers/RateLimiter.php';
+        $ip = self::getClientIp();
+        $verifyIpKey = 'pwreset_verify_ip:' . $ip;
+        if (RateLimiter::tooManyAttempts($verifyIpKey, self::PASSWORD_RESET_VERIFY_MAX, self::PASSWORD_RESET_TTL_SECONDS)) {
+            return ['success' => false, 'error' => 'Too many reset attempts. Please wait a few minutes and try again.', 'code' => 'rate_limited'];
+        }
+        RateLimiter::hit($verifyIpKey, self::PASSWORD_RESET_TTL_SECONDS);
+
+        $rawToken   = trim((string)($_POST['token'] ?? ''));
+        $newPwd     = substr(trim((string)($_POST['new_password'] ?? '')), 0, self::MAX_PASSWORD_LEN + 1);
+        $confirmPwd = substr(trim((string)($_POST['confirm_password'] ?? '')), 0, self::MAX_PASSWORD_LEN + 1);
+
+        $resetRow = $this->verifyResetToken($rawToken);
+        if (!$resetRow) {
+            return ['success' => false, 'error' => 'This password reset link is invalid or has expired. Please request a new one.', 'code' => 'invalid_token'];
+        }
+
+        $len = mb_strlen($newPwd);
+        if ($len < 6 || $len > self::MAX_PASSWORD_LEN) {
+            return ['success' => false, 'error' => 'Password must be between 6 and ' . self::MAX_PASSWORD_LEN . ' characters.', 'code' => 'invalid_password'];
+        }
+        if ($newPwd !== $confirmPwd) {
+            return ['success' => false, 'error' => 'New password and confirmation password do not match.', 'code' => 'mismatch'];
+        }
+
+        $uid     = (int)$resetRow['user_id'];
+        $newHash = password_hash($newPwd, PASSWORD_BCRYPT, ['cost' => self::BCRYPT_COST]);
+
+        $this->conn->begin_transaction();
+        try {
+            $sets = ['password = ?'];
+            $types = 's';
+            $params = [$newHash];
+            if ($this->supportsLoginLocking()) {
+                $sets[] = 'login_attempts = 0';
+                $sets[] = 'locked_until = NULL';
+            }
+            if ($this->supportsMustChangePassword()) {
+                $sets[] = 'must_change_password = 0';
+            }
+            $types .= 'i';
+            $params[] = $uid;
+
+            $updUser = $this->conn->prepare('UPDATE users SET ' . implode(', ', $sets) . ' WHERE id = ?');
+            if (!$updUser) throw new \RuntimeException('Failed to prepare password update.');
+            $updUser->bind_param($types, ...$params);
+            if (!$updUser->execute()) throw new \RuntimeException('Failed to update password.');
+            $updUser->close();
+
+            $markUsed = $this->conn->prepare('UPDATE password_resets SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL');
+            if ($markUsed) {
+                $markUsed->bind_param('i', $uid);
+                $markUsed->execute();
+                $markUsed->close();
+            }
+
+            $this->conn->commit();
+        } catch (\Throwable $e) {
+            $this->conn->rollback();
+            return ['success' => false, 'error' => 'Unable to complete password reset right now. Please try again.', 'code' => 'db_error'];
+        }
+
+        // Clear any login throttle left over from locked attempts
+        $this->clearThrottleState((string)$resetRow['user']);
+        if (!empty($resetRow['email'])) {
+            $this->clearThrottleState((string)$resetRow['email']);
+        }
+        $this->auditLog('password_reset_completed', "Password reset completed for '{$resetRow['user']}' ({$resetRow['role']}) from {$ip}");
+
+        // Security alert email to account owner
+        if (!empty($resetRow['email']) && filter_var($resetRow['email'], FILTER_VALIDATE_EMAIL)) {
+            require_once __DIR__ . '/../mail/mailer.php';
+            $displayName = trim((string)($resetRow['full_name'] ?: $resetRow['user']));
+            $alertBody = "<p>Peace be with you, <strong>" . htmlspecialchars($displayName) . "</strong>.</p>"
+                       . "<p>Your IFI Cathedral Portal password for <strong>" . htmlspecialchars($resetRow['user']) . "</strong> was successfully changed.</p>"
+                       . "<p>If you did not perform this change, please contact the Cathedral Parish Office immediately.</p>";
+            $chapelArg = $resetRow['chapel_id'] !== null ? (int)$resetRow['chapel_id'] : null;
+            @sendChurchEmail($resetRow['email'], $displayName, 'IFI Cathedral — Security Notice: Password Changed', $alertBody, $chapelArg);
+        }
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+            unset($_SESSION['csrf']);
+        }
+
+        return ['success' => true, 'error' => '', 'code' => 'ok'];
     }
 
     private function resetLoginAttempts(int $userId): void {

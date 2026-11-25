@@ -144,6 +144,12 @@ class DashboardController extends BaseController
             return;
         }
 
+        if (!empty($_SESSION['must_change_password']) && $section !== 'my_profile') {
+            $this->flash('error', 'Please set a new personal password in My Profile before continuing.');
+            $this->redirect('dashboard.php?section=my_profile&notice=must_change_password');
+            return;
+        }
+
         // Routing to specialized controllers
         if (in_array($section, ['donations', 'merchandise'])) {
             $this->finance()->handleRequest();
@@ -296,6 +302,13 @@ class DashboardController extends BaseController
                 $this->redirect('dashboard.php?section=events');
                 $activeSection = 'events';
             }
+        }
+
+        // Enforce mandatory password change when an administrator issued a temporary password
+        if (!$this->isGuest && !empty($_SESSION['must_change_password']) && $activeSection !== 'my_profile') {
+            $this->flash('error', 'Please set a new personal password in My Profile before continuing.');
+            $this->redirect('dashboard.php?section=my_profile&notice=must_change_password');
+            $activeSection = 'my_profile';
         }
 
         $p = $this->permissions;

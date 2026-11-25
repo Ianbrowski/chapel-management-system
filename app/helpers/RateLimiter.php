@@ -32,7 +32,8 @@ class RateLimiter
 
     private static function getFilePath(string $key): string
     {
-        $clean = preg_replace('/[^a-zA-Z0-9_\-\.:]/', '_', $key);
+        // Strip colons/unsafe characters so Windows NTFS doesn't treat ':' (e.g. IPv6 ::1) as an Alternate Data Stream
+        $clean = preg_replace('/[^a-zA-Z0-9_\-.]/', '_', $key);
         $hash = sha1($key);
         return self::getStorageDir() . '/' . substr($clean, 0, 30) . '_' . $hash . '.json';
     }

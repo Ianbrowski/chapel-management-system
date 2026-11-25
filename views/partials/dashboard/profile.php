@@ -16,6 +16,14 @@
             </div>
         </div>
     </div>
+    <?php if (!empty($_SESSION['must_change_password']) || (($_GET['notice'] ?? '') === 'must_change_password')): ?>
+    <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 10px; background: rgba(197, 160, 89, 0.14); border: 1px solid rgba(197, 160, 89, 0.45); color: var(--text); display: flex; align-items: center; gap: 12px;">
+        <i class="fa-solid fa-shield-halved" style="color: var(--accent); font-size: 1.15rem; flex-shrink: 0;"></i>
+        <div style="font-size: 0.9rem; line-height: 1.45;">
+            <strong>Password Update Required:</strong> An administrator issued a temporary password for your account. Please enter your current temporary password and set a new private password below to continue.
+        </div>
+    </div>
+    <?php endif; ?>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; align-items: start;" class="profile-layout-grid">
         <style>
             @media (min-width: 1024px) {
@@ -100,7 +108,7 @@
                     <div class="form-group">
                         <label>Confirm New Password</label>
                         <div class="pos-relative">
-                            <input type="password" id="confirm-pwd" minlength="6" maxlength="72" placeholder="Repeat new password"
+                            <input type="password" name="confirm_password" id="confirm-pwd" minlength="6" maxlength="72" placeholder="Repeat new password"
                                    oninput="checkPwdMatch()">
                             <button type="button" onclick="togglePwd('confirm-pwd','eye3')" class="pwd-toggle-btn">
                                 <i class="fa-regular fa-eye" id="eye3"></i>

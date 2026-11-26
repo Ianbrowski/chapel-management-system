@@ -960,6 +960,7 @@ html, body {
     flex-direction: column;
     overflow-y: auto;
     overflow-x: hidden;
+    scrollbar-gutter: stable;
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;

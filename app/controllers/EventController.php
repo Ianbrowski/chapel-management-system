@@ -81,6 +81,10 @@ class EventController extends BaseController {
                     $this->flash('error', 'You do not have permission to create schedules.');
                     break;
                 }
+                if ($loc !== null && !$this->chapelExists($loc)) {
+                    $this->flash('error', 'Please select a valid chapel location.');
+                    break;
+                }
                 if ($loc !== null && !$this->checkChapelAccess($loc)) {
                     $this->flash('error', 'You cannot create events for this chapel.');
                     break;
@@ -95,21 +99,31 @@ class EventController extends BaseController {
                     break;
                 }
                 
-                $this->conn->begin_transaction();
-                // Conflict Check
-                $conflict = $this->eventModel->checkConflict($start, $pastor, $loc, $type, null, $customDuration, null, $locationType);
-                if ($conflict['conflict']) {
-                    $this->conn->rollback();
-                    $this->flash('error', "Schedule conflict detected ({$conflict['type']}): {$conflict['details']}. Please choose a different time.");
-                    break;
+                $slotLocks = $this->acquireScheduleSlotLocks($loc, $pastor, $start);
+                try {
+                    $this->conn->begin_transaction();
+                    // Conflict Check
+                    $conflict = $this->eventModel->checkConflict($start, $pastor, $loc, $type, null, $customDuration, null, $locationType);
+                    if ($conflict['conflict']) {
+                        $this->conn->rollback();
+                        $this->flash('error', "Schedule conflict detected ({$conflict['type']}): {$conflict['details']}. Please choose a different time.");
+                        break;
+                    }
+
+                    $reqSource = $_POST['requester_source'] ?? 'office';
+                    $requestedBy = ($reqSource === 'walkin') ? null : $this->userId;
+
+                    $createdEventId = $this->eventModel->create($title, $type, $start, $loc, $pastor, $status, $scope, $customDuration, $phone, $email, $requestedBy, $locationType);
+                    if ($createdEventId) {
+                        $this->conn->commit();
+                    } else {
+                        $this->conn->rollback();
+                    }
+                } finally {
+                    $this->releaseScheduleSlotLocks($slotLocks);
                 }
 
-                $reqSource = $_POST['requester_source'] ?? 'office';
-                $requestedBy = ($reqSource === 'walkin') ? null : $this->userId;
-
-                $createdEventId = $this->eventModel->create($title, $type, $start, $loc, $pastor, $status, $scope, $customDuration, $phone, $email, $requestedBy, $locationType);
                 if ($createdEventId) {
-                    $this->conn->commit();
                     AuditLogger::logFromSession(
                         $this->conn,
                         'created',
@@ -140,7 +154,6 @@ class EventController extends BaseController {
                     }
                     $this->flash('success', 'Event created.' . $notifMsg);
                 } else {
-                    $this->conn->rollback();
                     $error = $_SESSION['db_error'] ?? $this->conn->error;
                     unset($_SESSION['db_error']);
                     $this->flash('error', "Failed to create event. Database error: " . $error);
@@ -154,6 +167,10 @@ class EventController extends BaseController {
                 $existing = $this->eventModel->getById($id);
                 if (!$existing || !$this->canManageExistingChapelRecord($existing['chapel_id'] ?? null)) {
                     $this->flash('error', 'You cannot update this event.');
+                    break;
+                }
+                if ($loc !== null && !$this->chapelExists($loc)) {
+                    $this->flash('error', 'Please select a valid chapel location.');
                     break;
                 }
                 if ($loc !== null && !$this->checkChapelAccess($loc)) {
@@ -186,17 +203,29 @@ class EventController extends BaseController {
                     }
                 }
 
-                $this->conn->begin_transaction();
-                // Conflict Check (exclude self)
-                $conflict = $this->eventModel->checkConflict($start, $pastor, $loc, $type, $id, $customDuration, null, $locationType);
-                if ($conflict['conflict']) {
-                    $this->conn->rollback();
-                    $this->flash('error', "Schedule conflict detected ({$conflict['type']}): {$conflict['details']}. Please choose a different time.");
-                    break;
+                $updatedOk = false;
+                $slotLocks = $this->acquireScheduleSlotLocks($loc, $pastor, $start);
+                try {
+                    $this->conn->begin_transaction();
+                    // Conflict Check (exclude self)
+                    $conflict = $this->eventModel->checkConflict($start, $pastor, $loc, $type, $id, $customDuration, null, $locationType);
+                    if ($conflict['conflict']) {
+                        $this->conn->rollback();
+                        $this->flash('error', "Schedule conflict detected ({$conflict['type']}): {$conflict['details']}. Please choose a different time.");
+                        break;
+                    }
+
+                    $updatedOk = (bool)$this->eventModel->update($id, $title, $type, $start, $loc, $pastor, $status, $scope, $customDuration, $phone, $email, $locationType);
+                    if ($updatedOk) {
+                        $this->conn->commit();
+                    } else {
+                        $this->conn->rollback();
+                    }
+                } finally {
+                    $this->releaseScheduleSlotLocks($slotLocks);
                 }
 
-                if ($this->eventModel->update($id, $title, $type, $start, $loc, $pastor, $status, $scope, $customDuration, $phone, $email, $locationType)) {
-                    $this->conn->commit();
+                if ($updatedOk) {
                                         AuditLogger::logFromSession(
                         $this->conn,
                         'updated',
@@ -226,7 +255,6 @@ class EventController extends BaseController {
                     }
                     $this->flash('success', 'Event updated.' . $notifMsg);
                 } else {
-                    $this->conn->rollback();
                     $this->flash('error', 'Failed to update event.');
                 }
                 break;
@@ -424,6 +452,236 @@ class EventController extends BaseController {
             $this->redirect($redirectUrl);
         }
 
+        if ($action === 'update_certificate_request') {
+            $reqId = (int)($_POST['event_id'] ?? $_POST['id'] ?? 0);
+            $event = $this->eventModel->getById($reqId);
+            $isCertRecord = $event && (
+                ((int)($event['service_id'] ?? 0) === 8)
+                || strcasecmp((string)($event['event_type'] ?? ''), 'Ecclesiastical Certificates') === 0
+                || stripos((string)($event['title'] ?? ''), 'Certificate') !== false
+            );
+            if (!$event || !$isCertRecord) {
+                $this->flash('error', 'Certificate request record not found.');
+                $this->redirect($redirectUrl);
+            }
+
+            $statusNow = (string)($event['status'] ?? 'Pending');
+            $isOwner = ((int)($event['requested_by'] ?? 0) === (int)$this->userId);
+            $isGlobalAdmin = in_array($this->role, ['Admin', 'Cathedral Admin'], true);
+            $canAdmin = $isGlobalAdmin || (!empty($this->permissions['can_approve_events']) && $this->checkChapelAccess($event['chapel_id'] ?? null));
+
+            if (!$canAdmin && !($isOwner && $statusNow === 'Pending')) {
+                $this->flash('error', 'Unauthorized to edit this certificate request.');
+                $this->redirect($redirectUrl);
+            }
+            if (in_array($statusNow, ['Cancelled', 'Rejected'], true)) {
+                $this->flash('error', 'Cancelled or declined certificate requests cannot be edited.');
+                $this->redirect($redirectUrl);
+            }
+
+            $personName = trim((string)($_POST['cert_person_name'] ?? ''));
+            if ($personName === '' || mb_strlen($personName) > 150) {
+                $this->flash('error', 'Person\'s name on record is required.');
+                $this->redirect($redirectUrl);
+            }
+
+            $certYear = trim((string)($_POST['cert_year'] ?? ''));
+            if ($certYear !== '' && (!preg_match('/^\d{4}$/', $certYear) || (int)$certYear < 1800 || (int)$certYear > 2099)) {
+                $this->flash('error', 'Please enter a valid 4-digit year (1800–2099) or leave it blank.');
+                $this->redirect($redirectUrl);
+            }
+
+            $certPurpose = trim((string)($_POST['cert_purpose'] ?? ''));
+            if ($certPurpose === '') {
+                $certPurpose = trim((string)($event['cert_purpose'] ?? '')) ?: 'Personal Records';
+            }
+
+            $pickupDate = trim((string)($_POST['pickup_date'] ?? ''));
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $pickupDate)) {
+                $this->flash('error', 'Please provide a valid target pickup date.');
+                $this->redirect($redirectUrl);
+            }
+            $existingPickupDate = !empty($event['start_time']) ? date('Y-m-d', strtotime($event['start_time'])) : '';
+            if (!$canAdmin && $pickupDate !== $existingPickupDate && $pickupDate < date('Y-m-d')) {
+                $this->flash('error', 'Target pickup date cannot be in the past.');
+                $this->redirect($redirectUrl);
+            }
+            // Match parish office schedule: closed Mondays -> bump to Tuesday if changed to Monday
+            if ($pickupDate !== $existingPickupDate && (int)date('N', strtotime($pickupDate)) === 1) {
+                $pickupDate = date('Y-m-d', strtotime($pickupDate . ' +1 day'));
+            }
+            $existingTimePart = !empty($event['start_time']) ? date('H:i:s', strtotime($event['start_time'])) : '08:00:00';
+            $startTime = $pickupDate . ' ' . $existingTimePart;
+
+            $reqName  = trim((string)($_POST['requester_name'] ?? ($event['requester_name'] ?? '')));
+            $reqPhone = trim((string)($_POST['requester_phone'] ?? ''));
+            $reqEmail = trim((string)($_POST['requester_email'] ?? ''));
+            if ($reqEmail !== '' && !filter_var($reqEmail, FILTER_VALIDATE_EMAIL)) {
+                $this->flash('error', 'Please enter a valid contact email address.');
+                $this->redirect($redirectUrl);
+            }
+            if ($reqPhone !== '' && !preg_match('/^[0-9\+\s\-()]{7,25}$/', $reqPhone)) {
+                $this->flash('error', 'Please enter a valid contact phone number.');
+                $this->redirect($redirectUrl);
+            }
+
+            // Issuing office / chapel scope
+            $loc = isset($event['chapel_id']) && (int)$event['chapel_id'] > 0 ? (int)$event['chapel_id'] : null;
+            if ($isGlobalAdmin && array_key_exists('chapel_id', $_POST)) {
+                $loc = $this->normalizeNullableInt($_POST['chapel_id']);
+                if ($loc !== null && !$this->chapelExists($loc)) {
+                    $this->flash('error', 'Please select a valid issuing office.');
+                    $this->redirect($redirectUrl);
+                }
+            }
+            $scope = $this->deriveEventScope($loc);
+
+            // Linked archival record (admin/staff only)
+            $linkedRecordId = !empty($event['linked_record_id']) ? (int)$event['linked_record_id'] : null;
+            if ($canAdmin && array_key_exists('linked_record_id', $_POST)) {
+                $postedRecId = (int)$_POST['linked_record_id'];
+                if ($postedRecId <= 0) {
+                    $linkedRecordId = null;
+                } else {
+                    $recStmt = $this->conn->prepare("SELECT record_id, chapel_id FROM sacramental_records WHERE record_id = ? AND is_archived = 0 LIMIT 1");
+                    $recRow = null;
+                    if ($recStmt) {
+                        $recStmt->bind_param('i', $postedRecId);
+                        $recStmt->execute();
+                        $recRow = $recStmt->get_result()->fetch_assoc();
+                        $recStmt->close();
+                    }
+                    if (!$recRow || (!$isGlobalAdmin && !$this->checkChapelAccess($recRow['chapel_id'] ?? null))) {
+                        $this->flash('error', 'Selected archival record could not be linked under your chapel scope.');
+                        $this->redirect($redirectUrl);
+                    }
+                    $linkedRecordId = (int)$recRow['record_id'];
+                }
+            }
+
+            // Preserve fee snapshot once paid or Released; otherwise allow updating document type & copies
+            $paidMap = $this->eventModel->getPaidAmountsMap([$reqId]);
+            $paidFee = (float)($paidMap[$reqId] ?? 0);
+            $canModifyBilling = ($statusNow === 'Pending' || ($canAdmin && $statusNow === 'Confirmed')) && $paidFee <= 0.01;
+
+            $variantId = !empty($event['variant_id']) ? (int)$event['variant_id'] : null;
+            $copies = max(1, (int)($event['cert_copies'] ?? 1));
+            $serviceFee = (float)($event['service_fee'] ?? 0);
+            $totalFee = (float)($event['total_fee'] ?? 0);
+            $variantLabel = trim(preg_replace('/\s*:.*$/', '', (string)($event['title'] ?? 'Certificate'))) ?: 'Certificate';
+
+            require_once __DIR__ . '/../models/ServiceModel.php';
+            $srvModel = new ServiceModel($this->conn);
+            if ($variantId) {
+                $existingVariant = $srvModel->getVariantById($variantId);
+                if ($existingVariant && !empty($existingVariant['name'])) {
+                    $variantLabel = trim((string)$existingVariant['name']);
+                }
+            }
+
+            if ($canModifyBilling) {
+                $postedVariant = (int)($_POST['variant_id'] ?? ($variantId ?? 0));
+                $postedCopies = max(1, min(25, (int)($_POST['certificate_copies'] ?? $copies)));
+                $svcId = !empty($event['service_id']) ? (int)$event['service_id'] : 8;
+                if ($postedVariant > 0) {
+                    try {
+                        $calc = $srvModel->calculateAndVerifyFee($svcId, $postedVariant, [], $postedCopies);
+                        $vInfo = $srvModel->getVariantById($postedVariant);
+                        $variantId = $postedVariant;
+                        $variantLabel = trim((string)($vInfo['name'] ?? $variantLabel));
+                        $copies = $postedCopies;
+                        $serviceFee = (float)$calc['base_fee'];
+                        $totalFee = (float)$calc['total_fee'];
+                    } catch (Exception $ex) {
+                        $this->flash('error', $ex->getMessage());
+                        $this->redirect($redirectUrl);
+                    }
+                } else {
+                    $unitRate = $copies > 0 ? ($totalFee / $copies) : 200.00;
+                    $copies = $postedCopies;
+                    $serviceFee = round($unitRate * $copies, 2);
+                    $totalFee = $serviceFee;
+                }
+            }
+
+            $newTitle = $variantLabel . ': ' . $personName
+                . ($certYear !== '' ? " ({$certYear})" : '')
+                . ($certPurpose !== '' ? " - {$certPurpose}" : '');
+
+            $ok = $this->eventModel->updateCertificateRequest($reqId, [
+                'title'           => $newTitle,
+                'variant_id'      => $variantId,
+                'start_time'      => $startTime,
+                'chapel_id'       => $loc,
+                'event_scope'     => $scope,
+                'pastor_id'       => $event['pastor_id'] ?? null,
+                'requester_phone' => $reqPhone,
+                'requester_email' => $reqEmail,
+                'service_fee'     => $serviceFee,
+                'total_fee'       => $totalFee,
+                'meta'            => [
+                    'requester_name'   => $reqName,
+                    'cert_person_name' => $personName,
+                    'cert_year'        => $certYear,
+                    'cert_purpose'     => $certPurpose,
+                    'cert_copies'      => $copies,
+                    'linked_record_id' => $linkedRecordId,
+                ],
+            ]);
+
+            if ($ok) {
+                AuditLogger::logFromSession($this->conn, 'updated', 'Certificates', "Updated certificate request ID: {$reqId} - {$newTitle}", $event, [
+                    'title'            => $newTitle,
+                    'start_time'       => $startTime,
+                    'chapel_id'        => $loc,
+                    'cert_person_name' => $personName,
+                    'cert_year'        => $certYear,
+                    'cert_purpose'     => $certPurpose,
+                    'cert_copies'      => $copies,
+                    'linked_record_id' => $linkedRecordId,
+                    'total_fee'        => $totalFee,
+                ]);
+                $this->flash('success', 'Certificate request details updated.');
+            } else {
+                $this->flash('error', 'Failed to update certificate request details.');
+            }
+            $this->redirect($redirectUrl);
+        }
+
+        if ($action === 'link_certificate_record') {
+            $reqId = (int)($_POST['event_id'] ?? $_POST['id'] ?? 0);
+            $recId = (int)($_POST['linked_record_id'] ?? $_POST['record_id'] ?? 0);
+            $event = $this->eventModel->getById($reqId);
+            $isGlobalAdmin = in_array($this->role, ['Admin', 'Cathedral Admin'], true);
+            $canAdmin = $isGlobalAdmin || (!empty($this->permissions['can_approve_events']) && $event && $this->checkChapelAccess($event['chapel_id'] ?? null));
+            if (!$event || !$canAdmin || $recId <= 0) {
+                $this->flash('error', 'Unauthorized or invalid archival record link request.');
+                $this->redirect($redirectUrl);
+            }
+
+            $recStmt = $this->conn->prepare("SELECT record_id, chapel_id, person_name, reference_id FROM sacramental_records WHERE record_id = ? AND is_archived = 0 LIMIT 1");
+            $recRow = null;
+            if ($recStmt) {
+                $recStmt->bind_param('i', $recId);
+                $recStmt->execute();
+                $recRow = $recStmt->get_result()->fetch_assoc();
+                $recStmt->close();
+            }
+            if (!$recRow || (!$isGlobalAdmin && !$this->checkChapelAccess($recRow['chapel_id'] ?? null))) {
+                $this->flash('error', 'Selected archival record could not be linked under your chapel scope.');
+                $this->redirect($redirectUrl);
+            }
+
+            if ($this->eventModel->linkCertificateRecord($reqId, $recId)) {
+                $refLabel = !empty($recRow['reference_id']) ? " ({$recRow['reference_id']})" : '';
+                AuditLogger::logFromSession($this->conn, 'updated', 'Certificates', "Linked certificate request ID {$reqId} to record #{$recId}{$refLabel}", $event, ['linked_record_id' => $recId]);
+                $this->flash('success', "Linked to archive record #" . $recId . $refLabel . '.');
+            } else {
+                $this->flash('error', 'Failed to link archival record.');
+            }
+            $this->redirect($redirectUrl);
+        }
+
         $title = $_POST['title'] ?? '';
         $type = $_POST['event_type'] ?? '';
         $start = $_POST['start_time'] ?? '';
@@ -493,59 +751,109 @@ class EventController extends BaseController {
             $requestMeta['cert_year']        = trim((string)($_POST['cert_year'] ?? ''));
             $requestMeta['cert_purpose']     = trim((string)($_POST['cert_purpose'] ?? ''));
             $requestMeta['cert_copies']      = max(1, (int)($_POST['certificate_copies'] ?? 1));
-            $requestMeta['linked_record_id'] = !empty($_POST['linked_record_id']) ? (int)$_POST['linked_record_id'] : null;
-        }
-
-        $this->conn->begin_transaction();
-        // Conflict Check: Certificates and shared Mass Intentions bypass altar exclusivity
-        if (!$isCertSection && $type !== 'Ecclesiastical Certificates') {
-            $conflict = $this->eventModel->checkConflict($start, $pastor, $loc, $type, null, $customDuration, $serviceId, $locationType);
-            if ($conflict['conflict']) {
-                $this->conn->rollback();
-                $this->flash('error', "Schedule conflict detected ({$conflict['type']}): {$conflict['details']}. Please choose a different time.");
-                $this->redirect($redirectUrl);
+            $linkedId = !empty($_POST['linked_record_id']) ? (int)$_POST['linked_record_id'] : null;
+            if ($linkedId === null && $requestMeta['cert_person_name'] !== '') {
+                $linkedId = $this->eventModel->findUniqueArchivalRecordMatch(
+                    $requestMeta['cert_person_name'],
+                    (string)$title,
+                    $loc,
+                    $requestMeta['cert_year']
+                );
             }
+            $requestMeta['linked_record_id'] = $linkedId;
         }
 
-        $serviceFee = 0.00;
-        $addonsFee  = 0.00;
-        $totalFee   = 0.00;
-        $verifiedAddons = [];
-
-        if ($serviceId && $variantId) {
-            require_once __DIR__ . '/../models/ServiceModel.php';
-            $srvModel = new ServiceModel($this->conn);
-            try {
-                // Verify submitted event_type matches the catalog service to prevent conflict-bypass tampering
-                $srvCheckStmt = $this->conn->prepare("SELECT name FROM services WHERE id = ? LIMIT 1");
-                if ($srvCheckStmt) {
-                    $srvCheckStmt->bind_param('i', $serviceId);
-                    $srvCheckStmt->execute();
-                    $srvRow = $srvCheckStmt->get_result()->fetch_assoc();
-                    $srvCheckStmt->close();
-                    if (!$srvRow || (strcasecmp(trim($srvRow['name']), trim($type)) !== 0 && !$isCertSection)) {
-                        throw new InvalidArgumentException("Selected service option does not match the requested rite.");
-                    }
+        // Prevent slot squatting: cap active Pending sanctuary requests per Member
+        if ($this->role === 'Member' && $status === 'Pending' && !$isCertSection && $this->userId > 0) {
+            $cntStmt = $this->conn->prepare(
+                "SELECT COUNT(*) FROM events
+                  WHERE requested_by = ?
+                    AND status = 'Pending'
+                    AND is_archived = 0
+                    AND COALESCE(event_type, '') != 'Ecclesiastical Certificates'
+                    AND COALESCE(event_type, '') NOT LIKE '%Certificate%'
+                    AND COALESCE(event_type, '') NOT LIKE '%Thanksgiving%'
+                    AND COALESCE(event_type, '') NOT LIKE '%Requiem%'
+                    AND COALESCE(event_type, '') NOT LIKE '%Intention%'"
+            );
+            if ($cntStmt) {
+                $cntStmt->bind_param('i', $this->userId);
+                $cntStmt->execute();
+                $pendingOpen = (int)($cntStmt->get_result()->fetch_row()[0] ?? 0);
+                $cntStmt->close();
+                if ($pendingOpen >= 5) {
+                    $this->flash('error', 'You currently have 5 pending sanctuary requests awaiting review. Please wait for approval or cancel an open request first.');
+                    $this->redirect($redirectUrl);
+                    return;
                 }
-                $quantity = max(1, (int)($_POST['certificate_copies'] ?? $_POST['quantity'] ?? 1));
-                $calc = $srvModel->calculateAndVerifyFee($serviceId, $variantId, $selectedAddons, $quantity);
-                $serviceFee = $calc['base_fee'];
-                $addonsFee  = $calc['addons_fee'];
-                $totalFee   = $calc['total_fee'];
-                $verifiedAddons = $calc['addons'];
-            } catch (Exception $ex) {
-                $this->conn->rollback();
-                $this->flash('error', $ex->getMessage());
-                $this->redirect($redirectUrl);
             }
         }
 
-        $eventId = $this->eventModel->requestEvent($title, $type, $start, $loc, $scope, $this->userId, $email, $status, $pastor, $customDuration, $phone, $serviceId, $variantId, $serviceFee, $addonsFee, $totalFee, $locationType, $requestMeta);
-        if ($eventId) {
-            foreach ($verifiedAddons as $ad) {
-                $this->eventModel->addRequestAddon((int)$eventId, (int)$ad['addon_id'], $ad['addon_name'], (float)$ad['unit_price'], (int)$ad['quantity'], (float)$ad['subtotal']);
+        $slotLocks = (!$isCertSection && $type !== 'Ecclesiastical Certificates')
+            ? $this->acquireScheduleSlotLocks($loc, $pastor, $start)
+            : [];
+        $eventId = false;
+        try {
+            $this->conn->begin_transaction();
+            // Conflict Check: Certificates and shared Mass Intentions bypass altar exclusivity
+            if (!$isCertSection && $type !== 'Ecclesiastical Certificates') {
+                $conflict = $this->eventModel->checkConflict($start, $pastor, $loc, $type, null, $customDuration, $serviceId, $locationType);
+                if ($conflict['conflict']) {
+                    $this->conn->rollback();
+                    $this->flash('error', "Schedule conflict detected ({$conflict['type']}): {$conflict['details']}. Please choose a different time.");
+                    $this->redirect($redirectUrl);
+                    return;
+                }
             }
-            $this->conn->commit();
+
+            $serviceFee = 0.00;
+            $addonsFee  = 0.00;
+            $totalFee   = 0.00;
+            $verifiedAddons = [];
+
+            if ($serviceId && $variantId) {
+                require_once __DIR__ . '/../models/ServiceModel.php';
+                $srvModel = new ServiceModel($this->conn);
+                try {
+                    // Verify submitted event_type matches the catalog service to prevent conflict-bypass tampering
+                    $srvCheckStmt = $this->conn->prepare("SELECT name FROM services WHERE id = ? LIMIT 1");
+                    if ($srvCheckStmt) {
+                        $srvCheckStmt->bind_param('i', $serviceId);
+                        $srvCheckStmt->execute();
+                        $srvRow = $srvCheckStmt->get_result()->fetch_assoc();
+                        $srvCheckStmt->close();
+                        if (!$srvRow || (strcasecmp(trim($srvRow['name']), trim($type)) !== 0 && !$isCertSection)) {
+                            throw new InvalidArgumentException("Selected service option does not match the requested rite.");
+                        }
+                    }
+                    $quantity = max(1, (int)($_POST['certificate_copies'] ?? $_POST['quantity'] ?? 1));
+                    $calc = $srvModel->calculateAndVerifyFee($serviceId, $variantId, $selectedAddons, $quantity);
+                    $serviceFee = $calc['base_fee'];
+                    $addonsFee  = $calc['addons_fee'];
+                    $totalFee   = $calc['total_fee'];
+                    $verifiedAddons = $calc['addons'];
+                } catch (Exception $ex) {
+                    $this->conn->rollback();
+                    $this->flash('error', $ex->getMessage());
+                    $this->redirect($redirectUrl);
+                    return;
+                }
+            }
+
+            $eventId = $this->eventModel->requestEvent($title, $type, $start, $loc, $scope, $this->userId, $email, $status, $pastor, $customDuration, $phone, $serviceId, $variantId, $serviceFee, $addonsFee, $totalFee, $locationType, $requestMeta);
+            if ($eventId) {
+                foreach ($verifiedAddons as $ad) {
+                    $this->eventModel->addRequestAddon((int)$eventId, (int)$ad['addon_id'], $ad['addon_name'], (float)$ad['unit_price'], (int)$ad['quantity'], (float)$ad['subtotal']);
+                }
+                $this->conn->commit();
+            } else {
+                $this->conn->rollback();
+            }
+        } finally {
+            $this->releaseScheduleSlotLocks($slotLocks);
+        }
+
+        if ($eventId) {
             AuditLogger::logFromSession(
                 $this->conn,
                 'requested',
@@ -633,26 +941,59 @@ class EventController extends BaseController {
         $pastor = $submittedPastor !== null ? $submittedPastor : (!empty($record['pastor_id']) ? (int)$record['pastor_id'] : null);
 
         if ($action === 'approve') {
-            $this->conn->begin_transaction();
-            // Optional: Re-check conflict before final approval (skip for office-only Certificates)
             $recType = (string)($record['event_type'] ?? '');
             $recServiceId = isset($record['service_id']) && (int)$record['service_id'] > 0 ? (int)$record['service_id'] : null;
             $isCertRecord = ($recType === 'Ecclesiastical Certificates' || stripos($recType, 'Certificate') !== false || $recServiceId === 8);
-            if (!$isCertRecord) {
-                $conflict = $this->eventModel->checkConflict($record['start_time'], $pastor, $record['chapel_id'], $recType, $id, $record['custom_duration'], $recServiceId, $record['location_type'] ?? 'Church');
-                if ($conflict['conflict']) {
-                    $this->conn->rollback();
-                    $this->flash('error', "Schedule conflict detected during approval ({$conflict['type']}): {$conflict['details']}.");
-                    $this->redirect($redirectUrl);
+
+            $recChapel = $this->normalizeNullableInt($record['chapel_id'] ?? null);
+            $slotLocks = !$isCertRecord ? $this->acquireScheduleSlotLocks($recChapel, $pastor, (string)$record['start_time']) : [];
+            $approvedOk = false;
+            try {
+                $this->conn->begin_transaction();
+                if (!$isCertRecord) {
+                    $conflict = $this->eventModel->checkConflict($record['start_time'], $pastor, $record['chapel_id'], $recType, $id, $record['custom_duration'], $recServiceId, $record['location_type'] ?? 'Church');
+                    if ($conflict['conflict']) {
+                        $this->conn->rollback();
+                        $this->flash('error', "Schedule conflict detected during approval ({$conflict['type']}): {$conflict['details']}.");
+                        $this->redirect($redirectUrl);
+                        return;
+                    }
                 }
+
+                $approvedOk = (bool)$this->eventModel->approveRequest($id, $pastor);
+                if ($approvedOk) {
+                    if ($isCertRecord && empty($record['linked_record_id'])) {
+                        $lookupName = trim((string)($record['cert_person_name'] ?? ''));
+                        if ($lookupName === '' && !empty($record['title'])) {
+                            $lookupName = preg_replace('/^[^:]+:\s*/', '', (string)$record['title']);
+                            $lookupName = trim(preg_replace('/\s*-\s*.*$/', '', $lookupName));
+                            $lookupName = trim(preg_replace('/\s*\(\d{4}\)$/', '', $lookupName));
+                        }
+                        if ($lookupName !== '') {
+                            $matchedId = $this->eventModel->findUniqueArchivalRecordMatch(
+                                $lookupName,
+                                (string)($record['title'] ?? ''),
+                                $recChapel,
+                                (string)($record['cert_year'] ?? '')
+                            );
+                            if ($matchedId !== null) {
+                                $this->eventModel->linkCertificateRecord($id, $matchedId);
+                            }
+                        }
+                    }
+                    $this->conn->commit();
+                } else {
+                    $this->conn->rollback();
+                }
+            } finally {
+                $this->releaseScheduleSlotLocks($slotLocks);
             }
 
-            if (!$this->eventModel->approveRequest($id, $pastor)) {
-                $this->conn->rollback();
+            if (!$approvedOk) {
                 $this->flash('error', 'Failed to approve request.');
                 $this->redirect($redirectUrl);
+                return;
             }
-            $this->conn->commit();
 
             $notifSummary = $this->sendConfirmedNotifications((int)$id, $pastor, true);
 
@@ -860,32 +1201,98 @@ class EventController extends BaseController {
         }
 
         $allowedTypes = ['Baptism', 'Wedding', 'Mass', 'Funeral', 'Confirmation', 'Other'];
-        $types = array_values(array_filter(
-            (array)($_POST['event_types'] ?? []),
-            fn($t) => in_array($t, $allowedTypes, true)
-        ));
-        $chapels = array_values(array_filter(
-            (array)($_POST['chapel_coverage'] ?? []),
-            fn($val) => is_string($val) && trim($val) !== ''
-        ));
+        $normalizeTime = static function ($t): string {
+            $t = trim((string)$t);
+            if ($t !== '' && strlen($t) === 5) {
+                $t .= ':00';
+            }
+            return preg_match('/^\d{2}:\d{2}:\d{2}$/', $t) ? $t : '';
+        };
 
-        $dutyStartTime = trim((string)($_POST['duty_start_time'] ?? ''));
-        $dutyEndTime   = trim((string)($_POST['duty_end_time'] ?? ''));
-        if ($dutyStartTime !== '' && strlen($dutyStartTime) === 5) {
-            $dutyStartTime .= ':00';
-        }
-        if ($dutyEndTime !== '' && strlen($dutyEndTime) === 5) {
-            $dutyEndTime .= ':00';
+        $stagedRaw = trim((string)($_POST['staged_prefs'] ?? ''));
+        $stagedList = [];
+        if ($stagedRaw !== '') {
+            $decoded = json_decode($stagedRaw, true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $pIdKey => $entry) {
+                    $pid = (int)$pIdKey;
+                    if ($pid <= 0 || !is_array($entry)) {
+                        continue;
+                    }
+                    $stagedList[$pid] = [
+                        'event_types' => array_values(array_filter(
+                            (array)($entry['event_types'] ?? []),
+                            static fn($t) => in_array($t, $allowedTypes, true)
+                        )),
+                        'chapel_coverage' => array_values(array_filter(
+                            (array)($entry['chapel_coverage'] ?? []),
+                            static fn($val) => is_string($val) && trim($val) !== ''
+                        )),
+                        'duty_start_time' => $normalizeTime($entry['duty_start_time'] ?? ''),
+                        'duty_end_time'   => $normalizeTime($entry['duty_end_time'] ?? ''),
+                    ];
+                }
+            }
         }
 
-        if ($this->userModel->savePastorPrefs($targetPriestId, $types, $chapels, $dutyStartTime, $dutyEndTime)) {
-            $msg = !empty($_POST['next_priest_id']) ? 'Changes saved! Now editing next priest.' : 'Clergy authorizations, coverage, and duty schedule updated.';
-            $this->flash('success', $msg);
+        if (!empty($stagedList)) {
+            $savedNames = [];
+            $allOk = true;
+            $chkStmt = $this->conn->prepare("SELECT COALESCE(NULLIF(full_name, ''), user) AS display_name FROM users WHERE id = ? AND role IN ('Priest', 'Pastor') LIMIT 1");
+            foreach ($stagedList as $pid => $payload) {
+                $pName = 'Priest #' . $pid;
+                if ($chkStmt) {
+                    $chkStmt->bind_param('i', $pid);
+                    $chkStmt->execute();
+                    $row = $chkStmt->get_result()->fetch_assoc();
+                    if (!$row) {
+                        continue;
+                    }
+                    $pName = $row['display_name'] ?: $pName;
+                }
+                if ($this->userModel->savePastorPrefs($pid, $payload['event_types'], $payload['chapel_coverage'], $payload['duty_start_time'], $payload['duty_end_time'])) {
+                    $savedNames[] = $pName;
+                } else {
+                    $allOk = false;
+                }
+            }
+            if ($chkStmt) {
+                $chkStmt->close();
+            }
+
+            if (!empty($savedNames) && $allOk) {
+                $summary = count($savedNames) === 1
+                    ? 'Clergy authorizations, coverage, and duty schedule updated for ' . $savedNames[0] . '.'
+                    : 'Saved changes for ' . count($savedNames) . ' priests: ' . implode(', ', $savedNames) . '.';
+                AuditLogger::logFromSession($this->conn, 'updated', 'Clergy Shifts', $summary);
+                $this->flash('success', $summary);
+            } elseif (!empty($savedNames)) {
+                $this->flash('error', 'Saved some priest updates, but one or more failed.');
+            } else {
+                $this->flash('error', 'Failed to update clergy authorizations.');
+            }
         } else {
-            $this->flash('error', 'Failed to update clergy authorizations.');
+            $types = array_values(array_filter(
+                (array)($_POST['event_types'] ?? []),
+                static fn($t) => in_array($t, $allowedTypes, true)
+            ));
+            $chapels = array_values(array_filter(
+                (array)($_POST['chapel_coverage'] ?? []),
+                static fn($val) => is_string($val) && trim($val) !== ''
+            ));
+
+            $dutyStartTime = $normalizeTime($_POST['duty_start_time'] ?? '');
+            $dutyEndTime   = $normalizeTime($_POST['duty_end_time'] ?? '');
+
+            if ($this->userModel->savePastorPrefs($targetPriestId, $types, $chapels, $dutyStartTime, $dutyEndTime)) {
+                $this->flash('success', 'Clergy authorizations, coverage, and duty schedule updated.');
+            } else {
+                $this->flash('error', 'Failed to update clergy authorizations.');
+            }
         }
+
         $targetRedirectId = !empty($_POST['next_priest_id']) ? (int)$_POST['next_priest_id'] : $targetPriestId;
-        $redir = 'dashboard.php?section=priest_schedule&tab=authorizations' . (!empty($_POST['priest_id']) || !empty($_POST['next_priest_id']) ? '&priest_id=' . $targetRedirectId : '');
+        $redir = 'dashboard.php?section=priest_schedule&tab=authorizations' . ($targetRedirectId > 0 ? '&priest_id=' . $targetRedirectId : '');
         $this->redirect($redir);
     }
 
@@ -1074,6 +1481,51 @@ class EventController extends BaseController {
         }
 
         return null;
+    }
+
+    /**
+     * Serializes concurrent writes targeting the same empty venue shift or priest date
+     * via MySQL advisory locks so phantom double-inserts cannot pass FOR UPDATE.
+     */
+    private function acquireScheduleSlotLocks(?int $chapelId, ?int $pastorId, string $startTime): array {
+        $ts = strtotime($startTime);
+        if ($ts === false) {
+            return [];
+        }
+        $dateStr = date('Ymd', $ts);
+        $shift = ((int)date('H', $ts) < 12) ? 'am' : 'pm';
+        $keys = ['ifi_slot_' . ($chapelId ?? 0) . '_' . $dateStr . '_' . $shift];
+        if ($pastorId !== null && $pastorId > 0) {
+            $keys[] = 'ifi_priest_' . $pastorId . '_' . $dateStr;
+        }
+        sort($keys);
+
+        $acquired = [];
+        foreach ($keys as $k) {
+            $stmt = @$this->conn->prepare('SELECT GET_LOCK(?, 5)');
+            if ($stmt) {
+                $stmt->bind_param('s', $k);
+                if ($stmt->execute()) {
+                    $row = $stmt->get_result()->fetch_row();
+                    if (!empty($row[0])) {
+                        $acquired[] = $k;
+                    }
+                }
+                $stmt->close();
+            }
+        }
+        return $acquired;
+    }
+
+    private function releaseScheduleSlotLocks(array $keys): void {
+        foreach (array_reverse($keys) as $k) {
+            $stmt = @$this->conn->prepare('SELECT RELEASE_LOCK(?)');
+            if ($stmt) {
+                $stmt->bind_param('s', $k);
+                @$stmt->execute();
+                $stmt->close();
+            }
+        }
     }
 
     private function chapelExists(int $chapelId): bool {

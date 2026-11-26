@@ -6,7 +6,6 @@
 $catalog = $services_catalog ?? [];
 $certTypes = $certificate_types ?? [];
 ?>
-<link rel="stylesheet" href="assets/css/workspace.css?v=3.0">
 
 <div class="workspace" style="min-height: 100%; flex: 1; display: flex; flex-direction: column; gap: 14px; padding: 14px; box-sizing: border-box;">
 

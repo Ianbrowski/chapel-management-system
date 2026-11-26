@@ -7,7 +7,6 @@
     $inqPages       = $inq_pages ?? 1;
     $inqTotal       = $inq_total ?? count($inquiries);
 ?>
-<link rel="stylesheet" href="assets/css/workspace.css?v=2.5">
 
 <div class="workspace workspace-fluid inbox-workspace">
 
@@ -275,23 +274,20 @@
     <input type="hidden" name="form_section" value="public_inquiries">
     <input type="hidden" name="action" value="send_quick_sms">
     <input type="hidden" name="id" id="inq-sms-id">
+    <input type="hidden" name="message" id="inq-sms-msg">
     <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
 </form>
 <form id="form-quick-email" method="POST" action="dashboard.php" style="display: none;">
     <input type="hidden" name="form_section" value="public_inquiries">
     <input type="hidden" name="action" value="send_quick_email">
     <input type="hidden" name="id" id="inq-email-id">
+    <input type="hidden" name="message" id="inq-email-msg">
     <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
 </form>
 
 <style>
 .inbox-workspace {
     gap: 10px !important;
-    padding: 14px 20px 20px !important;
-}
-.inbox-workspace .page-header-bar {
-    padding-bottom: 10px !important;
-    margin-bottom: 0 !important;
 }
 .inbox-split-panel {
     display: flex;
@@ -442,32 +438,42 @@ function showWorkspaceInquiryDetails(inq, rowElement) {
     const statusBadgeClass = statusClasses[inq.status] || 'badge-pending';
 
     // Merchandise block
+    const merchMeta = extractMerchMeta(inq);
     let merchBlockHtml = '';
-    if (inq.request_type === 'Merchandise' || (inq.details && inq.details.includes('Reservation for'))) {
-        let itemName = 'Unknown Merchandise';
-        let itemQty  = '1';
-        const lineMatch = inq.details.match(/Reservation for ([^x]+) x (\d+)\./);
-        if (lineMatch) { itemName = lineMatch[1]; itemQty = lineMatch[2]; }
+    if (merchMeta.isMerch) {
+        const canFulfillDirect = (canManageInquiries && !isArchivedInbox && merchMeta.itemId > 0);
         merchBlockHtml = `
-            <div style="background: var(--bg3); border: 1px solid var(--border); padding: 8px; border-radius: 6px; font-size: 12px;">
+            <div style="background: var(--bg3); border: 1px solid var(--border); padding: 10px; border-radius: 8px; font-size: 12px;">
                 <div style="font-weight: 700; color: var(--accent); margin-bottom: 4px;"><i class="fa-solid fa-store"></i> Merchandise Reservation</div>
-                <div style="color: var(--text); font-weight: 600;">${escInqHtml(itemName)}</div>
-                <div style="color: var(--text2); font-size: 11px; margin-top: 2px;">Qty: <strong>${escInqHtml(itemQty)}</strong></div>
-                ${canManageInquiries ? `<button type="button" class="btn btn-primary btn-sm" onclick="transferInquiryToMerch()" style="width:100%; margin-top:6px; justify-content:center; font-size:11px; height:26px;"><i class="fa-solid fa-basket-shopping"></i> Process Stock Sale</button>` : ''}
+                <div style="color: var(--text); font-weight: 600;">${escInqHtml(merchMeta.itemName)}</div>
+                <div style="color: var(--text2); font-size: 11px; margin-top: 2px;">Qty: <strong>${escInqHtml(String(merchMeta.itemQty))}</strong>${merchMeta.itemId > 0 ? ` &bull; Item #${escInqHtml(String(merchMeta.itemId))}` : ''}</div>
+                ${canManageInquiries && !isArchivedInbox ? `
+                <div style="display: flex; gap: 6px; margin-top: 8px;">
+                    ${canFulfillDirect ? `
+                    <button type="button" class="btn btn-success btn-sm" onclick="submitMerchFulfill()" style="flex: 1.2; justify-content: center; font-size: 11px; height: 30px; font-weight: 700;" title="Record sale, deduct inventory, archive, and email/SMS buyer">
+                        <i class="fa-solid fa-circle-check"></i> Fulfill &amp; Notify
+                    </button>` : ''}
+                    <button type="button" class="btn btn-primary btn-sm" onclick="transferInquiryToMerch()" style="flex: 1; justify-content: center; font-size: 11px; height: 30px;">
+                        <i class="fa-solid fa-basket-shopping"></i> Open POS
+                    </button>
+                </div>` : ''}
             </div>`;
     }
 
-    // Contact buttons
+    // Contact buttons (uses Office Response Note above if filled, else polite acknowledgment)
     let contactButtons = '';
-    if (canManageInquiries) {
+    if (canManageInquiries && !isArchivedInbox) {
         contactButtons = `
-            <div style="display: flex; gap: 6px;">
-                <button type="button" class="btn btn-ghost btn-sm" style="flex:1; padding:6px;" onclick="submitInquiryQuickContact('sms')" ${inq.phone ? '' : 'disabled'} title="${inq.phone ? 'Send SMS' : 'No phone'}">
-                    <i class="fa-solid fa-message"></i> SMS
-                </button>
-                <button type="button" class="btn btn-ghost btn-sm" style="flex:1; padding:6px;" onclick="submitInquiryQuickContact('email')" ${inq.email ? '' : 'disabled'} title="${inq.email ? 'Send Email' : 'No email'}">
-                    <i class="fa-solid fa-envelope"></i> Email
-                </button>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <div style="display: flex; gap: 6px;">
+                    <button type="button" class="btn btn-ghost btn-sm" style="flex:1; padding:6px; justify-content:center;" onclick="submitInquiryQuickContact('sms')" ${inq.phone ? '' : 'disabled'} title="${inq.phone ? 'Send Office Response Note (or acknowledgment) via SMS' : 'No phone number'}">
+                        <i class="fa-solid fa-message"></i> Send SMS
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-sm" style="flex:1; padding:6px; justify-content:center;" onclick="submitInquiryQuickContact('email')" ${inq.email ? '' : 'disabled'} title="${inq.email ? 'Send Office Response Note (or acknowledgment) via Email' : 'No email address'}">
+                        <i class="fa-solid fa-envelope"></i> Send Email
+                    </button>
+                </div>
+                <div style="font-size: 10.5px; color: var(--text2); text-align: center;">Uses Office Response Note below if filled, otherwise sends a receipt confirmation.</div>
             </div>`;
     }
 
@@ -611,17 +617,34 @@ function showWorkspaceInquiryDetails(inq, rowElement) {
 }
 window.showWorkspaceInquiryDetails = showWorkspaceInquiryDetails;
 
+function extractMerchMeta(inq) {
+    const details = String((inq && inq.details) || '');
+    const isMerch = !!(inq && (inq.request_type === 'Merchandise' || details.includes('Reservation for') || details.includes('Member Reservation:') || parseInt(inq.item_id || '0', 10) > 0));
+    let itemId = inq ? (parseInt(inq.item_id || '0', 10) || 0) : 0;
+    if (itemId <= 0) {
+        const idMatch = details.match(/\(Item ID: (\d+)\)/);
+        if (idMatch) itemId = parseInt(idMatch[1], 10) || 0;
+    }
+    let itemQty = inq ? (parseInt(inq.quantity || '0', 10) || 0) : 0;
+    let itemName = (inq && inq.service_category && inq.service_category !== 'Reservation') ? String(inq.service_category) : 'Merchandise Item';
+    const lineMatch = details.match(/(?:Reservation for|Member Reservation:)\s*(.+?)\s+x\s+(\d+)\./);
+    if (lineMatch) {
+        itemName = lineMatch[1].trim();
+        if (itemQty <= 0) itemQty = parseInt(lineMatch[2], 10) || 1;
+    }
+    if (itemQty <= 0) itemQty = 1;
+    return { isMerch, itemId, itemQty, itemName };
+}
+
 function transferInquiryToMerch() {
     if (!currentInquiry) return;
-    const details  = currentInquiry.details || '';
-    const idMatch  = details.match(/\(Item ID: (\d+)\)/);
-    const qtyMatch = details.match(/x (\d+)\./);
-    const prefill  = {
-        itemId: idMatch ? idMatch[1] : '',
-        quantity: qtyMatch ? qtyMatch[1] : '1',
+    const merch = extractMerchMeta(currentInquiry);
+    const prefill = {
+        itemId: merch.itemId > 0 ? String(merch.itemId) : '',
+        quantity: String(merch.itemQty),
         buyerName: currentInquiry.full_name,
         inquiryId: currentInquiry.inquiry_id || null,
-        title: currentInquiry.service_category || currentInquiry.request_type || 'Merchandise'
+        title: merch.itemName || currentInquiry.service_category || currentInquiry.request_type || 'Merchandise'
     };
     try { sessionStorage.setItem('merchSalePrefill', JSON.stringify(prefill)); } catch(e) {}
     showSection('merchandise');
@@ -631,7 +654,7 @@ function transferInquiryToMerch() {
 function submitMerchFulfill() {
     const form = document.getElementById('form-manage-inquiry');
     if (!form) return;
-    if (confirm('Fulfill this merchandise reservation and process sale automatically?')) {
+    if (confirm('Fulfill this merchandise reservation, deduct inventory, archive the inquiry, and notify the buyer?')) {
         const actionInput = form.querySelector('input[name="action"]');
         if (actionInput) actionInput.value = 'fulfill_merch_reservation';
         if (typeof form.requestSubmit === 'function') form.requestSubmit(); else form.submit();
@@ -641,12 +664,25 @@ function submitMerchFulfill() {
 
 function submitInquiryQuickContact(method) {
     if (!currentInquiry) return;
-    const formId   = method === 'sms' ? 'form-quick-sms' : 'form-quick-email';
-    const inputId  = method === 'sms' ? 'inq-sms-id'    : 'inq-email-id';
+    const isSms    = (method === 'sms');
+    const target   = isSms ? (currentInquiry.phone || '') : (currentInquiry.email || '');
+    const formId   = isSms ? 'form-quick-sms' : 'form-quick-email';
+    const inputId  = isSms ? 'inq-sms-id'     : 'inq-email-id';
+    const msgId    = isSms ? 'inq-sms-msg'    : 'inq-email-msg';
     const form     = document.getElementById(formId);
     const hiddenId = document.getElementById(inputId);
-    if (!form || !hiddenId) return;
+    const hiddenMsg = document.getElementById(msgId);
+    if (!form || !hiddenId || !target) return;
+
+    const noteEl  = document.getElementById('inq-note');
+    const custom  = noteEl ? noteEl.value.trim() : '';
+    const preview = custom !== ''
+        ? `Send your Office Response Note via ${method.toUpperCase()} to ${target}?\n\n"${custom}"`
+        : `Office Response Note is blank. Send a standard confirmation receipt via ${method.toUpperCase()} to ${target}?`;
+    if (!confirm(preview)) return;
+
     hiddenId.value = currentInquiry.inquiry_id;
+    if (hiddenMsg) hiddenMsg.value = custom;
     if (typeof form.requestSubmit === 'function') form.requestSubmit(); else form.submit();
 }
 

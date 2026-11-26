@@ -452,6 +452,7 @@ $riteMetadata = [
             background: var(--accent-soft);
             border-color: transparent;
             box-shadow: inset 3px 0 0 var(--accent);
+            padding-right: 30px;
         }
         .clergy-avatar {
             width: 32px;
@@ -806,10 +807,12 @@ $riteMetadata = [
         .auth-checkbox-styled {
             appearance: none;
             -webkit-appearance: none;
-            width: 18px;
-            height: 18px;
-            border: 1.5px solid #cbd5e1;
-            border-radius: 50%;
+            width: 18px !important;
+            height: 18px !important;
+            min-width: 18px !important;
+            padding: 0 !important;
+            border: 1.5px solid #cbd5e1 !important;
+            border-radius: 50% !important;
             background: var(--surface);
             cursor: pointer;
             display: inline-grid;
@@ -820,12 +823,55 @@ $riteMetadata = [
             outline: none;
         }
         .auth-checkbox-styled:checked {
-            background-color: var(--accent);
-            border-color: var(--accent);
+            background-color: var(--accent) !important;
+            border-color: var(--accent) !important;
             background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.2 4.8L6.5 10.5L3.8 7.8' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
             background-size: 11px 11px;
             background-position: center;
             background-repeat: no-repeat;
+        }
+        .clergy-unsaved-badge {
+            display: none;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 999px;
+            background: rgba(217, 119, 6, 0.14);
+            color: #b45309;
+            border: 1px solid rgba(217, 119, 6, 0.35);
+            flex-shrink: 0;
+        }
+        .clergy-nav-card.has-unsaved .clergy-unsaved-badge {
+            display: inline-flex;
+        }
+        .clergy-nav-card.active.has-unsaved .clergy-active-indicator {
+            display: none;
+        }
+        .clergy-unsaved-banner {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding: 10px 18px;
+            background: rgba(217, 119, 6, 0.1);
+            border-bottom: 1px solid rgba(217, 119, 6, 0.25);
+            color: #92400e;
+            font-size: 12.5px;
+        }
+        [data-theme="dark"] .clergy-unsaved-banner {
+            background: rgba(245, 158, 11, 0.12);
+            color: #fcd34d;
+        }
+        .clergy-unsaved-banner.is-visible {
+            display: flex;
+        }
+        .btn-save-dirty {
+            background: #b45309 !important;
+            border-color: #92400e !important;
+            box-shadow: 0 2px 8px rgba(180, 83, 9, 0.28) !important;
         }
 
         /* Shift Hours Section */
@@ -949,6 +995,52 @@ $riteMetadata = [
         [data-theme="dark"] .ps-sort-arrow-btn:not(.active) {
             color: #94a3b8 !important;
         }
+
+        /* ── Duty Schedule Table (Prevent dashboard.css max-width/nowrap + workspace.css overflow:visible overlap) ── */
+        #sec-priest_schedule .ps-duty-table {
+            width: 100%;
+            min-width: 960px;
+            border-collapse: separate;
+            border-spacing: 0;
+            text-align: left;
+            table-layout: fixed;
+        }
+        #sec-priest_schedule .ps-duty-table.is-priest-view {
+            min-width: 780px;
+        }
+        #sec-priest_schedule .ps-duty-table th,
+        #sec-priest_schedule .ps-duty-table td {
+            max-width: none !important;
+            box-sizing: border-box !important;
+        }
+        #sec-priest_schedule .ps-duty-table thead th {
+            background: var(--bg3, #F8FAFC) !important;
+            border-bottom: 1px solid var(--line) !important;
+            z-index: 15;
+        }
+        [data-theme="dark"] #sec-priest_schedule .ps-duty-table thead th {
+            background: #18181b !important;
+            border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        #sec-priest_schedule .ps-duty-table td {
+            white-space: normal !important;
+            overflow: hidden !important;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            vertical-align: middle;
+            border-bottom: 1px solid var(--line);
+        }
+        #sec-priest_schedule .ps-duty-table .ps-col-date,
+        #sec-priest_schedule .ps-duty-table .ps-col-type,
+        #sec-priest_schedule .ps-duty-table .ps-col-status,
+        #sec-priest_schedule .ps-duty-table .ps-col-details {
+            white-space: nowrap !important;
+        }
+        #sec-priest_schedule .ps-duty-table .ps-col-title {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            line-height: 1.4;
+        }
     </style>
 
     <!-- ─── 1. UNIFIED COMMAND HEADER: TITLE, BADGES, TABS, AND ACTIONS ─── -->
@@ -1005,9 +1097,9 @@ $riteMetadata = [
 
             <?php if ($active_tab === 'authorizations'): ?>
                 <?php if ($is_admin_view): ?>
-                    <button type="button" onclick="document.getElementById('form-priest-prefs').submit()" 
-                            class="btn btn-primary btn-sm" style="font-size: 12px; height: 34px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; background: #111111; color: #FFFFFF; border: 1px solid #111111; border-radius: 999px; padding: 0 16px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
-                        <i class="fa-solid fa-floppy-disk"></i> Save Changes
+                    <button type="button" id="btn-save-clergy-changes" onclick="submitClergyPrefsForm()"
+                            class="btn btn-primary btn-sm" style="font-size: 12px; height: 34px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; background: #111111; color: #FFFFFF; border: 1px solid #111111; border-radius: 999px; padding: 0 16px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.12); transition: all 0.15s ease;">
+                        <i class="fa-solid fa-floppy-disk"></i> <span id="btn-save-clergy-label">Save Changes</span>
                     </button>
                 <?php else: ?>
                     <span class="badge" style="padding: 6px 12px; font-size: 11.5px; border-radius: 999px; background: var(--bg3); border: 1px solid var(--border); color: var(--text2);">
@@ -1132,18 +1224,18 @@ $riteMetadata = [
                 </div>
             <?php else: ?>
             <div style="overflow-x: auto;">
-                <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: left; min-width: 680px;">
+                <table class="data-table ps-duty-table <?php echo $is_admin_view ? '' : 'is-priest-view'; ?>">
                     <thead>
                         <tr style="background: #fbfbfb; border-bottom: 1px solid var(--line);">
-                            <th style="padding: 10px 14px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); width: 140px; font-weight: 700; border-bottom: 1px solid var(--line); background: #fbfbfb;">Date &amp; Time</th>
+                            <th style="padding: 10px 14px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); width: 136px; font-weight: 700; border-bottom: 1px solid var(--line); background: #fbfbfb;">Date &amp; Time</th>
                             <th style="padding: 10px 14px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 700; border-bottom: 1px solid var(--line); background: #fbfbfb;">Assigned Liturgy</th>
-                            <th style="padding: 10px 14px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); width: 100px; text-align: center; font-weight: 700; border-bottom: 1px solid var(--line); background: #fbfbfb;">Type</th>
+                            <th style="padding: 10px 10px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); width: 138px; text-align: center; font-weight: 700; border-bottom: 1px solid var(--line); background: #fbfbfb;">Type</th>
                             <?php if ($is_admin_view): ?>
-                            <th style="padding: 10px 14px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); width: 160px; font-weight: 700; border-bottom: 1px solid var(--line); background: #fbfbfb;">Priest</th>
+                            <th style="padding: 10px 14px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); width: 184px; font-weight: 700; border-bottom: 1px solid var(--line); background: #fbfbfb;">Priest</th>
                             <?php endif; ?>
-                            <th style="padding: 10px 14px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); width: 160px; font-weight: 700; border-bottom: 1px solid var(--line); background: #fbfbfb;">Location</th>
-                            <th style="padding: 10px 14px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); width: 100px; text-align: center; font-weight: 700; border-bottom: 1px solid var(--line); background: #fbfbfb;">Status</th>
-                            <th style="padding: 10px 14px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); width: 75px; text-align: center; font-weight: 700; border-bottom: 1px solid var(--line); background: #fbfbfb;">Details</th>
+                            <th style="padding: 10px 14px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); width: 176px; font-weight: 700; border-bottom: 1px solid var(--line); background: #fbfbfb;">Location</th>
+                            <th style="padding: 10px 10px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); width: 142px; text-align: center; font-weight: 700; border-bottom: 1px solid var(--line); background: #fbfbfb;">Status</th>
+                            <th style="padding: 10px 12px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); width: 92px; text-align: center; font-weight: 700; border-bottom: 1px solid var(--line); background: #fbfbfb;">Details</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1154,7 +1246,7 @@ $riteMetadata = [
                         <tr style="border-bottom: 1px solid var(--line); transition: background 0.12s ease; <?php echo $has_conflict ? 'background: rgba(214,69,69,0.04);' : ''; ?>">
                             
                             <!-- Date & Time -->
-                            <td style="padding: 12px 14px; white-space: nowrap; border-bottom: 1px solid var(--line);">
+                            <td class="ps-col-date" style="padding: 12px 14px; border-bottom: 1px solid var(--line);">
                                 <div style="font-weight: 600; font-size: 13.5px; color: var(--text);">
                                     <?php echo date('M d, Y', strtotime($ev['start_time'])); ?>
                                 </div>
@@ -1165,8 +1257,8 @@ $riteMetadata = [
                             </td>
 
                             <!-- Liturgy Title -->
-                            <td style="padding: 12px 14px;">
-                                <div style="font-weight: 600; font-size: 14px; color: var(--text); line-height: 1.3;">
+                            <td class="ps-col-title" style="padding: 12px 14px;">
+                                <div style="font-weight: 600; font-size: 14px; color: var(--text); line-height: 1.35;">
                                     <?php echo htmlspecialchars($ev['title']); ?>
                                 </div>
                                 <?php if ($has_conflict): ?>
@@ -1177,18 +1269,18 @@ $riteMetadata = [
                             </td>
 
                             <!-- Type -->
-                            <td style="padding: 12px 14px; text-align: center;">
+                            <td class="ps-col-type" style="padding: 12px 10px; text-align: center;">
                                 <?php echo renderPriestTypeBadge($ev['event_type'] ?? 'Other'); ?>
                             </td>
 
                             <!-- Celebrant (Admin) -->
                             <?php if ($is_admin_view): ?>
-                            <td style="padding: 12px 14px; font-size: 13px; color: var(--text);">
+                            <td class="ps-col-priest" style="padding: 12px 14px; font-size: 13px; color: var(--text);">
                                 <?php 
                                 $pName = trim($ev['pastor_assigned'] ?? '');
                                 if (!empty($pName)) {
                                     $displayName = preg_match('/^(Fr\.|Rev\.|Father|Msgr\.)/i', $pName) ? $pName : 'Fr. ' . $pName;
-                                    echo '<span style="font-weight: 500;"><i class="fa-solid fa-user-tie" style="font-size: 11px; color: var(--text2); margin-right: 5px;"></i>' . htmlspecialchars($displayName) . '</span>';
+                                    echo '<span style="display: inline-flex; align-items: flex-start; gap: 5px; font-weight: 500; max-width: 100%;"><i class="fa-solid fa-user-tie" style="font-size: 11px; color: var(--text2); margin-top: 3px; flex-shrink: 0;"></i><span>' . htmlspecialchars($displayName) . '</span></span>';
                                 } else {
                                     echo '<span style="color: var(--text2); opacity: 0.6;">— Unassigned —</span>';
                                 }
@@ -1197,20 +1289,20 @@ $riteMetadata = [
                             <?php endif; ?>
 
                             <!-- Location -->
-                            <td style="padding: 12px 14px; font-size: 13px; color: var(--text);">
-                                <span style="display: inline-flex; align-items: center; gap: 5px;">
-                                    <i class="fa-solid fa-place-of-worship" style="font-size: 11px; color: var(--text2);"></i>
-                                    <?php echo htmlspecialchars($ev['chapel_location'] ?? ($ev['chapel_name'] ?? 'Main Cathedral')); ?>
+                            <td class="ps-col-location" style="padding: 12px 14px; font-size: 13px; color: var(--text);">
+                                <span style="display: inline-flex; align-items: flex-start; gap: 5px; max-width: 100%;">
+                                    <i class="fa-solid fa-place-of-worship" style="font-size: 11px; color: var(--text2); margin-top: 3px; flex-shrink: 0;"></i>
+                                    <span><?php echo htmlspecialchars($ev['chapel_location'] ?? ($ev['chapel_name'] ?? 'Main Cathedral')); ?></span>
                                 </span>
                             </td>
 
                             <!-- Status -->
-                            <td style="padding: 12px 14px; text-align: center;">
+                            <td class="ps-col-status" style="padding: 12px 10px; text-align: center;">
                                 <?php echo renderPriestStatusBadge($ev['status'] ?? 'Confirmed'); ?>
                             </td>
 
                             <!-- Details Button -->
-                            <td style="padding: 12px 14px; text-align: center;">
+                            <td class="ps-col-details" style="padding: 12px 12px; text-align: center;">
                                 <button type="button" 
                                         class="ps-tab-link" 
                                         data-event="<?php echo htmlspecialchars(json_encode($ev, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
@@ -1238,9 +1330,8 @@ $riteMetadata = [
             <input type="hidden" name="form_section" value="priest_prefs">
             <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
             <input type="hidden" name="next_priest_id" id="field-next-priest-id" value="">
-            <?php if (!empty($prefTargetId)): ?>
-                <input type="hidden" name="priest_id" value="<?php echo (int)$prefTargetId; ?>">
-            <?php endif; ?>
+            <input type="hidden" name="staged_prefs" id="field-staged-prefs" value="">
+            <input type="hidden" name="priest_id" id="field-priest-id" value="<?php echo (int)$prefTargetId; ?>">
 
             <div class="clergy-workspace-grid">
                 
@@ -1269,7 +1360,8 @@ $riteMetadata = [
                             }
                         ?>
                         <a href="dashboard.php?section=priest_schedule&amp;tab=authorizations&amp;priest_id=<?php echo $p['id']; ?>" 
-                           onclick="return switchPriest(event, <?php echo $p['id']; ?>);"
+                           data-priest-id="<?php echo (int)$p['id']; ?>"
+                           onclick="return switchPriest(event, <?php echo (int)$p['id']; ?>);"
                            class="clergy-nav-card <?php echo $isActive ? 'active' : ''; ?>">
                             <div class="clergy-avatar">
                                 <?php echo htmlspecialchars($pInitials); ?>
@@ -1278,10 +1370,11 @@ $riteMetadata = [
                                 <span class="clergy-nav-name"><?php echo htmlspecialchars($pFullName); ?></span>
                                 <span class="clergy-nav-role">Priest</span>
                                 <div class="clergy-nav-meta">
-                                    <span class="clergy-meta-tag"><i class="fa-solid fa-cross" style="font-size:9px;"></i> <?php echo count($pTypes); ?> Rites</span>
-                                    <span class="clergy-meta-tag"><i class="fa-solid fa-place-of-worship" style="font-size:9px;"></i> <?php echo count($pCov); ?> Chapels</span>
+                                    <span class="clergy-meta-tag"><i class="fa-solid fa-cross" style="font-size:9px;"></i> <span class="clergy-nav-rites-count"><?php echo count($pTypes); ?></span> Rites</span>
+                                    <span class="clergy-meta-tag"><i class="fa-solid fa-place-of-worship" style="font-size:9px;"></i> <span class="clergy-nav-chapels-count"><?php echo count($pCov); ?></span> Chapels</span>
                                 </div>
                             </div>
+                            <span class="clergy-unsaved-badge" title="Modified — click Save Changes to apply">Unsaved</span>
                             <div class="clergy-active-indicator">
                                 <i class="fa-solid fa-circle-check"></i>
                             </div>
@@ -1296,11 +1389,11 @@ $riteMetadata = [
                     <!-- 1. Hero / Profile Header -->
                     <div class="clergy-hero-banner">
                         <div class="clergy-hero-left">
-                            <div class="clergy-hero-avatar">
+                            <div class="clergy-hero-avatar" id="clergy-hero-avatar">
                                 <?php echo htmlspecialchars(getPriestInitials($targetName)); ?>
                             </div>
                             <div>
-                                <h2 class="clergy-hero-name"><?php echo htmlspecialchars($targetName); ?></h2>
+                                <h2 class="clergy-hero-name" id="clergy-hero-name"><?php echo htmlspecialchars($targetName); ?></h2>
                                 <p class="clergy-hero-title">Diocesan Priest &middot; St. Michael Parish</p>
                             </div>
                         </div>
@@ -1308,15 +1401,15 @@ $riteMetadata = [
                         <div class="clergy-hero-stats">
                             <div class="clergy-hero-pill">
                                 <i class="fa-solid fa-cross"></i>
-                                <span><?php echo count($my_event_types ?? []); ?>/6 Rites</span>
+                                <span id="clergy-hero-rites"><?php echo count($my_event_types ?? []); ?>/6 Rites</span>
                             </div>
                             <div class="clergy-hero-pill">
                                 <i class="fa-solid fa-place-of-worship"></i>
-                                <span><?php echo count($cov); ?> Chapels</span>
+                                <span id="clergy-hero-chapels"><?php echo count($cov); ?> Chapels</span>
                             </div>
                             <div class="clergy-hero-pill">
                                 <i class="fa-solid fa-clock"></i>
-                                <span>
+                                <span id="clergy-hero-shift">
                                     <?php 
                                     $stFmt = !empty($target_priest['duty_start_time']) ? date('g:i A', strtotime($target_priest['duty_start_time'])) : '8:00 AM';
                                     $endFmt = !empty($target_priest['duty_end_time']) ? date('g:i A', strtotime($target_priest['duty_end_time'])) : '5:00 PM';
@@ -1325,6 +1418,17 @@ $riteMetadata = [
                                 </span>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Unsaved Reminder Banner (shown when edits are staged) -->
+                    <div class="clergy-unsaved-banner" id="clergy-unsaved-banner" role="status">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                            <span id="clergy-unsaved-text">You have unsaved changes — click <strong>Save Changes</strong> to save.</span>
+                        </div>
+                        <button type="button" onclick="discardStagedClergyChanges()" style="background: transparent; border: 1px solid currentColor; border-radius: 6px; padding: 3px 10px; font-size: 11.5px; font-weight: 600; color: inherit; cursor: pointer;">
+                            Discard Changes
+                        </button>
                     </div>
 
                     <!-- 2. Section: Sacramental Authorizations -->
@@ -1451,16 +1555,12 @@ $riteMetadata = [
                         </div>
                     </div>
 
-                    <!-- 5. Footer Actions -->
+                    <!-- 5. Footer Info -->
                     <div class="clergy-card-footer">
                         <div class="clergy-footer-hint">
                             <i class="fa-solid fa-circle-info"></i>
-                            <span>Auto-saves when switching priests</span>
+                            <span id="clergy-footer-hint-text">Edits stay staged when switching priests — click Save Changes when ready to save.</span>
                         </div>
-
-                        <button type="submit" id="btn-save-auth-main" class="btn-gold-action">
-                            <i class="fa-solid fa-floppy-disk"></i> Save Changes
-                        </button>
                     </div>
 
                 </div>
@@ -1553,28 +1653,254 @@ $riteMetadata = [
     <?php endif; ?>
 </div>
 
+<?php
+$clergyBootstrap = [];
+foreach (($all_priests ?? []) as $pRow) {
+    $pidKey = (int)$pRow['id'];
+    $pName = !empty($pRow['full_name']) ? $pRow['full_name'] : $pRow['user'];
+    $clergyBootstrap[$pidKey] = [
+        'id'              => $pidKey,
+        'name'            => $pName,
+        'initials'        => getPriestInitials($pName),
+        'event_types'     => array_values(array_filter(array_map('trim', explode(',', (string)($pRow['event_types'] ?? ''))))),
+        'chapel_coverage' => array_values(array_filter(array_map('trim', explode(',', (string)($pRow['chapel_coverage'] ?? ''))))),
+        'duty_start_time' => !empty($pRow['duty_start_time']) ? substr((string)$pRow['duty_start_time'], 0, 5) : '08:00',
+        'duty_end_time'   => !empty($pRow['duty_end_time']) ? substr((string)$pRow['duty_end_time'], 0, 5) : '17:00',
+    ];
+}
+?>
 <script>
 window.pastorEvents = <?php echo json_encode($pastor_schedule ?? []); ?>;
 
-let isFormDirty = false;
+var clergyBaselineState = <?php echo json_encode($clergyBootstrap, JSON_UNESCAPED_UNICODE); ?>;
+var clergyDraftState = {};
+Object.keys(clergyBaselineState).forEach(function(id) {
+    const src = clergyBaselineState[id];
+    clergyDraftState[id] = {
+        id: src.id,
+        name: src.name,
+        initials: src.initials,
+        event_types: src.event_types.slice(),
+        chapel_coverage: src.chapel_coverage.slice(),
+        duty_start_time: src.duty_start_time,
+        duty_end_time: src.duty_end_time
+    };
+});
+
+var activePriestId = <?php echo (int)($prefTargetId ?? 0); ?>;
+var isSubmittingClergyForm = false;
+
+function formatShift12h(hhmm) {
+    if (!hhmm || hhmm.indexOf(':') === -1) return hhmm || '';
+    const parts = hhmm.split(':');
+    let h = parseInt(parts[0], 10);
+    const m = parts[1];
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    return h + ':' + m + ' ' + ampm;
+}
+
+function isPriestDirty(priestId) {
+    const key = String(priestId);
+    const base = clergyBaselineState[key];
+    const draft = clergyDraftState[key];
+    if (!base || !draft) return false;
+    const normArr = function(arr) { return (arr || []).slice().sort().join('|'); };
+    return (
+        normArr(base.event_types) !== normArr(draft.event_types) ||
+        normArr(base.chapel_coverage) !== normArr(draft.chapel_coverage) ||
+        (base.duty_start_time || '') !== (draft.duty_start_time || '') ||
+        (base.duty_end_time || '') !== (draft.duty_end_time || '')
+    );
+}
+
+function getDirtyPriestIds() {
+    return Object.keys(clergyDraftState).filter(isPriestDirty);
+}
+
+function captureCurrentDomIntoDraft() {
+    const key = String(activePriestId);
+    if (!clergyDraftState[key]) return;
+    const form = document.getElementById('form-priest-prefs');
+    if (!form) return;
+    clergyDraftState[key].event_types = Array.from(form.querySelectorAll('input[name="event_types[]"]:checked')).map(function(el) { return el.value; });
+    clergyDraftState[key].chapel_coverage = Array.from(form.querySelectorAll('input[name="chapel_coverage[]"]:checked')).map(function(el) { return el.value; });
+    const s = document.getElementById('priest-duty-start');
+    const e = document.getElementById('priest-duty-end');
+    if (s && s.value) clergyDraftState[key].duty_start_time = s.value.substring(0, 5);
+    if (e && e.value) clergyDraftState[key].duty_end_time = e.value.substring(0, 5);
+}
+
+function renderActivePriestHeroAndDirectory() {
+    const key = String(activePriestId);
+    const draft = clergyDraftState[key];
+    if (draft) {
+        const av = document.getElementById('clergy-hero-avatar');
+        const nm = document.getElementById('clergy-hero-name');
+        const rt = document.getElementById('clergy-hero-rites');
+        const ch = document.getElementById('clergy-hero-chapels');
+        const sh = document.getElementById('clergy-hero-shift');
+        if (av) av.textContent = draft.initials || 'PR';
+        if (nm) nm.textContent = draft.name || 'Priest';
+        if (rt) rt.textContent = draft.event_types.length + '/6 Rites';
+        if (ch) ch.textContent = draft.chapel_coverage.length + ' Chapels';
+        if (sh) sh.textContent = formatShift12h(draft.duty_start_time) + ' – ' + formatShift12h(draft.duty_end_time);
+    }
+
+    document.querySelectorAll('.clergy-nav-card[data-priest-id]').forEach(function(card) {
+        const pid = card.getAttribute('data-priest-id');
+        const pDraft = clergyDraftState[pid];
+        const dirty = isPriestDirty(pid);
+        card.classList.toggle('active', pid === key);
+        card.classList.toggle('has-unsaved', dirty);
+        if (pDraft) {
+            const rc = card.querySelector('.clergy-nav-rites-count');
+            const cc = card.querySelector('.clergy-nav-chapels-count');
+            if (rc) rc.textContent = pDraft.event_types.length;
+            if (cc) cc.textContent = pDraft.chapel_coverage.length;
+        }
+    });
+}
+
+function updateClergyUnsavedUI() {
+    const dirtyIds = getDirtyPriestIds();
+    const banner = document.getElementById('clergy-unsaved-banner');
+    const bannerText = document.getElementById('clergy-unsaved-text');
+    const saveBtn = document.getElementById('btn-save-clergy-changes');
+    const saveLabel = document.getElementById('btn-save-clergy-label');
+    const footerText = document.getElementById('clergy-footer-hint-text');
+
+    renderActivePriestHeroAndDirectory();
+
+    if (dirtyIds.length > 0) {
+        const names = dirtyIds.map(function(id) { return clergyDraftState[id] ? clergyDraftState[id].name : ('Priest #' + id); });
+        if (banner) banner.classList.add('is-visible');
+        if (bannerText) {
+            bannerText.innerHTML = 'Unsaved changes for <strong>' + names.map(function(n) {
+                return n.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }).join(', ') + '</strong> — click <strong>Save Changes</strong> to apply.';
+        }
+        if (saveBtn) saveBtn.classList.add('btn-save-dirty');
+        if (saveLabel) saveLabel.textContent = 'Save Changes (' + dirtyIds.length + ')';
+        if (footerText) footerText.textContent = dirtyIds.length + ' priest(s) have unsaved staged edits — click Save Changes above to save.';
+    } else {
+        if (banner) banner.classList.remove('is-visible');
+        if (saveBtn) saveBtn.classList.remove('btn-save-dirty');
+        if (saveLabel) saveLabel.textContent = 'Save Changes';
+        if (footerText) footerText.textContent = 'Edits stay staged when switching priests — click Save Changes when ready to save.';
+    }
+}
 
 function markDirty() {
-    isFormDirty = true;
+    captureCurrentDomIntoDraft();
+    updateClergyUnsavedUI();
 }
 
 function switchPriest(event, targetPriestId) {
-    if (isFormDirty) {
-        event.preventDefault();
-        const nextInput = document.getElementById('field-next-priest-id');
-        const form = document.getElementById('form-priest-prefs');
-        if (nextInput && form) {
-            nextInput.value = targetPriestId;
-            form.submit();
-            return false;
-        }
+    const key = String(targetPriestId);
+    const draft = clergyDraftState[key];
+    const form = document.getElementById('form-priest-prefs');
+    if (!draft || !form) {
+        return true;
     }
-    return true;
+    if (event) event.preventDefault();
+
+    captureCurrentDomIntoDraft();
+    activePriestId = parseInt(targetPriestId, 10);
+
+    const priestField = document.getElementById('field-priest-id');
+    if (priestField) priestField.value = String(activePriestId);
+    form.action = 'dashboard.php?section=priest_schedule&tab=authorizations&priest_id=' + encodeURIComponent(activePriestId);
+
+    form.querySelectorAll('input[name="event_types[]"]').forEach(function(cb) {
+        const on = draft.event_types.indexOf(cb.value) !== -1;
+        cb.checked = on;
+        const lbl = cb.closest('label');
+        if (lbl) {
+            lbl.classList.toggle('is-checked', on);
+            lbl.classList.toggle('selected', on);
+        }
+    });
+
+    form.querySelectorAll('input[name="chapel_coverage[]"]').forEach(function(cb) {
+        const on = draft.chapel_coverage.indexOf(cb.value) !== -1;
+        cb.checked = on;
+        const lbl = cb.closest('label');
+        if (lbl) {
+            lbl.classList.toggle('is-checked', on);
+            lbl.classList.toggle('selected', on);
+        }
+    });
+
+    const s = document.getElementById('priest-duty-start');
+    const e = document.getElementById('priest-duty-end');
+    if (s) s.value = draft.duty_start_time || '08:00';
+    if (e) e.value = draft.duty_end_time || '17:00';
+
+    updateShiftPresetHighlight();
+    updateClergyUnsavedUI();
+
+    if (window.history && typeof window.history.replaceState === 'function') {
+        const nextUrl = 'dashboard.php?section=priest_schedule&tab=authorizations&priest_id=' + encodeURIComponent(activePriestId);
+        window.history.replaceState({}, '', nextUrl);
+    }
+    return false;
 }
+
+function discardStagedClergyChanges() {
+    Object.keys(clergyBaselineState).forEach(function(id) {
+        const src = clergyBaselineState[id];
+        clergyDraftState[id] = {
+            id: src.id,
+            name: src.name,
+            initials: src.initials,
+            event_types: src.event_types.slice(),
+            chapel_coverage: src.chapel_coverage.slice(),
+            duty_start_time: src.duty_start_time,
+            duty_end_time: src.duty_end_time
+        };
+    });
+    switchPriest(null, activePriestId);
+}
+
+function submitClergyPrefsForm() {
+    const form = document.getElementById('form-priest-prefs');
+    if (!form) return;
+    captureCurrentDomIntoDraft();
+
+    const dirtyIds = getDirtyPriestIds();
+    const payload = {};
+    const idsToSave = dirtyIds.length > 0 ? dirtyIds : [String(activePriestId)];
+    idsToSave.forEach(function(id) {
+        const d = clergyDraftState[id];
+        if (d) {
+            payload[id] = {
+                event_types: d.event_types,
+                chapel_coverage: d.chapel_coverage,
+                duty_start_time: d.duty_start_time,
+                duty_end_time: d.duty_end_time
+            };
+        }
+    });
+
+    const stagedField = document.getElementById('field-staged-prefs');
+    if (stagedField) stagedField.value = JSON.stringify(payload);
+
+    isSubmittingClergyForm = true;
+    if (form.requestSubmit) {
+        form.requestSubmit();
+    } else {
+        form.submit();
+    }
+}
+
+window.addEventListener('beforeunload', function(e) {
+    if (!isSubmittingClergyForm && getDirtyPriestIds().length > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
 
 function updateShiftPresetHighlight() {
     const s = document.getElementById('priest-duty-start');
@@ -1627,22 +1953,25 @@ function setAllRites(selectVal) {
     markDirty();
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+function initClergyPrefsListeners() {
     updateShiftPresetHighlight();
 
     const s = document.getElementById('priest-duty-start');
     const e = document.getElementById('priest-duty-end');
-    if (s) {
+    if (s && !s.dataset.clergyBound) {
+        s.dataset.clergyBound = '1';
         s.addEventListener('input', updateShiftPresetHighlight);
         s.addEventListener('change', updateShiftPresetHighlight);
     }
-    if (e) {
+    if (e && !e.dataset.clergyBound) {
+        e.dataset.clergyBound = '1';
         e.addEventListener('input', updateShiftPresetHighlight);
         e.addEventListener('change', updateShiftPresetHighlight);
     }
 
     const form = document.getElementById('form-priest-prefs');
-    if (form) {
+    if (form && !form.dataset.clergyBound) {
+        form.dataset.clergyBound = '1';
         form.querySelectorAll('input').forEach(el => {
             el.addEventListener('change', function() {
                 if (el.type === 'checkbox') {
@@ -1657,5 +1986,11 @@ document.addEventListener('DOMContentLoaded', function() {
             el.addEventListener('input', markDirty);
         });
     }
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initClergyPrefsListeners);
+} else {
+    initClergyPrefsListeners();
+}
 </script>

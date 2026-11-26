@@ -144,15 +144,36 @@ function openEditRecordModal(r, scope) {
     openModal(modalId);
 }
 
+function syncIssueCertPurpose() {
+    const sel = document.getElementById('issue-cert-purpose-select');
+    const custom = document.getElementById('issue-cert-purpose-custom');
+    const hidden = document.getElementById('issue-cert-purpose');
+    if (!sel || !hidden) return;
+    const isCustom = (sel.value === '__custom__');
+    if (custom) {
+        custom.style.display = isCustom ? 'block' : 'none';
+        custom.required = isCustom;
+    }
+    hidden.value = isCustom
+        ? ((custom && custom.value.trim()) ? custom.value.trim() : '')
+        : sel.value;
+}
+
 function openCertModal(r, scope) {
     document.getElementById('issue-cert-section').value = (scope === 'cathedral' ? 'records_cathedral' : 'records_chapel');
     document.getElementById('issue-cert-record-id').value = r.record_id;
     document.getElementById('issue-cert-person-name').textContent = r.person_name;
     document.getElementById('issue-cert-type').textContent = r.record_type;
     document.getElementById('issue-cert-issued-to').value = '';
-    document.getElementById('issue-cert-purpose').value = '';
+    const sel = document.getElementById('issue-cert-purpose-select');
+    const custom = document.getElementById('issue-cert-purpose-custom');
+    if (sel) sel.value = 'Personal Records';
+    if (custom) custom.value = '';
+    syncIssueCertPurpose();
     openModal('modal-issue-cert');
 }
+
+window.syncIssueCertPurpose = syncIssueCertPurpose;
 
 function previewCert() {
     const recordId = document.getElementById('issue-cert-record-id').value;

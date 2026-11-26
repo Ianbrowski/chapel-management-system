@@ -1,7 +1,6 @@
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <!-- block html dis ->: MANAGE CHAPELS (MAX-DATA EXPANDED VIEW)        -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
-<link rel="stylesheet" href="assets/css/workspace.css?v=2.5">
 <style>
 #status-filter-tabs .tab-btn {
     padding: 7px 16px;
@@ -101,15 +100,6 @@ $inactiveChapels = $totalChapels - $activeChapels;
             <?php if ($inactiveChapels > 0): ?>
             <button type="button" class="chapel-status-pill" onclick="setChapelStatusFilter('inactive', this)" style="border: 1px solid transparent; background: transparent; color: var(--text2); font-size: 11.5px; font-weight: 600; padding: 4px 14px; border-radius: 999px; cursor: pointer; transition: all 0.15s ease;">
                 Inactive (<?php echo $inactiveChapels; ?>)
-            </button>
-            <?php endif; ?>
-        </div>
-
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <?php if (in_array($role, ['Admin', 'Cathedral Admin'])): ?>
-            <button type="button" class="btn btn-primary btn-sm" onclick="openModal('modal-add-chapel')" 
-                    style="height: 34px; font-weight: 600; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; background: #111111; color: #FFFFFF; border: 1px solid #111111; border-radius: 999px; padding: 0 16px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
-                <i class="fa-solid fa-plus"></i> Add Chapel
             </button>
             <?php endif; ?>
         </div>

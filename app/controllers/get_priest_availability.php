@@ -30,14 +30,13 @@ $response = $eventM->getAvailablePriests($event_type, $datetime, $excludeId, $cu
 
 $reqCidInt = $requestedChapelId ?? 0;
 $canViewConflictTitle = $isGlobalAdmin || ($isStaffOrClergy && (($sessionChapelId === null || (int)$sessionChapelId === 0) ? $reqCidInt === 0 : (int)$sessionChapelId === $reqCidInt));
-if (!$canViewConflictTitle) {
-    foreach ($response as &$p) {
-        if (!empty($p['conflict_reason']) && ($p['conflict_status'] ?? '') !== 'Off-Duty') {
-            $p['conflict_reason'] = 'Time slot unavailable';
-        }
+foreach ($response as &$p) {
+    if (!$canViewConflictTitle && !empty($p['conflict_reason']) && ($p['conflict_status'] ?? '') !== 'Off-Duty') {
+        $p['conflict_reason'] = !empty($p['conflict_masked']) ? $p['conflict_masked'] : 'Not available for this schedule';
     }
-    unset($p);
+    unset($p['conflict_masked']);
 }
+unset($p);
 
 header('Content-Type: application/json');
 echo json_encode($response);

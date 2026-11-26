@@ -98,25 +98,40 @@ class InquiryController extends BaseController {
             return;
         }
 
+        $customMsg = mb_substr(trim((string)($_POST['message'] ?? '')), 0, 800);
+        $cat       = $inq['service_category'] ?: ($inq['request_type'] ?: 'request');
+        $firstName = trim($inq['full_name'] ?: 'Parishioner');
+
         if ($method === 'email' && !empty($inq['email'])) {
             require_once BASE_PATH . '/app/mail/InquiryMailer.php';
-            $sent = InquiryMailer::sendStatusUpdate($inq['email'], $inq['full_name'], $inq['service_category'], 'Pending Review', 'Hello! We are confirming the receipt of your request. We will review it and get back to you shortly.');
+            $emailStatus = $customMsg !== '' ? ($inq['status'] ?: 'Parish Office Update') : 'Pending Review';
+            $emailBody   = $customMsg !== '' ? $customMsg : 'Hello! We are confirming the receipt of your request. We will review it and get back to you shortly.';
+            $sent = InquiryMailer::sendStatusUpdate($inq['email'], $inq['full_name'], $cat, $emailStatus, $emailBody);
             if ($sent) {
-                $this->flash('success', 'Auto-Email sent successfully.');
+                if ($customMsg !== '') {
+                    $this->inquiryModel->updateStatus($id, $inq['status'] ?: 'Pending', $customMsg);
+                    AuditLogger::logFromSession($this->conn, 'updated', 'Inquiries', "Sent email message for inquiry #{$id}", $inq, array_merge($inq, ['admin_note' => $customMsg]));
+                }
+                $this->flash('success', 'Email sent to ' . $inq['email'] . '.');
             } else {
                 $err = trim((string)($GLOBALS['lastMailError'] ?? ''));
-                $this->flash('error', 'Failed to send Auto-Email' . ($err !== '' ? ": {$err}" : '.'));
+                $this->flash('error', 'Failed to send Email' . ($err !== '' ? ": {$err}" : '.'));
             }
         } elseif ($method === 'sms' && !empty($inq['phone'])) {
             require_once BASE_PATH . '/app/services/SmsService.php';
-            $cat = $inq['service_category'] ?: 'request';
-            $msg = "Hi " . trim($inq['full_name'] ?: 'Parishioner') . "! We have received your {$cat} and our office will review it shortly. Thank you!";
+            $msg = $customMsg !== ''
+                ? "Hi {$firstName}! Parish Office: {$customMsg}"
+                : "Hi {$firstName}! We have received your {$cat} and our office will review it shortly. Thank you!";
             $sent = SmsService::send($inq['phone'], $msg);
             if ($sent) {
-                $this->flash('success', 'Auto-SMS sent successfully.');
+                if ($customMsg !== '') {
+                    $this->inquiryModel->updateStatus($id, $inq['status'] ?: 'Pending', $customMsg);
+                    AuditLogger::logFromSession($this->conn, 'updated', 'Inquiries', "Sent SMS message for inquiry #{$id}", $inq, array_merge($inq, ['admin_note' => $customMsg]));
+                }
+                $this->flash('success', 'SMS sent to ' . $inq['phone'] . '.');
             } else {
                 $smsErr = trim((string) SmsService::getLastError());
-                $this->flash('error', 'Failed to send Auto-SMS' . ($smsErr !== '' ? ": {$smsErr}" : '.'));
+                $this->flash('error', 'Failed to send SMS' . ($smsErr !== '' ? ": {$smsErr}" : '.'));
             }
         } else {
             $this->flash('error', 'Missing contact information to send ' . strtoupper($method) . '.');
@@ -132,7 +147,7 @@ class InquiryController extends BaseController {
         $this->conn->begin_transaction();
         try {
             // 1. Lock row & prevent duplicate fulfillment
-            $lockStmt = $this->conn->prepare("SELECT * FROM public_inquiries WHERE id = ? FOR UPDATE");
+            $lockStmt = $this->conn->prepare("SELECT * FROM public_inquiries WHERE inquiry_id = ? FOR UPDATE");
             if (!$lockStmt) {
                 throw new RuntimeException('Unable to lock reservation record.');
             }
@@ -291,7 +306,7 @@ class InquiryController extends BaseController {
 
         $mailSent = InquiryMailer::sendStatusUpdate($inq['email'], $inq['full_name'], $inq['service_category'], $status, $note);
         
-        $smsStatuses = ['Reviewed', 'Completed', 'For Claiming'];
+        $smsStatuses = ['Reviewed', 'Completed', 'For Claiming', 'Cancelled'];
         $smsSent = false;
         if (in_array($status, $smsStatuses, true)) {
             require_once BASE_PATH . '/app/services/SmsService.php';

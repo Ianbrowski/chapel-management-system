@@ -10,7 +10,6 @@ $voidedCount = count($voided_donations ?? []);
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <!-- DONATIONS & STEWARDSHIP — Segmented Operational Hub             -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
-<link rel="stylesheet" href="assets/css/workspace.css?v=2.5">
 
 <style>
 /* Local style overrides for Donations Hub */
@@ -476,9 +475,9 @@ $voidedCount = count($voided_donations ?? []);
                             Contribution Amount (₱) <span style="color:#ef4444;">*</span>
                         </label>
                         <div style="position: relative; margin-bottom: 4px;">
-                            <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 14px; font-weight: 700; color: var(--text2);">₱</span>
+                            <span style="position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 14px; font-weight: 700; color: var(--text2); pointer-events: none; z-index: 2;">₱</span>
                             <input type="number" name="amount" id="log-donation-amount" min="0.01" step="0.01" required placeholder="0.00" 
-                                    style="width: 100%; font-size: 14.5px; font-weight: 800; padding: 5px 10px 5px 24px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box;">
+                                    style="width: 100%; font-size: 14.5px; font-weight: 800; padding: 7px 12px 7px 30px !important; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box;">
                         </div>
                         
                         <!-- Preset Amount Pills -->

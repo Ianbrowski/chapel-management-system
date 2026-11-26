@@ -371,9 +371,6 @@ try {
                     <i class="fa-solid fa-arrow-right-to-bracket"></i> <span>Sign In / Register</span>
                 </a>
             <?php else: ?>
-                <a href="javascript:void(0)" onclick="showSection('my_profile',null)" class="logout-link" data-tooltip="Change Password" style="margin-bottom: 6px; color: var(--accent);">
-                    <i class="fa-solid fa-key"></i> <span>Change Password</span>
-                </a>
                 <a href="javascript:void(0)" onclick="openModal('modal-logout')" class="logout-link" data-tooltip="Logout">
                     <i class="fa-solid fa-right-from-bracket"></i> <span>Logout</span>
                 </a>

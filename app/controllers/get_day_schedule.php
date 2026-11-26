@@ -28,7 +28,7 @@ $venueId = ($venue === '0' || $venue === '' || $venue === null || $venue === 'nu
 $date  = $_GET['date'] ?? null;
 $exclude = isset($_GET['exclude_id']) && (int)$_GET['exclude_id'] > 0 ? (int)$_GET['exclude_id'] : null;
 
-if (!$date) {
+if (!$date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
     echo json_encode([]);
     exit;
 }
@@ -40,19 +40,20 @@ $canViewTitles = $isAdmin || ($isStaffOrClergy && (($sessionChapelId === null ||
 
 $eventModel = new Event($conn);
 
-$sql = "SELECT event_id, title, start_time, event_type, status, custom_duration 
-        FROM events 
-        WHERE " . ($venueId === null ? "(chapel_id IS NULL OR chapel_id = 0)" : "chapel_id = ?") . "
-          AND DATE(start_time) = ? 
-          AND status NOT IN ('Cancelled', 'Rejected') 
-          AND is_archived = 0
-          AND COALESCE(event_type, '') != 'Ecclesiastical Certificates'
-          AND COALESCE(event_type, '') NOT LIKE '%Certificate%'
-          AND COALESCE(event_type, '') NOT LIKE '%Thanksgiving%'
-          AND COALESCE(event_type, '') NOT LIKE '%Requiem%'
-          AND COALESCE(event_type, '') NOT LIKE '%Intention%'
-          AND COALESCE(location_type, 'Church') != 'Outside'
-          AND (service_id IS NULL OR service_id NOT IN (4, 7, 8))";
+$sql = "SELECT e.event_id, e.title, e.start_time, e.event_type, e.status, e.custom_duration, e.chapel_id, e.location_type, c.chapel_name
+        FROM events e
+        LEFT JOIN chapels c ON c.chapel_id = e.chapel_id
+        WHERE " . ($venueId === null ? "(e.chapel_id IS NULL OR e.chapel_id = 0)" : "e.chapel_id = ?") . "
+          AND DATE(e.start_time) = ?
+          AND e.status NOT IN ('Cancelled', 'Rejected')
+          AND e.is_archived = 0
+          AND COALESCE(e.event_type, '') != 'Ecclesiastical Certificates'
+          AND COALESCE(e.event_type, '') NOT LIKE '%Certificate%'
+          AND COALESCE(e.event_type, '') NOT LIKE '%Thanksgiving%'
+          AND COALESCE(e.event_type, '') NOT LIKE '%Requiem%'
+          AND COALESCE(e.event_type, '') NOT LIKE '%Intention%'
+          AND COALESCE(e.location_type, 'Church') != 'Outside'
+          AND (e.service_id IS NULL OR e.service_id NOT IN (4, 7, 8))";
 
 $params = [];
 $types  = '';
@@ -64,12 +65,12 @@ $params[] = $date;
 $types   .= 's';
 
 if ($exclude !== null) {
-    $sql .= " AND event_id != ?";
+    $sql .= " AND e.event_id != ?";
     $params[] = $exclude;
     $types   .= 'i';
 }
 
-$sql .= " ORDER BY start_time ASC";
+$sql .= " ORDER BY e.start_time ASC";
 
 $stmt = $conn->prepare($sql);
 $stmt->bind_param($types, ...$params);
@@ -81,8 +82,11 @@ while ($row = $res->fetch_assoc()) {
     $row['duration'] = $eventModel->getEventDuration($row['event_type'], $row['custom_duration']);
     $hour = (int)date('H', strtotime($row['start_time']));
     $row['slot'] = ($hour < 12) ? 'Morning' : 'Afternoon';
+    $row['venue_name'] = !empty($row['chapel_name'])
+        ? $row['chapel_name']
+        : (empty($row['chapel_id']) ? 'Main Cathedral' : 'Chapel #' . (int)$row['chapel_id']);
     if (!$canViewTitles) {
-        $row['title'] = 'Reserved Sanctuary Slot';
+        $row['title'] = 'Reserved (' . $row['venue_name'] . ')';
     }
     $events[] = $row;
 }

@@ -278,11 +278,13 @@ $tp = (int)($total_pages ?? 1);
                                 <span class="badge" style="background: var(--bg2, #F6F6F6); color: var(--text, #111111); border: 1px solid var(--border, #E5E5E5); font-size: 11.5px; padding: 2px 7px; border-radius: 4px; font-weight: 600;">
                                     <?php echo htmlspecialchars($evType); ?>
                                 </span>
-                                <?php if (!empty($req['event_scope'])): ?>
+                                <?php
+                                    $rawEvScope = strtolower(trim((string)($req['event_scope'] ?? '')));
+                                    $evScopeDisplay = ($rawEvScope === 'chapel' || ($rawEvScope !== 'cathedral' && !empty($req['chapel_id']) && (int)$req['chapel_id'] > 0)) ? 'chapel' : 'cathedral';
+                                ?>
                                 <span style="font-size: 11.5px; color: var(--text2, #737373);">
-                                    &bull; <?php echo htmlspecialchars($req['event_scope']); ?>
+                                    &bull; <?php echo htmlspecialchars($evScopeDisplay); ?>
                                 </span>
-                                <?php endif; ?>
                                 <?php if ($evFee > 0): ?>
                                 <span style="font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 4px; <?php echo $evIsPaid ? 'background: rgba(22,163,74,0.12); color: #16a34a;' : 'background: rgba(197,160,89,0.14); color: #9a7418;'; ?>">
                                     ₱<?php echo number_format($evFee, 2); ?> &bull; <?php echo $evIsPaid ? 'Paid' : ($evPaid > 0 ? 'Partial' : 'Unpaid'); ?>

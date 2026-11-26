@@ -181,6 +181,43 @@ $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_reques
 [data-theme="dark"] .ent-card-subtitle {
     color: var(--text2) !important;
 }
+
+/* Ledger scroll container & sticky table header (prevents global .panel-body !important padding and border-collapse sticky bleed) */
+#sec-certificates .cert-ledger-header {
+    padding: 10px 16px !important;
+}
+#sec-certificates .cert-ledger-scroll {
+    padding: 0 !important;
+    overflow: auto;
+    flex: 1;
+    min-height: 0;
+    background: var(--surface, #FFFFFF);
+}
+#cert-requests-table {
+    width: 100%;
+    min-width: 860px;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+#cert-requests-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    background: var(--bg3, #F8FAFC) !important;
+    border-bottom: 1px solid var(--border);
+    max-width: none !important;
+    box-sizing: border-box !important;
+}
+[data-theme="dark"] #cert-requests-table thead th {
+    background: #18181b !important;
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+#cert-requests-table tbody td {
+    max-width: none !important;
+    box-sizing: border-box !important;
+    border-bottom: 1px solid var(--border);
+}
 </style>
 
 <div class="workspace workspace-fluid" id="sec-certificates" style="display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 1680px; margin: 0 auto; box-sizing: border-box; padding: 14px clamp(16px, 1.8vw, 24px) 24px;">
@@ -215,7 +252,7 @@ $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_reques
     </div>
 
     <!-- ── 2. SUB-ROW: TABS LEFT + ACTIONS RIGHT ── -->
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 8px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 0;">
         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <div class="cert-tabs-bar" style="margin-bottom: 0;">
                 <button type="button" class="cert-tab-btn <?php echo ($initialCertTab === 'ledger') ? 'active' : ''; ?>" 
@@ -260,7 +297,7 @@ $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_reques
         <div class="panel" style="border-radius: 12px; overflow: hidden; background: var(--surface); border: 1px solid var(--border); display: flex; flex-direction: column; flex: 1; min-height: 0;">
             
             <!-- Filter & Search Toolbar -->
-            <div class="panel-header" style="background: var(--bg2); padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div class="panel-header cert-ledger-header" style="background: var(--bg2); padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <div style="font-weight: 700; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px;">
                         <i class="fa-solid fa-folder-open text-gold"></i>
@@ -301,7 +338,7 @@ $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_reques
                         <i class="fa-solid fa-arrow-down-wide-short" style="font-size: 12px;"></i>
                     </button>
 
-                    <div id="cert-search-wrap" style="position: relative; width: 250px;">
+                    <div id="cert-search-wrap" style="position: relative; width: 268px;">
                         <input type="text" id="cert-search-input" maxlength="60" autocomplete="off"
                                placeholder="Search applicant, ref, purpose..." 
                                oninput="handleCertSearchInput()"
@@ -316,7 +353,7 @@ $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_reques
             </div>
 
             <!-- Table Body -->
-            <div class="panel-body" style="padding: 0; overflow-y: auto; flex: 1;">
+            <div class="panel-body cert-ledger-scroll">
                 <?php if ($isGuest): ?>
                     <div style="padding: 45px 20px; text-align: center; color: var(--text2);">
                         <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(197,160,89,0.12); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; border: 1px solid rgba(197,160,89,0.25); color: var(--accent);">
@@ -350,8 +387,8 @@ $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_reques
                         </div>
                     </div>
                 <?php else: ?>
-                    <table class="data-table" id="cert-requests-table" style="width: 100%; table-layout: fixed; border-collapse: collapse;">
-                        <thead style="position: sticky; top: 0; background: var(--bg3); z-index: 5; border-bottom: 1px solid var(--border);">
+                    <table class="data-table" id="cert-requests-table">
+                        <thead>
                             <tr>
                                 <th style="padding: 9px 16px; text-align: left; font-size: 11px; text-transform: uppercase; width: auto;">Certificate / Person</th>
                                 <th style="padding: 9px 14px; text-align: left; font-size: 11px; text-transform: uppercase; width: 175px;">Sacrament Details</th>
@@ -369,14 +406,34 @@ $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_reques
                                 $isCancelled = in_array($st, ['Cancelled', 'Rejected']);
                                 $fee = (float)($req['total_fee'] ?? 200.00);
                                 $pickupTime = !empty($req['start_time']) ? date('M d, Y', strtotime($req['start_time'])) : 'Pending';
-                                
+                                $paidMap = $event_paid_map ?? [];
+                                $paidFee = (float)($paidMap[(int)$req['event_id']] ?? 0);
+                                $isPaidFee = ($fee > 0 && $paidFee >= ($fee - 0.01));
+                                $currentUid = (int)($_SESSION['user_id'] ?? 0);
+                                $reqOwnerUid = (int)($req['requested_by'] ?? 0);
+                                $isRowOwner = ($currentUid > 0 && $reqOwnerUid === $currentUid);
+                                $canDeleteRow = $isAdmin || $isRowOwner || $isCancelled;
+                                $canEditRow = !$isCancelled && ($isAdmin || ($isRowOwner && $st === 'Pending'));
+                                $canChatApplicant = ($isAdmin && $reqOwnerUid > 0 && $reqOwnerUid !== $currentUid);
+
                                 // Extract person name and year from title if formatted
                                 $pTitle = $req['title'] ?? 'Certificate';
+                                $searchPerson = trim((string)($req['cert_person_name'] ?? ''));
+                                if ($searchPerson === '') {
+                                    $searchPerson = preg_replace('/^[^:]+:\s*/', '', (string)$pTitle);
+                                    $searchPerson = trim(preg_replace('/\s*-\s*.*$/', '', $searchPerson));
+                                    $searchPerson = trim(preg_replace('/\s*\(\d{4}\)$/', '', $searchPerson));
+                                }
+                                $recordsSection = (!empty($req['chapel_id']) && (int)$req['chapel_id'] > 0) ? 'records_chapel' : 'records_cathedral';
                             ?>
                             <tr class="cert-table-row" 
                                 data-status="<?php echo strtolower($st); ?>"
                                 data-title="<?php echo strtolower(htmlspecialchars($pTitle)); ?>"
                                 data-id="<?php echo $req['event_id']; ?>"
+                                data-paid="<?php echo number_format($paidFee, 2, '.', ''); ?>"
+                                data-can-edit="<?php echo $canEditRow ? '1' : '0'; ?>"
+                                data-records-section="<?php echo htmlspecialchars($recordsSection, ENT_QUOTES, 'UTF-8'); ?>"
+                                data-records-query="<?php echo htmlspecialchars($searchPerson, ENT_QUOTES, 'UTF-8'); ?>"
                                 data-created="<?php echo !empty($req['created_at']) ? strtotime($req['created_at']) : 0; ?>"
                                 data-updated="<?php echo !empty($req['updated_at']) ? strtotime($req['updated_at']) : (!empty($req['created_at']) ? strtotime($req['created_at']) : 0); ?>"
                                 onclick="viewCertDetailsFromRow(this)" 
@@ -419,11 +476,6 @@ $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_reques
                                     <?php echo htmlspecialchars($pickupTime); ?>
                                 </td>
 
-                                <?php
-                                    $paidMap = $event_paid_map ?? [];
-                                    $paidFee = (float)($paidMap[(int)$req['event_id']] ?? 0);
-                                    $isPaidFee = ($fee > 0 && $paidFee >= ($fee - 0.01));
-                                ?>
                                 <td style="padding: 10px 14px; font-size: 12.5px; font-weight: 700; color: var(--text); text-align: right; white-space: nowrap;">
                                     <div>₱<?php echo number_format($fee, 2); ?></div>
                                     <?php if ($fee > 0): ?>
@@ -454,13 +506,6 @@ $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_reques
                                 </td>
 
                                 <td style="padding: 10px 16px; text-align: center;" onclick="event.stopPropagation();">
-                                    <?php
-                                        $currentUid = (int)($_SESSION['user_id'] ?? 0);
-                                        $reqOwnerUid = (int)($req['requested_by'] ?? 0);
-                                        $isRowOwner = ($currentUid > 0 && $reqOwnerUid === $currentUid);
-                                        $canDeleteRow = $isAdmin || $isRowOwner || in_array($st, ['Cancelled', 'Rejected']);
-                                        $canChatApplicant = ($isAdmin && $reqOwnerUid > 0 && $reqOwnerUid !== $currentUid);
-                                    ?>
                                     <div class="portal-dropdown-wrapper" style="position: relative; display: inline-block;">
                                         <button class="btn-icon" onclick="togglePortalDropdown(this)" title="Actions" style="width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: #FFFFFF; color: var(--text); cursor: pointer;">
                                             <i class="fa-solid fa-ellipsis-vertical" style="font-size: 11px;"></i>
@@ -487,15 +532,7 @@ $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_reques
                                                 <i class="fa-solid fa-peso-sign"></i> Record Payment
                                             </a>
                                             <?php endif; ?>
-                                            <?php if ($isAdmin):
-                                                $searchPerson = trim((string)($req['cert_person_name'] ?? ''));
-                                                if ($searchPerson === '') {
-                                                    $searchPerson = preg_replace('/^[^:]+:\s*/', '', (string)$pTitle);
-                                                    $searchPerson = trim(preg_replace('/\s*-\s*.*$/', '', $searchPerson));
-                                                    $searchPerson = trim(preg_replace('/\s*\(\d{4}\)$/', '', $searchPerson));
-                                                }
-                                                $recordsSection = (!empty($req['chapel_id']) && (int)$req['chapel_id'] > 0) ? 'records_chapel' : 'records_cathedral';
-                                            ?>
+                                            <?php if ($isAdmin): ?>
                                             <a class="dropdown-item" href="dashboard.php?section=<?php echo $recordsSection; ?>&amp;search=<?php echo urlencode($searchPerson); ?>" style="padding: 6px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); border-radius: 4px;">
                                                 <i class="fa-solid fa-folder-open" style="color: var(--accent);"></i> Find in Records
                                             </a>
@@ -904,18 +941,22 @@ $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_reques
 
 <!-- ─── DOSSIER VIEW MODAL ─── -->
 <div class="modal-overlay" id="cert-view-modal" style="z-index: 10000;">
-    <div class="modal" style="max-width: 500px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; padding: 0; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg); overflow: hidden;">
-        <div style="padding: 16px 20px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-            <div style="display: flex; align-items: center; gap: 10px;">
+    <div class="modal" style="max-width: 560px; width: 94%; max-height: 88vh; display: flex; flex-direction: column; padding: 0; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg); overflow: hidden;">
+        <div style="padding: 15px 20px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
                 <i class="fa-solid fa-certificate" style="color: var(--accent);"></i>
-                <h3 style="font-family: var(--font-family, 'Inter', sans-serif); font-size: 15px; font-weight: 700; color: var(--text); margin: 0;">Certificate Details</h3>
+                <h3 id="cert-view-modal-title" style="font-family: var(--font-family, 'Inter', sans-serif); font-size: 15px; font-weight: 700; color: var(--text); margin: 0;">Certificate Details</h3>
+                <span id="cert-view-unsaved-badge" style="display: none; font-size: 10.5px; font-weight: 700; color: #b45309; background: rgba(245,158,11,0.14); border: 1px solid rgba(245,158,11,0.35); padding: 2px 8px; border-radius: 999px; white-space: nowrap;">
+                    <i class="fa-solid fa-circle-dot" style="font-size: 8px; margin-right: 3px;"></i> Unsaved changes
+                </span>
             </div>
             <button class="btn-icon" onclick="closeCertViewModal()" title="Close" style="border: none; background: transparent; cursor: pointer; color: var(--text2);">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
-        <div id="cert-view-body" style="padding: 20px; display: flex; flex-direction: column; gap: 12px; flex: 1; overflow-y: auto; background: var(--surface);"></div>
-        <div style="padding: 14px 20px; background: var(--surface); border-top: 1px solid var(--border); display: flex; justify-content: flex-end;">
+        <div id="cert-view-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; flex: 1; overflow-y: auto; background: var(--surface);"></div>
+        <div id="cert-view-footer" style="padding: 12px 20px; background: var(--surface); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"></div>
             <button class="btn btn-gray" onclick="closeCertViewModal()" style="padding: 0 18px; height: 36px; border-radius: 8px;">Close</button>
         </div>
     </div>
@@ -990,6 +1031,15 @@ $releasedCertCount = $certCounts['completed'] ?? count(array_filter($cert_reques
     <input type="hidden" name="action" value="resend_pickup_notice">
     <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
     <input type="hidden" name="id" id="cert-resend-id-input">
+</form>
+
+<form id="cert-link-record-form" method="POST" action="dashboard.php?section=request_certificate" style="display: none;">
+    <input type="hidden" name="form_section" value="certificate_request">
+    <input type="hidden" name="redirect_section" value="request_certificate">
+    <input type="hidden" name="action" value="link_certificate_record">
+    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+    <input type="hidden" name="event_id" id="cert-link-event-id-input">
+    <input type="hidden" name="linked_record_id" id="cert-link-record-id-input">
 </form>
 
 <?php if ($isAdmin): ?>
@@ -1194,32 +1244,280 @@ function submitCertForm() {
     document.getElementById('cert-application-form').submit();
 }
 
+const CERT_MODAL_CFG = {
+    isAdmin: <?php echo $isAdmin ? 'true' : 'false'; ?>,
+    isGlobalAdmin: <?php echo in_array($role, ['Admin', 'Cathedral Admin'], true) ? 'true' : 'false'; ?>,
+    csrf: <?php echo json_encode((string)$csrf); ?>,
+    variants: <?php echo json_encode(array_values($certVariants), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+    chapels: <?php echo json_encode(array_values($chapels ?? []), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
+};
+
+const CERT_PURPOSE_OPTIONS = [
+    { value: 'Personal Records', label: 'Personal Records / File Copy' },
+    { value: 'Marriage Requirement', label: 'Marriage Requirement' },
+    { value: 'School / Enrollment', label: 'School / University Requirement' },
+    { value: 'Confirmation / Holy Orders', label: 'Church Requirement' },
+    { value: 'Passport / Visa / Travel', label: 'Passport / Visa / Embassy' },
+    { value: 'Employment / Legal', label: 'Employment / Legal' }
+];
+
+let _activeCertDetailReq = null;
+let _activeCertDetailMeta = null;
+let _certEditMode = false;
+let _certEditDirty = false;
+let _certEditSubmitting = false;
+
+function setCertEditDirty(dirty) {
+    _certEditDirty = !!dirty;
+    const badge = document.getElementById('cert-view-unsaved-badge');
+    if (badge) badge.style.display = _certEditDirty ? 'inline-flex' : 'none';
+    const saveBtn = document.getElementById('cert-edit-save-btn');
+    if (saveBtn) saveBtn.disabled = !_certEditDirty;
+}
+
+function parseCertFallbackMeta(req) {
+    const rawTitle = String(req.title || '');
+    let docName = '';
+    let personName = String(req.cert_person_name || '').trim();
+    let certYear = String(req.cert_year || '').trim();
+    let purpose = String(req.cert_purpose || '').trim();
+
+    const colonIdx = rawTitle.indexOf(':');
+    let rest = rawTitle;
+    if (colonIdx !== -1) {
+        docName = rawTitle.slice(0, colonIdx).trim();
+        rest = rawTitle.slice(colonIdx + 1).trim();
+    }
+    if (rest && (!personName || !purpose)) {
+        const dashMatch = rest.match(/^(.*?)\s+-\s+(.+)$/);
+        if (dashMatch) {
+            if (!purpose) purpose = dashMatch[2].trim();
+            rest = dashMatch[1].trim();
+        }
+        const yearMatch = rest.match(/^(.*?)\s*\((\d{4})\)\s*$/);
+        if (yearMatch) {
+            if (!certYear) certYear = yearMatch[2].trim();
+            rest = yearMatch[1].trim();
+        }
+        if (!personName) personName = rest;
+    }
+
+    if (!docName && req.variant_id && Array.isArray(CERT_MODAL_CFG.variants)) {
+        const found = CERT_MODAL_CFG.variants.find(v => parseInt(v.id, 10) === parseInt(req.variant_id, 10));
+        if (found) docName = found.name;
+    }
+
+    return {
+        docName: docName || 'Ecclesiastical Certificate',
+        personName: personName || 'Not specified',
+        certYear: certYear,
+        purpose: purpose || 'Personal Records'
+    };
+}
+
 function viewCertDetailsFromRow(tr) {
     const raw = tr.getAttribute('data-req');
     if (!raw) return;
     try {
         const req = JSON.parse(raw);
-        viewCertDetails(req);
+        const meta = {
+            paidFee: parseFloat(tr.getAttribute('data-paid') || '0') || 0,
+            canEdit: tr.getAttribute('data-can-edit') === '1',
+            recordsSection: tr.getAttribute('data-records-section') || 'records_cathedral',
+            recordsQuery: tr.getAttribute('data-records-query') || ''
+        };
+        viewCertDetails(req, meta);
     } catch(e){}
 }
 
-function viewCertDetails(req) {
+function viewCertDetails(req, meta = {}) {
+    _activeCertDetailReq = req;
+    _activeCertDetailMeta = {
+        paidFee: parseFloat(meta.paidFee || 0) || 0,
+        canEdit: !!meta.canEdit,
+        recordsSection: meta.recordsSection || ((parseInt(req.chapel_id || '0', 10) > 0) ? 'records_chapel' : 'records_cathedral'),
+        recordsQuery: meta.recordsQuery || ''
+    };
+    _certEditMode = false;
+    _certEditSubmitting = false;
+    setCertEditDirty(false);
+    renderCertDetailModal();
+
+    const m = document.getElementById('cert-view-modal');
+    if (m) {
+        m.style.display = 'flex';
+        m.classList.add('open');
+    }
+}
+
+function renderCertDetailModal() {
+    const req = _activeCertDetailReq;
+    const meta = _activeCertDetailMeta || {};
+    if (!req) return;
+
+    const titleEl = document.getElementById('cert-view-modal-title');
+    if (titleEl) titleEl.textContent = _certEditMode ? 'Edit Certificate Request' : 'Certificate Details';
+
+    const bodyEl = document.getElementById('cert-view-body');
+    const footerEl = document.getElementById('cert-view-footer');
+    if (!bodyEl || !footerEl) return;
+
+    const parsed = parseCertFallbackMeta(req);
+    const totalFee = parseFloat(req.total_fee || 200) || 0;
+    const paidFee = parseFloat(meta.paidFee || 0) || 0;
+    const isPaidFee = (totalFee > 0 && paidFee >= (totalFee - 0.01));
+    const balance = Math.max(0, totalFee - paidFee);
+    const linkedRecId = parseInt(req.linked_record_id || '0', 10);
+    const copies = Math.max(1, parseInt(req.cert_copies || '1', 10));
+    const reqStatus = String(req.status || 'Pending');
+
+    if (_certEditMode) {
+        const canModifyBilling = (reqStatus === 'Pending' || (CERT_MODAL_CFG.isAdmin && reqStatus === 'Confirmed')) && paidFee <= 0.01;
+        let pickupDateVal = '';
+        if (req.start_time) {
+            const m = String(req.start_time).match(/^(\d{4}-\d{2}-\d{2})/);
+            if (m) pickupDateVal = m[1];
+        }
+        const selectedVariantId = parseInt(req.variant_id || '0', 10) || (CERT_MODAL_CFG.variants[0]?.id || '');
+        const variantOptionsHtml = CERT_MODAL_CFG.variants.map(v => {
+            const selected = parseInt(v.id, 10) === parseInt(selectedVariantId, 10) ? 'selected' : '';
+            return `<option value="${escapeHtml(v.id)}" data-name="${escapeHtml(v.name)}" data-price="${escapeHtml(v.price)}" ${selected}>${escapeHtml(v.name)} — PHP ${parseFloat(v.price || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</option>`;
+        }).join('');
+
+        const hasPresetPurpose = CERT_PURPOSE_OPTIONS.some(o => o.value === parsed.purpose);
+        const purposeOptionsHtml = (hasPresetPurpose ? '' : `<option value="${escapeHtml(parsed.purpose)}" selected>${escapeHtml(parsed.purpose)}</option>`)
+            + CERT_PURPOSE_OPTIONS.map(o => `<option value="${escapeHtml(o.value)}" ${o.value === parsed.purpose ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
+
+        const currentChapelId = parseInt(req.chapel_id || '0', 10);
+        const chapelOptionsHtml = `<option value="0" ${currentChapelId === 0 ? 'selected' : ''}>Cathedral Parish Office (Main)</option>`
+            + CERT_MODAL_CFG.chapels.map(c => `<option value="${escapeHtml(c.chapel_id)}" ${parseInt(c.chapel_id, 10) === currentChapelId ? 'selected' : ''}>${escapeHtml(c.chapel_name)}</option>`).join('');
+
+        bodyEl.innerHTML = `
+            <form id="cert-edit-form" method="POST" action="dashboard.php?section=request_certificate" style="display: flex; flex-direction: column; gap: 12px; margin: 0;" onsubmit="_certEditSubmitting = true;">
+                <input type="hidden" name="form_section" value="certificate_request">
+                <input type="hidden" name="redirect_section" value="request_certificate">
+                <input type="hidden" name="action" value="update_certificate_request">
+                <input type="hidden" name="csrf" value="${escapeHtml(CERT_MODAL_CFG.csrf)}">
+                <input type="hidden" name="event_id" value="${escapeHtml(req.event_id)}">
+                <input type="hidden" name="linked_record_id" id="cert-edit-linked-record-id" value="${linkedRecId > 0 ? linkedRecId : ''}">
+
+                <div style="display: grid; grid-template-columns: 2.2fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text2); display: block; margin-bottom: 4px;">Document Type</label>
+                        <select name="variant_id" id="cert-edit-variant" ${canModifyBilling ? '' : 'disabled'} onchange="updateCertEditFeePreview(); setCertEditDirty(true);"
+                                style="width: 100%; height: 36px; padding: 0 10px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border); background: ${canModifyBilling ? 'var(--surface)' : 'var(--bg2)'}; color: var(--text); font-weight: 600;">
+                            ${variantOptionsHtml}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text2); display: block; margin-bottom: 4px;">Copies</label>
+                        <input type="number" name="certificate_copies" id="cert-edit-copies" min="1" max="25" value="${copies}" ${canModifyBilling ? '' : 'readonly'} oninput="updateCertEditFeePreview(); setCertEditDirty(true);"
+                               style="width: 100%; height: 36px; padding: 0 10px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border); background: ${canModifyBilling ? 'var(--surface)' : 'var(--bg2)'}; color: var(--text); font-weight: 700; text-align: center; box-sizing: border-box;">
+                    </div>
+                </div>
+                ${!canModifyBilling ? `<div style="font-size: 11px; color: var(--text2); background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px;"><i class="fa-solid fa-lock" style="margin-right: 5px; color: var(--accent);"></i> Document type &amp; copies are locked because this request is already paid or released. Recorded fee: <strong>PHP ${totalFee.toLocaleString('en-US', {minimumFractionDigits: 2})}</strong>.</div>` : `<div id="cert-edit-fee-banner" style="font-size: 11.5px; color: var(--text2); background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; display: flex; justify-content: space-between;"><span>Updated Issuance Fee Preview</span><strong id="cert-edit-fee-val" style="color: var(--text);">PHP ${totalFee.toLocaleString('en-US', {minimumFractionDigits: 2})}</strong></div>`}
+
+                <div style="display: grid; grid-template-columns: 2.2fr 1fr; gap: 10px;">
+                    <div id="cert-edit-record-wrap" style="position: relative;">
+                        <label style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text2); display: block; margin-bottom: 4px;">Person's Name on Record <span style="color:#ef4444;">*</span></label>
+                        <input type="text" name="cert_person_name" id="cert-edit-person-name" required maxlength="150" autocomplete="off" value="${escapeHtml(parsed.personName === 'Not specified' ? '' : parsed.personName)}"
+                               oninput="setCertEditDirty(true);${CERT_MODAL_CFG.isAdmin ? ' handleCertRecordNameInput(_CERT_EDIT_AUTOCOMPLETE);' : ''}"
+                               ${CERT_MODAL_CFG.isAdmin ? 'onfocus="if (this.value.trim().length > 0) handleCertRecordNameInput(_CERT_EDIT_AUTOCOMPLETE);" onkeydown="handleCertSuggestionKeydown(event, \'cert-edit-record-suggestions\')"' : ''}
+                               style="width: 100%; height: 36px; padding: 0 10px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); box-sizing: border-box;">
+                        ${CERT_MODAL_CFG.isAdmin ? '<div id="cert-edit-record-suggestions" role="listbox" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; max-height: 210px; overflow-y: auto; background: var(--surface, #FFFFFF); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.16); z-index: 80;"></div>' : ''}
+                    </div>
+                    <div>
+                        <label style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text2); display: block; margin-bottom: 4px;">Approx. Year</label>
+                        <input type="number" name="cert_year" id="cert-edit-year" min="1800" max="2099" placeholder="e.g. 1995" value="${escapeHtml(parsed.certYear)}" oninput="setCertEditDirty(true);"
+                               style="width: 100%; height: 36px; padding: 0 10px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); text-align: center; box-sizing: border-box;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text2); display: block; margin-bottom: 4px;">Purpose of Request</label>
+                        <select name="cert_purpose" onchange="setCertEditDirty(true);"
+                                style="width: 100%; height: 36px; padding: 0 10px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text);">
+                            ${purposeOptionsHtml}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text2); display: block; margin-bottom: 4px;">Target Pickup Date <span style="color:#ef4444;">*</span></label>
+                        <input type="date" name="pickup_date" required value="${escapeHtml(pickupDateVal)}" max="2099-12-31" onchange="setCertEditDirty(true);"
+                               style="width: 100%; height: 36px; padding: 0 10px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); box-sizing: border-box;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text2); display: block; margin-bottom: 4px;">Applicant Name</label>
+                        <input type="text" name="requester_name" maxlength="150" placeholder="Requester / Claimant name" value="${escapeHtml(req.requester_name || req.encoded_by_name || '')}" oninput="setCertEditDirty(true);"
+                               style="width: 100%; height: 36px; padding: 0 10px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); box-sizing: border-box;">
+                    </div>
+                    <div>
+                        <label style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text2); display: block; margin-bottom: 4px;">Mobile Phone</label>
+                        <input type="tel" name="requester_phone" maxlength="25" placeholder="0912-345-6789" value="${escapeHtml(req.requester_phone || '')}" oninput="setCertEditDirty(true);"
+                               style="width: 100%; height: 36px; padding: 0 10px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); box-sizing: border-box;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: ${CERT_MODAL_CFG.isGlobalAdmin ? '1fr 1fr' : '1fr'}; gap: 10px;">
+                    <div>
+                        <label style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text2); display: block; margin-bottom: 4px;">Email Address</label>
+                        <input type="email" name="requester_email" maxlength="150" placeholder="applicant@email.com" value="${escapeHtml(req.requester_email || '')}" oninput="setCertEditDirty(true);"
+                               style="width: 100%; height: 36px; padding: 0 10px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); box-sizing: border-box;">
+                    </div>
+                    ${CERT_MODAL_CFG.isGlobalAdmin ? `
+                    <div>
+                        <label style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text2); display: block; margin-bottom: 4px;">Releasing Office</label>
+                        <select name="chapel_id" onchange="setCertEditDirty(true);"
+                                style="width: 100%; height: 36px; padding: 0 10px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text);">
+                            ${chapelOptionsHtml}
+                        </select>
+                    </div>` : ''}
+                </div>
+
+                ${CERT_MODAL_CFG.isAdmin ? `
+                <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                    <div style="font-size: 11.5px; color: var(--text);">
+                        <i class="fa-solid fa-link" style="color: var(--accent); margin-right: 5px;"></i>
+                        <span id="cert-edit-link-status">${linkedRecId > 0 ? `Linked to Archival Record #${linkedRecId}` : 'No archival record linked — pick a match while typing name above'}</span>
+                    </div>
+                    <button type="button" id="cert-edit-clear-link-btn" onclick="clearCertEditLinkedRecord()" style="display: ${linkedRecId > 0 ? 'inline-flex' : 'none'}; align-items: center; gap: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 11px; padding: 3px 8px; border-radius: 5px; cursor: pointer;">
+                        <i class="fa-solid fa-xmark"></i> Unlink
+                    </button>
+                </div>` : ''}
+            </form>
+        `;
+
+        footerEl.innerHTML = `
+            <div style="font-size: 11px; color: var(--text2);">Editing #REQ-${String(req.event_id).padStart(4, '0')}</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button type="button" class="btn btn-gray" onclick="cancelCertEditMode()" style="padding: 0 14px; height: 36px; border-radius: 8px;">Cancel Edit</button>
+                <button type="submit" form="cert-edit-form" id="cert-edit-save-btn" class="btn btn-primary" disabled style="padding: 0 18px; height: 36px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Changes
+                </button>
+            </div>
+        `;
+        return;
+    }
+
     const statusColors = { Confirmed:'#16a34a', Completed:'#2563eb', Pending:'#c5a059', Cancelled:'#dc2626', Rejected:'#dc2626' };
     const statusLabels = { Confirmed:'Ready', Completed:'Released', Pending:'Pending', Cancelled:'Cancelled', Rejected:'Rejected' };
-    const sc = statusColors[req.status] || '#6b7280';
-    const sl = statusLabels[req.status] || req.status || 'Pending';
+    const sc = statusColors[reqStatus] || '#6b7280';
+    const sl = statusLabels[reqStatus] || reqStatus || 'Pending';
 
     let stepGuide = '';
-    if (req.status === 'Pending') {
-        stepGuide = '<strong>Step 1 of 3 &mdash; Pending Archive Check:</strong> Look up the person in Records, verify the entry, then select <strong>Mark as Ready</strong> in Actions.';
-    } else if (req.status === 'Confirmed') {
-        stepGuide = '<strong>Step 2 of 3 &mdash; Ready for Pickup:</strong> Available at the Parish Office (Tue&ndash;Sun, 8am&ndash;5pm). Record payment if unpaid and select <strong>Mark as Released</strong> upon pickup.';
-    } else if (req.status === 'Completed') {
+    if (reqStatus === 'Pending') {
+        stepGuide = '<strong>Step 1 of 3 &mdash; Pending Archive Check:</strong> Verify the person in Records, link the matching archive record, then click <strong>Mark as Ready</strong>.';
+    } else if (reqStatus === 'Confirmed') {
+        stepGuide = '<strong>Step 2 of 3 &mdash; Ready for Pickup:</strong> Available at the Parish Office (Tue&ndash;Sun, 8am&ndash;5pm). Record payment if unpaid and click <strong>Mark as Released</strong> upon pickup.';
+    } else if (reqStatus === 'Completed') {
         stepGuide = '<strong>Step 3 of 3 &mdash; Released:</strong> This certificate has been claimed and completed.';
     } else {
         stepGuide = '<strong>Closed:</strong> This certificate request was cancelled or declined.';
     }
-    
+
     let pickupFormatted = req.start_time || 'Pending';
     try {
         const dt = new Date(req.start_time.replace(/-/g, '/'));
@@ -1227,64 +1525,279 @@ function viewCertDetails(req) {
             pickupFormatted = dt.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
         }
     } catch(e){}
-    
-    document.getElementById('cert-view-body').innerHTML = `
-        <div style="background: #F6F6F6; border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
-            <div style="width: 40px; height: 40px; border-radius: 8px; background: #FFFFFF; border: 1px solid var(--border); color: #111111; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">
+
+    const applicantName = (req.requester_name || req.encoded_by_name || 'Walk-in / Parishioner').trim();
+    const contactParts = [];
+    if (req.requester_phone) contactParts.push(escapeHtml(req.requester_phone));
+    if (req.requester_email) contactParts.push(escapeHtml(req.requester_email));
+
+    const payBadgeHtml = totalFee > 0
+        ? `<span style="display:inline-block; margin-left:6px; font-size:9.5px; font-weight:700; padding:1px 6px; border-radius:4px; ${isPaidFee ? 'background:rgba(46,158,91,0.12);color:#16a34a;' : 'background:rgba(197,160,89,0.16);color:#9a7418;'}">${isPaidFee ? 'PAID' : (paidFee > 0 ? `PARTIAL (Bal: PHP ${balance.toLocaleString('en-US', {minimumFractionDigits: 2})})` : 'UNPAID')}</span>`
+        : '';
+
+    const archiveSearchUrl = `dashboard.php?section=${encodeURIComponent(meta.recordsSection || 'records_cathedral')}&search=${encodeURIComponent(meta.recordsQuery || parsed.personName)}`;
+    const certPreviewUrl = linkedRecId > 0 ? `certificates/sacramental_certificate.php?record_id=${linkedRecId}&preview=1` : '';
+
+    bodyEl.innerHTML = `
+        <div style="background: var(--bg2, #F6F6F6); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+            <div style="width: 40px; height: 40px; border-radius: 8px; background: var(--surface, #FFFFFF); border: 1px solid var(--border); color: var(--text, #111111); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">
                 <i class="fa-solid fa-file-invoice"></i>
             </div>
             <div style="min-width: 0; flex: 1;">
-                <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 2px;">
-                    <span class="badge" style="background: #FFFFFF; border: 1px solid var(--border); font-size: 10px; font-weight: 600; padding: 2px 8px; color: var(--text);">Certificate Issuance</span>
+                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 2px;">
+                    <span class="badge" style="background: var(--surface, #FFFFFF); border: 1px solid var(--border); font-size: 10px; font-weight: 600; padding: 2px 8px; color: var(--text);">${escapeHtml(parsed.docName)}</span>
                     <span class="badge" style="background: ${sc}18; color: ${sc}; border: 1px solid ${sc}35; font-size: 10px; font-weight: 600; padding: 2px 8px;">${escapeHtml(sl)}</span>
                     <span style="font-size: 10px; color: var(--text2); font-family: monospace;">#REQ-${String(req.event_id).padStart(4, '0')}</span>
                 </div>
-                <div style="font-family: var(--font-family, 'Inter', sans-serif); font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.3;">${escapeHtml(req.title)}</div>
+                <div style="font-family: var(--font-family, 'Inter', sans-serif); font-size: 14.5px; font-weight: 700; color: var(--text); line-height: 1.3;">${escapeHtml(req.title)}</div>
             </div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-            <div style="background: #F6F6F6; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
-                <div style="font-size: 10px; text-transform: uppercase; color: var(--text2); font-weight: 700; margin-bottom: 2px;"><i class="fa-regular fa-calendar-check" style="color:var(--text); margin-right:4px;"></i> Target Pickup Date</div>
-                <div style="font-size: 12px; color: var(--text); font-weight: 600;">${pickupFormatted}</div>
+            <div style="background: var(--bg2, #F6F6F6); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                <div style="font-size: 10px; text-transform: uppercase; color: var(--text2); font-weight: 700; margin-bottom: 2px;"><i class="fa-solid fa-user-check" style="color:var(--text); margin-right:4px;"></i> Person on Record</div>
+                <div style="font-size: 12px; color: var(--text); font-weight: 600;">${escapeHtml(parsed.personName)}${parsed.certYear ? ` <span style="color:var(--text2);font-weight:500;">(${escapeHtml(parsed.certYear)})</span>` : ''}</div>
             </div>
-            <div style="background: #F6F6F6; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+            <div style="background: var(--bg2, #F6F6F6); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                <div style="font-size: 10px; text-transform: uppercase; color: var(--text2); font-weight: 700; margin-bottom: 2px;"><i class="fa-regular fa-calendar-check" style="color:var(--text); margin-right:4px;"></i> Target Pickup Date</div>
+                <div style="font-size: 12px; color: var(--text); font-weight: 600;">${escapeHtml(pickupFormatted)}</div>
+            </div>
+            <div style="background: var(--bg2, #F6F6F6); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                <div style="font-size: 10px; text-transform: uppercase; color: var(--text2); font-weight: 700; margin-bottom: 2px;"><i class="fa-solid fa-id-card-clip" style="color:var(--text); margin-right:4px;"></i> Purpose &amp; Copies</div>
+                <div style="font-size: 12px; color: var(--text); font-weight: 600;">${escapeHtml(parsed.purpose)} &bull; ${copies} ${copies > 1 ? 'copies' : 'copy'}</div>
+            </div>
+            <div style="background: var(--bg2, #F6F6F6); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
                 <div style="font-size: 10px; text-transform: uppercase; color: var(--text2); font-weight: 700; margin-bottom: 2px;"><i class="fa-solid fa-building-columns" style="color:var(--text); margin-right:4px;"></i> Releasing Office</div>
                 <div style="font-size: 12px; color: var(--text); font-weight: 600;">${escapeHtml(req.chapel_location || 'IFI Cathedral Parish Office')}</div>
             </div>
-            <div style="background: #F6F6F6; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
-                <div style="font-size: 10px; text-transform: uppercase; color: var(--text2); font-weight: 700; margin-bottom: 2px;"><i class="fa-solid fa-id-card-clip" style="color:var(--text); margin-right:4px;"></i> Details</div>
-                <div style="font-size: 12px; color: var(--text); font-weight: 600;">${escapeHtml(req.cert_purpose || 'Archives & Records')}${parseInt(req.cert_copies || '1', 10) > 1 ? ` (${parseInt(req.cert_copies, 10)} copies)` : ''}</div>
+            <div style="background: var(--bg2, #F6F6F6); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                <div style="font-size: 10px; text-transform: uppercase; color: var(--text2); font-weight: 700; margin-bottom: 2px;"><i class="fa-regular fa-address-book" style="color:var(--text); margin-right:4px;"></i> Applicant &amp; Contact</div>
+                <div style="font-size: 12px; color: var(--text); font-weight: 600;">${escapeHtml(applicantName)}</div>
+                ${contactParts.length ? `<div style="font-size: 11px; color: var(--text2); margin-top: 2px; word-break: break-word;">${contactParts.join(' &bull; ')}</div>` : ''}
             </div>
-            <div style="background: #F6F6F6; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+            <div style="background: var(--bg2, #F6F6F6); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
                 <div style="font-size: 10px; text-transform: uppercase; color: var(--text2); font-weight: 700; margin-bottom: 2px;"><i class="fa-solid fa-receipt" style="color:var(--text); margin-right:4px;"></i> Recorded Total Fee</div>
-                <div style="font-size: 12px; color: #111111; font-weight: 700;">PHP ${parseFloat(req.total_fee || 200).toLocaleString('en-US', {minimumFractionDigits: 2})}${parseInt(req.linked_record_id || '0', 10) > 0 ? ' <span style="font-size:10px;color:#15803d;font-weight:600;">&bull; Archive Linked</span>' : ''}</div>
+                <div style="font-size: 12px; color: var(--text); font-weight: 700;">PHP ${totalFee.toLocaleString('en-US', {minimumFractionDigits: 2})}${payBadgeHtml}</div>
             </div>
         </div>
+
+        ${CERT_MODAL_CFG.isAdmin ? `
+        <div style="background: var(--bg2, #F6F6F6); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div style="font-size: 11.5px; color: var(--text);">
+                    <i class="fa-solid fa-folder-tree" style="color: var(--accent); margin-right: 6px;"></i>
+                    ${linkedRecId > 0
+                        ? `<strong style="color:#15803d;">Linked to Archive Record #${linkedRecId}</strong>`
+                        : `<span id="cert-detail-link-status-text" style="color: var(--text2);">No archive record linked yet &mdash; checking archives&hellip;</span>`}
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                    ${certPreviewUrl ? `<a href="${certPreviewUrl}" target="_blank" rel="noopener" class="btn btn-sm" style="height: 28px; padding: 0 10px; font-size: 11px; font-weight: 600; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); text-decoration: none; display: inline-flex; align-items: center; gap: 5px;"><i class="fa-solid fa-file-pdf" style="color: #15803d;"></i> Preview Certificate</a>` : ''}
+                    <a href="${archiveSearchUrl}" class="btn btn-sm" style="height: 28px; padding: 0 10px; font-size: 11px; font-weight: 600; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); text-decoration: none; display: inline-flex; align-items: center; gap: 5px;"><i class="fa-solid fa-folder-open" style="color: var(--accent);"></i> Find in Records</a>
+                </div>
+            </div>
+            ${linkedRecId <= 0 ? `<div id="cert-detail-archive-matches" style="display: none; flex-direction: column; gap: 6px; border-top: 1px dashed var(--border); padding-top: 8px;"></div>` : ''}
+        </div>` : ''}
 
         ${req.rejection_note ? `
         <div style="background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); border-radius: 8px; padding: 8px 10px;">
             <div style="font-size: 9.5px; text-transform: uppercase; color: #ef4444; font-weight: 700; margin-bottom: 2px;">Note from Office</div>
-            <div style="font-size: 11.5px; color: #fca5a5; line-height: 1.35;">${escapeHtml(req.rejection_note)}</div>
+            <div style="font-size: 11.5px; color: #b91c1c; line-height: 1.35;">${escapeHtml(req.rejection_note)}</div>
         </div>` : ''}
 
-        <div style="background: #FAFAFA; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: var(--text); line-height: 1.45;">
+        <div style="background: var(--bg2, #FAFAFA); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: var(--text); line-height: 1.45;">
             <i class="fa-solid fa-list-check" style="color: var(--accent); margin-right: 6px;"></i>${stepGuide}
         </div>
     `;
-    
-    const m = document.getElementById('cert-view-modal');
-    m.style.display = 'flex';
-    m.classList.add('open');
+
+    const leftActions = [];
+    if (meta.canEdit) {
+        leftActions.push(`<button type="button" class="btn btn-sm" onclick="toggleCertEditMode(true)" style="height: 34px; padding: 0 12px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg2); color: var(--text); font-weight: 600; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;"><i class="fa-solid fa-pen-to-square" style="color: var(--accent);"></i> Edit Details</button>`);
+    }
+    if (CERT_MODAL_CFG.isAdmin) {
+        if (reqStatus === 'Pending') {
+            leftActions.push(`<button type="button" class="btn btn-sm" onclick="triggerCertActionFromDetail('approve')" style="height: 34px; padding: 0 12px; border-radius: 7px; border: 1px solid rgba(22,163,74,0.35); background: rgba(22,163,74,0.12); color: #15803d; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;"><i class="fa-solid fa-circle-check"></i> Mark as Ready</button>`);
+        } else if (reqStatus === 'Confirmed') {
+            leftActions.push(`<button type="button" class="btn btn-sm" onclick="triggerCertActionFromDetail('complete')" style="height: 34px; padding: 0 12px; border-radius: 7px; border: 1px solid rgba(37,99,235,0.35); background: rgba(37,99,235,0.12); color: #2563eb; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;"><i class="fa-solid fa-box-open"></i> Mark as Released</button>`);
+            leftActions.push(`<button type="button" class="btn btn-sm" onclick="triggerCertActionFromDetail('resend')" style="height: 34px; padding: 0 12px; border-radius: 7px; border: 1px solid rgba(180,83,9,0.3); background: rgba(180,83,9,0.08); color: #b45309; font-weight: 600; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;"><i class="fa-solid fa-paper-plane"></i> Resend Notice</button>`);
+        }
+        if (totalFee > 0 && !isPaidFee) {
+            leftActions.push(`<button type="button" class="btn btn-sm" onclick="triggerCertActionFromDetail('payment')" style="height: 34px; padding: 0 12px; border-radius: 7px; border: 1px solid rgba(22,163,74,0.35); background: rgba(22,163,74,0.12); color: #15803d; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;"><i class="fa-solid fa-peso-sign"></i> Record Payment</button>`);
+        }
+    } else if (reqStatus === 'Pending') {
+        leftActions.push(`<button type="button" class="btn btn-sm" onclick="triggerCertActionFromDetail('cancel')" style="height: 34px; padding: 0 12px; border-radius: 7px; border: 1px solid rgba(220,38,38,0.3); background: rgba(220,38,38,0.08); color: #dc2626; font-weight: 600; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;"><i class="fa-solid fa-ban"></i> Cancel Request</button>`);
+    }
+
+    footerEl.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">${leftActions.join('')}</div>
+        <button type="button" class="btn btn-gray" onclick="closeCertViewModal()" style="padding: 0 18px; height: 36px; border-radius: 8px;">Close</button>
+    `;
+
+    if (CERT_MODAL_CFG.isAdmin && linkedRecId <= 0) {
+        loadCertDetailArchiveMatches(req, parsed);
+    }
 }
 
-function closeCertViewModal() {
+let _certDetailMatchAbort = null;
+function loadCertDetailArchiveMatches(req, parsed) {
+    const container = document.getElementById('cert-detail-archive-matches');
+    const statusText = document.getElementById('cert-detail-link-status-text');
+    const q = (parsed && parsed.personName && parsed.personName !== 'Not specified') ? parsed.personName.trim() : '';
+    if (!container || !q) {
+        if (statusText) statusText.textContent = 'No archive record linked yet';
+        return;
+    }
+
+    let rType = '';
+    const docLower = String(parsed.docName || req.title || '').toLowerCase();
+    if (docLower.includes('baptism')) rType = 'Baptism';
+    else if (docLower.includes('marriage') || docLower.includes('wedding')) rType = 'Wedding';
+    else if (docLower.includes('burial') || docLower.includes('funeral')) rType = 'Funeral';
+    else if (docLower.includes('confirmation')) rType = 'Confirmation';
+
+    if (_certDetailMatchAbort) _certDetailMatchAbort.abort();
+    _certDetailMatchAbort = new AbortController();
+    const url = 'app/controllers/get_cert_record_suggestions.php?q=' + encodeURIComponent(q) + (rType ? '&record_type=' + encodeURIComponent(rType) : '');
+
+    fetch(url, { signal: _certDetailMatchAbort.signal, credentials: 'same-origin' })
+        .then(r => r.ok ? r.json() : { suggestions: [] })
+        .then(data => {
+            if (!_activeCertDetailReq || parseInt(_activeCertDetailReq.event_id, 10) !== parseInt(req.event_id, 10)) return;
+            const list = Array.isArray(data.suggestions) ? data.suggestions.slice(0, 3) : [];
+            if (!list.length) {
+                if (statusText) statusText.textContent = 'No matching archive record found automatically';
+                return;
+            }
+            if (statusText) {
+                statusText.innerHTML = `<span style="color:#b45309;font-weight:600;">Not linked yet &bull; ${list.length} archive match${list.length > 1 ? 'es' : ''} found</span>`;
+            }
+            container.style.display = 'flex';
+            container.innerHTML = list.map(rec => {
+                const sub = [rec.record_type, rec.year, rec.reference_id, rec.chapel_name].filter(Boolean).join(' · ');
+                return `
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; background: var(--surface, #FFFFFF); border: 1px solid var(--border); border-radius: 6px;">
+                        <div style="min-width: 0; flex: 1;">
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(rec.person_name || '')}</div>
+                            <div style="font-size: 10.5px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(sub)}</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+                            <a href="certificates/sacramental_certificate.php?record_id=${encodeURIComponent(rec.record_id)}&preview=1" target="_blank" rel="noopener" class="btn btn-sm" style="height: 26px; padding: 0 8px; font-size: 11px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg2); color: var(--text); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                                <i class="fa-regular fa-eye"></i> Preview
+                            </a>
+                            <button type="button" onclick="linkCertArchiveRecord(${parseInt(req.event_id, 10)}, ${parseInt(rec.record_id, 10)})" class="btn btn-sm" style="height: 26px; padding: 0 9px; font-size: 11px; font-weight: 700; border-radius: 5px; border: 1px solid rgba(22,163,74,0.35); background: rgba(22,163,74,0.12); color: #15803d; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                <i class="fa-solid fa-link"></i> Link
+                            </button>
+                        </div>
+                    </div>`;
+            }).join('');
+        })
+        .catch(() => {
+            if (statusText) statusText.textContent = 'No archive record linked yet';
+        });
+}
+
+function linkCertArchiveRecord(eventId, recordId) {
+    const evInp = document.getElementById('cert-link-event-id-input');
+    const recInp = document.getElementById('cert-link-record-id-input');
+    const form = document.getElementById('cert-link-record-form');
+    if (evInp && recInp && form && eventId > 0 && recordId > 0) {
+        evInp.value = String(eventId);
+        recInp.value = String(recordId);
+        form.submit();
+    }
+}
+window.linkCertArchiveRecord = linkCertArchiveRecord;
+
+function updateCertEditFeePreview() {
+    const sel = document.getElementById('cert-edit-variant');
+    const copiesInp = document.getElementById('cert-edit-copies');
+    const feeVal = document.getElementById('cert-edit-fee-val');
+    if (!sel || !copiesInp || !feeVal) return;
+    const opt = sel.options[sel.selectedIndex];
+    const price = parseFloat(opt ? opt.getAttribute('data-price') || '200' : '200') || 200;
+    const copies = Math.max(1, parseInt(copiesInp.value || '1', 10));
+    feeVal.textContent = 'PHP ' + (price * copies).toLocaleString('en-US', {minimumFractionDigits: 2});
+}
+
+function clearCertEditLinkedRecord() {
+    const inp = document.getElementById('cert-edit-linked-record-id');
+    const lbl = document.getElementById('cert-edit-link-status');
+    const btn = document.getElementById('cert-edit-clear-link-btn');
+    if (inp) inp.value = '';
+    if (lbl) lbl.textContent = 'No archival record linked — pick a match while typing name above';
+    if (btn) btn.style.display = 'none';
+    setCertEditDirty(true);
+}
+
+function toggleCertEditMode(enable) {
+    _certEditMode = !!enable;
+    if (!enable) setCertEditDirty(false);
+    renderCertDetailModal();
+}
+
+function cancelCertEditMode() {
+    if (_certEditDirty && !confirm('You have unsaved changes to this certificate request. Discard them?')) {
+        return;
+    }
+    toggleCertEditMode(false);
+}
+
+function triggerCertActionFromDetail(kind) {
+    const req = _activeCertDetailReq;
+    const meta = _activeCertDetailMeta || {};
+    if (!req) return;
+    const id = req.event_id;
+    const totalFee = parseFloat(req.total_fee || 200) || 0;
+    const paidFee = parseFloat(meta.paidFee || 0) || 0;
+    const balance = Math.max(0, totalFee - paidFee);
+
+    closeCertViewModal(true);
+    if (kind === 'approve') {
+        const input = document.getElementById('cert-approve-id-input');
+        const form = document.getElementById('cert-approve-form');
+        if (input && form) { input.value = id; form.submit(); }
+    } else if (kind === 'complete') {
+        const input = document.getElementById('cert-complete-id-input');
+        const form = document.getElementById('cert-complete-form');
+        if (input && form) { input.value = id; form.submit(); }
+    } else if (kind === 'resend') {
+        const input = document.getElementById('cert-resend-id-input');
+        const form = document.getElementById('cert-resend-form');
+        if (input && form) { input.value = id; form.submit(); }
+    } else if (kind === 'payment') {
+        const fakeEl = document.createElement('span');
+        fakeEl.setAttribute('data-id', String(id));
+        fakeEl.setAttribute('data-title', req.title || '');
+        fakeEl.setAttribute('data-balance', balance.toFixed(2));
+        openCertPaymentModal(fakeEl);
+    } else if (kind === 'cancel') {
+        cancelCertRequest(id, req.title || '');
+    }
+}
+
+function closeCertViewModal(force = false) {
+    if (!force && _certEditMode && _certEditDirty && !_certEditSubmitting) {
+        if (!confirm('You have unsaved changes to this certificate request. Discard them?')) {
+            return;
+        }
+    }
+    _certEditMode = false;
+    setCertEditDirty(false);
     const m = document.getElementById('cert-view-modal');
     if (m) {
         m.style.display = 'none';
         m.classList.remove('open');
     }
 }
+
+window.viewCertDetailsFromRow = viewCertDetailsFromRow;
+window.viewCertDetails = viewCertDetails;
+window.closeCertViewModal = closeCertViewModal;
+window.toggleCertEditMode = toggleCertEditMode;
+window.cancelCertEditMode = cancelCertEditMode;
+window.updateCertEditFeePreview = updateCertEditFeePreview;
+window.clearCertEditLinkedRecord = clearCertEditLinkedRecord;
+window.triggerCertActionFromDetail = triggerCertActionFromDetail;
+window.setCertEditDirty = setCertEditDirty;
 
 function cancelCertRequest(idOrEl, title) {
     let id = idOrEl;
@@ -1715,8 +2228,25 @@ function selectCertSearchSuggestion(filterVal, reqId) {
 let _certRecordSuggestTimer = null;
 let _certRecordSuggestAbort = null;
 
-function inferCertRecordTypeHint() {
-    const sel = document.getElementById('cert-variant-selector');
+const _CERT_APPLY_AUTOCOMPLETE = {
+    inputId: 'cert-person-name',
+    yearId: 'cert-year-input',
+    linkedId: 'cert-linked-record-id',
+    boxId: 'cert-record-suggestions',
+    variantSelectId: 'cert-variant-selector'
+};
+const _CERT_EDIT_AUTOCOMPLETE = {
+    inputId: 'cert-edit-person-name',
+    yearId: 'cert-edit-year',
+    linkedId: 'cert-edit-linked-record-id',
+    boxId: 'cert-edit-record-suggestions',
+    variantSelectId: 'cert-edit-variant',
+    isEdit: true
+};
+let _activeCertRecordCtx = _CERT_APPLY_AUTOCOMPLETE;
+
+function inferCertRecordTypeHint(selectId = 'cert-variant-selector') {
+    const sel = document.getElementById(selectId);
     if (!sel || sel.selectedIndex < 0) return '';
     const txt = (sel.options[sel.selectedIndex].text || '').toLowerCase();
     if (txt.includes('baptism')) return 'Baptism';
@@ -1726,16 +2256,17 @@ function inferCertRecordTypeHint() {
     return '';
 }
 
-function handleCertRecordNameInput() {
-    const input = document.getElementById('cert-person-name');
-    const box = document.getElementById('cert-record-suggestions');
+function handleCertRecordNameInput(ctx = _CERT_APPLY_AUTOCOMPLETE) {
+    _activeCertRecordCtx = ctx || _CERT_APPLY_AUTOCOMPLETE;
+    const input = document.getElementById(_activeCertRecordCtx.inputId);
+    const box = document.getElementById(_activeCertRecordCtx.boxId);
     if (!input || !box) return;
 
     const q = input.value.trim();
     if (!q) {
         if (_certRecordSuggestTimer) clearTimeout(_certRecordSuggestTimer);
         if (_certRecordSuggestAbort) _certRecordSuggestAbort.abort();
-        hideCertSuggestions('cert-record-suggestions');
+        hideCertSuggestions(_activeCertRecordCtx.boxId);
         return;
     }
 
@@ -1743,7 +2274,7 @@ function handleCertRecordNameInput() {
     _certRecordSuggestTimer = setTimeout(() => {
         if (_certRecordSuggestAbort) _certRecordSuggestAbort.abort();
         _certRecordSuggestAbort = new AbortController();
-        const rType = inferCertRecordTypeHint();
+        const rType = inferCertRecordTypeHint(_activeCertRecordCtx.variantSelectId);
         const url = 'app/controllers/get_cert_record_suggestions.php?q='
             + encodeURIComponent(q)
             + (rType ? '&record_type=' + encodeURIComponent(rType) : '');
@@ -1751,18 +2282,20 @@ function handleCertRecordNameInput() {
         fetch(url, { signal: _certRecordSuggestAbort.signal, credentials: 'same-origin' })
             .then(r => r.ok ? r.json() : { suggestions: [] })
             .then(data => {
-                renderCertRecordSuggestions(data.suggestions || [], q);
+                renderCertRecordSuggestions(data.suggestions || [], q, _activeCertRecordCtx);
             })
             .catch(err => {
                 if (err && err.name !== 'AbortError') {
-                    hideCertSuggestions('cert-record-suggestions');
+                    hideCertSuggestions(_activeCertRecordCtx.boxId);
                 }
             });
     }, 150);
 }
 
-function renderCertRecordSuggestions(suggestions, query) {
-    const box = document.getElementById('cert-record-suggestions');
+function renderCertRecordSuggestions(suggestions, query, ctx = _CERT_APPLY_AUTOCOMPLETE) {
+    const targetCtx = ctx || _CERT_APPLY_AUTOCOMPLETE;
+    _activeCertRecordCtx = targetCtx;
+    const box = document.getElementById(targetCtx.boxId);
     if (!box) return;
 
     if (!suggestions.length) {
@@ -1772,7 +2305,7 @@ function renderCertRecordSuggestions(suggestions, query) {
         return;
     }
 
-    const header = '<div style="padding: 6px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); background: #F4F4F5; border-bottom: 1px solid var(--border);">'
+    const header = '<div style="padding: 6px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); background: var(--bg2, #F4F4F5); border-bottom: 1px solid var(--border);">'
         + 'Archive Name Matches (Click to fill)</div>';
 
     const itemsHtml = suggestions.map(rec => {
@@ -1788,13 +2321,13 @@ function renderCertRecordSuggestions(suggestions, query) {
             + 'data-name="' + escapeCertHtml(rec.person_name || '') + '" '
             + 'data-year="' + escapeCertHtml(rec.year || '') + '" '
             + 'onclick="selectCertRecordSuggestion(this.dataset.name, this.dataset.year, this.dataset.recordId)" '
-            + 'onmouseenter="this.style.background=\'#F4F4F5\'" onmouseleave="this.style.background=\'#FFFFFF\'" '
-            + 'style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; padding: 8px 12px; border: none; border-bottom: 1px solid #f4f4f5; background: #FFFFFF; cursor: pointer; font-family: inherit;">'
+            + 'onmouseenter="this.style.background=\'var(--bg2, #F4F4F5)\'" onmouseleave="this.style.background=\'var(--surface, #FFFFFF)\'" '
+            + 'style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; padding: 8px 12px; border: none; border-bottom: 1px solid var(--border); background: var(--surface, #FFFFFF); cursor: pointer; font-family: inherit;">'
             + '<div style="min-width: 0; flex: 1;">'
             + '<div style="font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + highlightCertMatch(rec.person_name || '', query) + '</div>'
             + '<div style="font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + escapeCertHtml(meta.join(' · ')) + '</div>'
             + '</div>'
-            + (rec.reference_id ? '<span style="flex-shrink: 0; font-family: monospace; font-size: 10.5px; color: var(--text2); background: #F4F4F5; padding: 2px 6px; border-radius: 4px;">' + escapeCertHtml(rec.reference_id) + '</span>' : '')
+            + (rec.reference_id ? '<span style="flex-shrink: 0; font-family: monospace; font-size: 10.5px; color: var(--text2); background: var(--bg2, #F4F4F5); padding: 2px 6px; border-radius: 4px;">' + escapeCertHtml(rec.reference_id) + '</span>' : '')
             + '</button>';
     }).join('');
 
@@ -1804,9 +2337,10 @@ function renderCertRecordSuggestions(suggestions, query) {
 }
 
 function selectCertRecordSuggestion(personName, year, recordId) {
-    const nameInput = document.getElementById('cert-person-name');
-    const yearInput = document.getElementById('cert-year-input');
-    const linkedInput = document.getElementById('cert-linked-record-id');
+    const ctx = _activeCertRecordCtx || _CERT_APPLY_AUTOCOMPLETE;
+    const nameInput = document.getElementById(ctx.inputId);
+    const yearInput = document.getElementById(ctx.yearId);
+    const linkedInput = document.getElementById(ctx.linkedId);
     if (nameInput && personName) {
         nameInput.value = personName;
     }
@@ -1816,16 +2350,26 @@ function selectCertRecordSuggestion(personName, year, recordId) {
     if (linkedInput) {
         linkedInput.value = recordId ? String(recordId) : '';
     }
-    if (typeof syncCertDynamicTitle === 'function') {
+    if (ctx.isEdit) {
+        const lbl = document.getElementById('cert-edit-link-status');
+        const clr = document.getElementById('cert-edit-clear-link-btn');
+        if (lbl) lbl.textContent = recordId ? `Linked to Archival Record #${recordId}` : 'No archival record linked — pick a match while typing name above';
+        if (clr) clr.style.display = recordId ? 'inline-flex' : 'none';
+        setCertEditDirty(true);
+    } else if (typeof syncCertDynamicTitle === 'function') {
         syncCertDynamicTitle();
     }
-    hideCertSuggestions('cert-record-suggestions');
+    hideCertSuggestions(ctx.boxId);
 }
 
 document.addEventListener('click', function(e) {
     const searchWrap = document.getElementById('cert-search-wrap');
     if (searchWrap && !searchWrap.contains(e.target)) {
         hideCertSuggestions('cert-search-suggestions');
+    }
+    const editRecordWrap = document.getElementById('cert-edit-record-wrap');
+    if (editRecordWrap && !editRecordWrap.contains(e.target)) {
+        hideCertSuggestions('cert-edit-record-suggestions');
     }
     const recWrap = document.getElementById('cert-record-search-wrap');
     if (recWrap && !recWrap.contains(e.target)) {

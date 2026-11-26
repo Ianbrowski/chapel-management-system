@@ -29,8 +29,6 @@ if (!function_exists('renderSacramentBadge')) {
 }
 ?>
 
-<link rel="stylesheet" href="assets/css/workspace.css?v=2.6">
-
 <?php
 $curType = $rec_filters['record_type'] ?? '';
 $searchQuery = $rec_filters['search'] ?? '';

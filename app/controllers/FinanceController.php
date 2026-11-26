@@ -96,8 +96,16 @@ class FinanceController extends BaseController {
         );
 
         if ($success) {
+            $ackNote = '';
+            if (trim((string)$email) !== '') {
+                require_once BASE_PATH . '/app/mail/InquiryMailer.php';
+                $sentAck = InquiryMailer::sendAcknowledgment($email, $full_name, 'Merchandise Reservation: ' . $item['name']);
+                if ($sentAck) {
+                    $ackNote = ' Confirmation email sent.';
+                }
+            }
             AuditLogger::logFromSession($this->conn, 'created', 'Finance', "Member Online Order Inquiry: {$qty}x {$item['name']} by {$full_name}");
-            $this->flash('success', 'Your order has been placed! Please wait for the office staff to process your reservation. You can visit the parish office for pickup and payment.');
+            $this->flash('success', 'Your order has been placed! Please wait for the office staff to process your reservation. You can visit the parish office for pickup and payment.' . $ackNote);
         } else {
             $this->flash('error', 'Could not place order request.');
         }

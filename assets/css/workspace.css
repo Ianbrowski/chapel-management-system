@@ -13,7 +13,7 @@
     --workspace-toolbar-h: 34px;
     --workspace-footer-h: 30px;
     --workspace-gap: clamp(12px, 1.4vw, 18px);
-    --workspace-padding: clamp(14px, 1.6vw, 22px);
+    --workspace-padding: clamp(16px, 1.8vw, 24px);
 
     /* Panel & Card Elevate System */
     --panel-bg: var(--surface, #FFFFFF);
@@ -53,32 +53,47 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    max-width: 1680px;
+    max-width: 1680px !important;
     margin: 0 auto;
-    padding: var(--workspace-padding, 16px 22px 24px) !important;
-    gap: var(--workspace-gap, 14px) !important;
+    padding: 14px clamp(16px, 1.8vw, 24px) 24px !important;
+    gap: 14px !important;
     box-sizing: border-box;
     min-height: 0;
     flex: 1;
     height: 100%;
 }
 
+.settings-hub-container,
+#sec-priest_schedule,
+#sec-my_profile {
+    width: 100%;
+    max-width: 1680px !important;
+    margin: 0 auto;
+    padding: 14px clamp(16px, 1.8vw, 24px) 24px !important;
+    box-sizing: border-box;
+}
+
 .workspace.workspace-fluid,
 .workspace-fluid {
-    max-width: 100% !important;
+    max-width: 1680px !important;
 }
 
 .workspace-header,
-.page-header-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 0 12px 0 !important;
-    margin-bottom: 2px !important;
-    border-bottom: 1px solid var(--line);
+.page-header-bar,
+.cal-view-header,
+.bulletin-header-bar,
+.settings-hub-header,
+.req-command-header,
+.section-header-bar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 0 0 8px 0 !important;
+    margin: 0 0 6px 0 !important;
+    border-bottom: 1px solid var(--border, var(--line));
     flex-shrink: 0;
     flex-wrap: wrap;
-    gap: 12px !important;
+    gap: 10px !important;
     background: transparent;
     height: auto;
 }
@@ -794,7 +809,6 @@ form[method="GET"] input[type="date"] {
 @media (min-width: 1920px) {
     :root {
         --split-left-w: 420px;
-        --workspace-padding: 32px;
         --workspace-gap: 24px;
     }
 
@@ -807,7 +821,6 @@ form[method="GET"] input[type="date"] {
 @media (min-width: 1440px) and (max-width: 1919px) {
     :root {
         --split-left-w: 390px;
-        --workspace-padding: 28px;
         --workspace-gap: 20px;
     }
 }
@@ -816,7 +829,6 @@ form[method="GET"] input[type="date"] {
 @media (min-width: 1280px) and (max-width: 1439px) {
     :root {
         --split-left-w: 350px;
-        --workspace-padding: 22px;
         --workspace-gap: 16px;
     }
 }
@@ -868,8 +880,12 @@ form[method="GET"] input[type="date"] {
         --workspace-gap: 6px;
     }
 
-    .workspace {
-        padding: var(--workspace-padding);
+    .workspace,
+    .workspace-fluid,
+    .settings-hub-container,
+    #sec-priest_schedule,
+    #sec-my_profile {
+        padding: 8px 8px 18px !important;
     }
 
     .stats-row {
@@ -1055,7 +1071,7 @@ form[method="GET"] input[type="date"] {
     display: flex;
     flex-direction: column;
     gap: 14px;
-    padding: 14px;
+    padding: 14px clamp(16px, 1.8vw, 24px) 24px !important;
     box-sizing: border-box;
 }
 
@@ -1156,23 +1172,23 @@ padding-right: 40px !important;
     flex-shrink: 0;
     border-bottom: 1px solid var(--border);
     padding-bottom: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .page-title {
-    font-family: var(--font-family, 'Inter', sans-serif);
-    font-size: 1.65rem !important;
-    margin: 0;
-    color: var(--text);
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    font-family: var(--font-family-base, 'Inter', -apple-system, sans-serif) !important;
+    font-size: var(--font-page-title, 20px) !important;
+    font-weight: 700 !important;
+    margin: 0 !important;
+    line-height: 1.3 !important;
+    color: var(--text, var(--ink));
 }
 
 .page-subtitle {
-    color: var(--text2);
-    margin: 3px 0 0;
-    font-size: 13px !important;
+    color: var(--text2, var(--muted));
+    margin: 3px 0 0 0 !important;
+    font-size: var(--font-page-subtitle, 14px) !important;
+    line-height: 1.45 !important;
 }
 
 /* Stat card elements */

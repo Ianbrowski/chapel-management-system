@@ -680,6 +680,10 @@ function openChapelHubModal(chapel) {
                     <!-- Hidden inputs for backend form processing -->
                     <input type="hidden" name="start_time" id="field-datetime-edit-modal" required>
                     <input type="hidden" name="custom_duration" id="field-custom-duration-edit-modal" value="">
+                    <div id="venue-warning-edit-modal" style="display:none; margin-top:4px; padding:8px 12px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); border-radius:6px; color:#b91c1c; font-size:12px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span id="venue-warning-text-edit-modal"></span>
+                    </div>
                 </div>
 
                 <!-- Section 3: Presiding Priest Selection -->
@@ -1504,6 +1508,12 @@ function openChapelHubModal(chapel) {
                 <input type="hidden" id="field-datetime-approve">
                 <input type="hidden" id="field-venue-approve">
                 <input type="hidden" id="field-custom-duration-approve">
+                <input type="hidden" id="field-location-type-approve" value="Church">
+
+                <div id="venue-warning-approve" style="display:none; margin-bottom:12px; padding:8px 12px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); border-radius:6px; color:#b91c1c; font-size:12px;">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span id="venue-warning-text-approve"></span>
+                </div>
 
                 <div class="form-group">
                     <label>Assign Priest <small class="text-muted">(Optional)</small></label>
@@ -1694,46 +1704,68 @@ function openChapelHubModal(chapel) {
 
 <!-- MODAL: Issue Certificate -->
 <div class="modal-overlay" id="modal-issue-cert">
-    <div class="modal" style="max-width: 450px;">
-        <div class="modal-header">
-            <div class="modal-title"><i class="fa-solid fa-certificate"></i> Issue Certificate</div>
-            <button class="modal-close" onclick="closeModal('modal-issue-cert')">×</button>
+    <div class="modal" style="max-width: 470px; width: 94%; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; background: var(--surface, #FFFFFF);">
+        <div class="modal-header" style="background: var(--surface, #FFFFFF); border-bottom: 1px solid var(--border); padding: 16px 22px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 38px; height: 38px; border-radius: 8px; background: var(--bg2, #F6F6F6); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 16px; border: 1px solid var(--border); flex-shrink: 0;">
+                    <i class="fa-solid fa-certificate"></i>
+                </div>
+                <div>
+                    <div class="modal-title" style="font-size: 15px; font-weight: 700; font-family: var(--font-family, 'Inter', sans-serif); margin: 0; line-height: 1.2; color: var(--text);">Issue Certificate</div>
+                    <div style="font-size: 11px; color: var(--text2); font-weight: 400; margin-top: 2px;">Log official issuance or preview archival sheet</div>
+                </div>
+            </div>
+            <button type="button" class="modal-close" onclick="closeModal('modal-issue-cert')">×</button>
         </div>
-        <form method="POST">
+        <form method="POST" style="margin: 0;">
             <input type="hidden" name="form_section" id="issue-cert-section" value="records_cathedral">
             <input type="hidden" name="action" value="issue_cert">
             <input type="hidden" name="record_id" id="issue-cert-record-id">
             <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
             
-            <div class="modal-body">
-                <div class="p-16 mb-16" style="background:var(--bg3); border:1px solid var(--border); border-radius:10px; border-left:4px solid var(--accent);">
-                    <div class="text-xs text-muted text-uppercase text-bold mb-4">Generating For</div>
-                    <div style="font-size:16px; font-weight:700;" id="issue-cert-person-name">...</div>
-                    <div class="text-sm text-accent" id="issue-cert-type">...</div>
+            <div class="modal-body" style="padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; background: var(--surface, #FFFFFF);">
+                <div style="padding: 13px 16px; background: var(--bg2, #F6F6F6); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 10px;">
+                    <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text2); margin-bottom: 4px;">Generating For</div>
+                    <div style="font-size: 15.5px; font-weight: 700; color: var(--text); line-height: 1.25;" id="issue-cert-person-name">...</div>
+                    <div style="font-size: 12px; font-weight: 600; color: var(--accent); margin-top: 3px;" id="issue-cert-type">...</div>
                 </div>
 
-                <div class="form-group mb-16">
-                    <label>Issued To (Recipient Name)</label>
-                    <input name="issued_to" id="issue-cert-issued-to" placeholder="e.g. Juan dela Cruz" required>
-                    <p class="text-xs text-muted mt-4">This name will appear on the "Issued To" line of the certificate footer.</p>
+                <div class="form-group" style="margin: 0;">
+                    <label for="issue-cert-issued-to" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text2); margin-bottom: 5px;">Issued To (Recipient Name) <span style="color: #ef4444;">*</span></label>
+                    <input name="issued_to" id="issue-cert-issued-to" placeholder="e.g. Juan dela Cruz" required style="width: 100%; box-sizing: border-box;">
+                    <p style="font-size: 11px; color: var(--text2); margin: 5px 0 0;">This name will appear on the &ldquo;Issued To&rdquo; line of the certificate footer.</p>
                 </div>
 
-                <div class="form-group mb-16">
-                    <label>Purpose of Issuance</label>
-                    <input name="purpose" id="issue-cert-purpose" placeholder="e.g. For School, Personal Copy, Marriage Requirement">
+                <div class="form-group" style="margin: 0;">
+                    <label for="issue-cert-purpose-select" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text2); margin-bottom: 5px;">Purpose of Issuance</label>
+                    <input type="hidden" name="purpose" id="issue-cert-purpose" value="Personal Records">
+                    <select id="issue-cert-purpose-select" onchange="syncIssueCertPurpose()" style="width: 100%; box-sizing: border-box;">
+                        <option value="Personal Records">Personal Records / File Copy</option>
+                        <option value="Marriage Requirement">Marriage Requirement</option>
+                        <option value="School / Enrollment">School / University Requirement</option>
+                        <option value="Confirmation / Holy Orders">Church Requirement</option>
+                        <option value="Passport / Visa / Travel">Passport / Visa / Embassy</option>
+                        <option value="Employment / Legal">Employment / Legal</option>
+                        <option value="__custom__">Other (Specify)</option>
+                    </select>
+                    <input type="text" id="issue-cert-purpose-custom" maxlength="120" placeholder="Enter custom purpose of issuance..." oninput="syncIssueCertPurpose()" style="display: none; width: 100%; box-sizing: border-box; margin-top: 8px;">
                 </div>
 
-                <div class="text-center p-12" style="background:rgba(138,96,16,0.05); border-radius:8px; border:1px dashed rgba(138,96,16,0.3);">
-                    <p class="text-xs text-muted" style="color:#8a6010!important;">
-                        <i class="fa-solid fa-circle-info mr-4"></i>
-                        Confirming this will log an official issuance entry in the system and open the printable document.
-                    </p>
+                <div style="padding: 10px 12px; background: rgba(197,160,89,0.08); border-radius: 8px; border: 1px dashed rgba(197,160,89,0.45); display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; line-height: 1.45; color: #8a6010;">
+                    <i class="fa-solid fa-circle-info" style="margin-top: 2px; flex-shrink: 0;"></i>
+                    <span>Confirming this will log an official issuance entry in the system and open the printable document.</span>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-print mr-6"></i> Issue & Print</button>
-                <button type="button" class="btn btn-ghost" onclick="previewCert()">Preview instead</button>
-                <button type="button" class="btn btn-gray" onclick="closeModal('modal-issue-cert')">Cancel</button>
+            <div class="modal-footer" style="padding: 14px 22px; border-top: 1px solid var(--border); background: var(--surface, #FFFFFF); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-ghost" onclick="previewCert()" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fa-regular fa-eye"></i> Preview instead
+                </button>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button type="button" class="btn btn-gray" onclick="closeModal('modal-issue-cert')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 7px;">
+                        <i class="fa-solid fa-print"></i> Issue &amp; Print
+                    </button>
+                </div>
             </div>
         </form>
     </div>

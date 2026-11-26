@@ -1,7 +1,6 @@
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <!-- block html dis ->: MANAGE USERS (MAX-DATA EXPANDED VIEW)          -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
-<link rel="stylesheet" href="assets/css/workspace.css?v=2.5">
 <style>
 #role-filter-tabs .tab-btn {
     padding: 7px 16px;

@@ -312,6 +312,54 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
             height: 180px;
         }
     }
+
+    .pi-unsaved-dot {
+        display: none;
+        align-items: center;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: rgba(217, 119, 6, 0.16);
+        color: #b45309;
+        border: 1px solid rgba(217, 119, 6, 0.35);
+        margin-left: 2px;
+    }
+    .parish-tab-btn.has-unsaved .pi-unsaved-dot {
+        display: inline-flex;
+    }
+    .parish-tab-btn.active.has-unsaved .pi-unsaved-dot {
+        background: rgba(251, 191, 36, 0.25);
+        color: #fde68a;
+        border-color: rgba(251, 191, 36, 0.45);
+    }
+    .pi-unsaved-banner {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding: 10px 16px;
+        margin-bottom: 14px;
+        border-radius: 10px;
+        background: rgba(217, 119, 6, 0.1);
+        border: 1px solid rgba(217, 119, 6, 0.28);
+        color: #92400e;
+        font-size: 12.5px;
+    }
+    [data-theme="dark"] .pi-unsaved-banner {
+        background: rgba(245, 158, 11, 0.12);
+        color: #fcd34d;
+    }
+    .pi-unsaved-banner.is-visible {
+        display: flex;
+    }
+    .btn-pi-dirty {
+        background: #b45309 !important;
+        border-color: #92400e !important;
+        color: #ffffff !important;
+        box-shadow: 0 2px 8px rgba(180, 83, 9, 0.28) !important;
+    }
 </style>
 
 <div class="section <?php echo ($active_section === 'parish_info') ? 'active' : ''; ?>" id="sec-parish_info" style="padding: 20px 28px 36px; width: 100%; box-sizing: border-box;">
@@ -339,27 +387,43 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
     <!-- Navigation Tabs -->
     <div class="parish-nav-tabs">
         <button type="button" class="parish-tab-btn <?php echo $active_tab === 'contact' ? 'active' : ''; ?>" data-tab="contact" onclick="switchPITab('contact')">
-            <i class="fa-solid fa-address-book"></i> Contact &amp; Location
+            <i class="fa-solid fa-address-book"></i> Contact &amp; Location <span class="pi-unsaved-dot">Unsaved</span>
         </button>
         <button type="button" class="parish-tab-btn <?php echo $active_tab === 'mass' ? 'active' : ''; ?>" data-tab="mass" onclick="switchPITab('mass')">
             <i class="fa-solid fa-calendar-check"></i> Mass Schedules
         </button>
         <button type="button" class="parish-tab-btn <?php echo $active_tab === 'history' ? 'active' : ''; ?>" data-tab="history" onclick="switchPITab('history')">
-            <i class="fa-solid fa-landmark"></i> Historical Milestones
+            <i class="fa-solid fa-landmark"></i> Historical Milestones <span class="pi-unsaved-dot">Unsaved</span>
         </button>
         <button type="button" class="parish-tab-btn <?php echo $active_tab === 'leaders' ? 'active' : ''; ?>" data-tab="leaders" onclick="switchPITab('leaders')">
-            <i class="fa-solid fa-users"></i> Pastoral Leadership
+            <i class="fa-solid fa-users"></i> Pastoral Leadership <span class="pi-unsaved-dot">Unsaved</span>
         </button>
         <button type="button" class="parish-tab-btn <?php echo $active_tab === 'email' ? 'active' : ''; ?>" data-tab="email" onclick="switchPITab('email')">
-            <i class="fa-solid fa-envelope-circle-check"></i> Outgoing Mail Server
+            <i class="fa-solid fa-envelope-circle-check"></i> Outgoing Mail Server <span class="pi-unsaved-dot">Unsaved</span>
         </button>
+    </div>
+
+    <!-- Unsaved Reminder Banner across sub-tabs -->
+    <div class="pi-unsaved-banner" id="pi-unsaved-banner" role="status">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <span id="pi-unsaved-text">You have unsaved changes — click the tab's Save button to apply.</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" id="pi-save-active-tab-btn" onclick="saveActivePITab()" style="display: none; background: #b45309; color: #ffffff; border: 1px solid #92400e; border-radius: 6px; padding: 4px 12px; font-size: 11.5px; font-weight: 600; cursor: pointer;">
+                <i class="fa-solid fa-floppy-disk"></i> Save Current Tab
+            </button>
+            <button type="button" onclick="discardPITabChanges()" style="background: transparent; border: 1px solid currentColor; border-radius: 6px; padding: 4px 10px; font-size: 11.5px; font-weight: 600; color: inherit; cursor: pointer;">
+                Discard
+            </button>
+        </div>
     </div>
 
     <!-- ───────────────────────────────────────────────────────────────── -->
     <!-- TAB 1: CONTACT INFORMATION                                       -->
     <!-- ───────────────────────────────────────────────────────────────── -->
     <div class="parish-tab-pane <?php echo $active_tab === 'contact' ? 'active' : ''; ?>" id="pi-tab-contact">
-        <form method="POST" enctype="multipart/form-data">
+        <form method="POST" enctype="multipart/form-data" data-pi-dirty-tab="contact" data-pi-tab-label="Contact &amp; Location">
             <input type="hidden" name="form_section" value="parish_info">
             <input type="hidden" name="action" value="update_contact">
             <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
@@ -570,7 +634,7 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
                     <div class="parish-card-desc">General background story of the Cathedral displayed on the visitor portal history page</div>
                 </div>
             </div>
-            <form method="POST">
+            <form method="POST" data-pi-dirty-tab="history" data-pi-tab-label="Historical Milestones">
                 <input type="hidden" name="form_section" value="parish_info">
                 <input type="hidden" name="action" value="update_history_intro">
                 <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
@@ -665,7 +729,7 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
                     <div class="parish-card-desc">Introductory text introducing the parish leaders and clergy on the public site</div>
                 </div>
             </div>
-            <form method="POST">
+            <form method="POST" data-pi-dirty-tab="leaders" data-pi-tab-label="Pastoral Leadership">
                 <input type="hidden" name="form_section" value="parish_info">
                 <input type="hidden" name="action" value="update_leadership_intro">
                 <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
@@ -818,7 +882,7 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
                 </div>
             </div>
             
-            <form method="POST">
+            <form method="POST" data-pi-dirty-tab="email" data-pi-tab-label="Outgoing Mail Server">
                 <input type="hidden" name="form_section" value="parish_info">
                 <input type="hidden" name="action" value="update_email_settings">
                 <input type="hidden" name="redirect_tab" value="email">
@@ -1188,6 +1252,9 @@ function switchPITab(tab) {
         url.searchParams.set('tab', tab);
         window.history.replaceState({}, '', url);
     } catch(e) {}
+    if (typeof updatePIDirtyUI === 'function') {
+        updatePIDirtyUI();
+    }
 }
 
 function previewCathedralPhoto(input) {
@@ -1320,5 +1387,127 @@ function copyAppsScriptCode(btn) {
         document.execCommand('copy');
         document.body.removeChild(ta);
     }
+}
+
+var piBaselineSnapshots = {};
+var piIsSubmitting = false;
+
+function getPIFormState(form) {
+    const out = {};
+    form.querySelectorAll('input, textarea, select').forEach(function(el) {
+        if (!el.name || el.type === 'hidden') return;
+        if (el.type === 'file') {
+            out[el.name] = (el.files && el.files.length > 0) ? el.files[0].name : '';
+        } else if (el.type === 'checkbox' || el.type === 'radio') {
+            out[el.name] = el.checked ? '1' : '0';
+        } else {
+            out[el.name] = el.value;
+        }
+    });
+    return JSON.stringify(out);
+}
+
+function getDirtyPITabs() {
+    const dirty = [];
+    document.querySelectorAll('#sec-parish_info form[data-pi-dirty-tab]').forEach(function(form) {
+        const tab = form.getAttribute('data-pi-dirty-tab');
+        if (piBaselineSnapshots[tab] !== undefined && piBaselineSnapshots[tab] !== getPIFormState(form)) {
+            dirty.push({
+                tab: tab,
+                label: form.getAttribute('data-pi-tab-label') || tab,
+                form: form
+            });
+        }
+    });
+    return dirty;
+}
+
+function updatePIDirtyUI() {
+    const dirtyTabs = getDirtyPITabs();
+    const dirtySet = {};
+    dirtyTabs.forEach(function(item) { dirtySet[item.tab] = true; });
+
+    document.querySelectorAll('#sec-parish_info .parish-tab-btn[data-tab]').forEach(function(btn) {
+        btn.classList.toggle('has-unsaved', !!dirtySet[btn.getAttribute('data-tab')]);
+    });
+
+    document.querySelectorAll('#sec-parish_info form[data-pi-dirty-tab]').forEach(function(form) {
+        const tab = form.getAttribute('data-pi-dirty-tab');
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.classList.toggle('btn-pi-dirty', !!dirtySet[tab]);
+    });
+
+    const banner = document.getElementById('pi-unsaved-banner');
+    const textEl = document.getElementById('pi-unsaved-text');
+    const saveActiveBtn = document.getElementById('pi-save-active-tab-btn');
+    const activeTabBtn = document.querySelector('#sec-parish_info .parish-tab-btn.active');
+    const activeTab = activeTabBtn ? activeTabBtn.getAttribute('data-tab') : '';
+
+    if (dirtyTabs.length > 0) {
+        if (banner) banner.classList.add('is-visible');
+        if (textEl) {
+            const labels = dirtyTabs.map(function(d) {
+                return d.label.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            });
+            textEl.innerHTML = 'Unsaved changes in <strong>' + labels.join(', ') + '</strong> — click Save to apply.';
+        }
+        if (saveActiveBtn) {
+            saveActiveBtn.style.display = dirtySet[activeTab] ? 'inline-flex' : 'none';
+        }
+    } else {
+        if (banner) banner.classList.remove('is-visible');
+        if (saveActiveBtn) saveActiveBtn.style.display = 'none';
+    }
+}
+
+function saveActivePITab() {
+    const activeTabBtn = document.querySelector('#sec-parish_info .parish-tab-btn.active');
+    const activeTab = activeTabBtn ? activeTabBtn.getAttribute('data-tab') : '';
+    const form = document.querySelector('#sec-parish_info form[data-pi-dirty-tab="' + activeTab + '"]');
+    if (!form) return;
+    piIsSubmitting = true;
+    if (form.requestSubmit) form.requestSubmit(); else form.submit();
+}
+
+function discardPITabChanges() {
+    document.querySelectorAll('#sec-parish_info form[data-pi-dirty-tab]').forEach(function(form) {
+        form.reset();
+    });
+    const photoInput = document.getElementById('cathedral-photo-input');
+    if (photoInput) photoInput.value = '';
+    const filenameEl = document.getElementById('cathedral-photo-filename');
+    if (filenameEl) filenameEl.textContent = '';
+    updatePIDirtyUI();
+}
+
+function initParishInfoDirtyTracker() {
+    piBaselineSnapshots = {};
+    document.querySelectorAll('#sec-parish_info form[data-pi-dirty-tab]').forEach(function(form) {
+        const tab = form.getAttribute('data-pi-dirty-tab');
+        piBaselineSnapshots[tab] = getPIFormState(form);
+        if (!form.dataset.piDirtyBound) {
+            form.dataset.piDirtyBound = '1';
+            form.addEventListener('input', updatePIDirtyUI);
+            form.addEventListener('change', updatePIDirtyUI);
+            form.addEventListener('submit', function() { piIsSubmitting = true; });
+        }
+    });
+    updatePIDirtyUI();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initParishInfoDirtyTracker);
+} else {
+    initParishInfoDirtyTracker();
+}
+
+if (!window.__piBeforeUnloadBound) {
+    window.__piBeforeUnloadBound = true;
+    window.addEventListener('beforeunload', function(e) {
+        if (!piIsSubmitting && document.getElementById('sec-parish_info') && getDirtyPITabs().length > 0) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
 }
 </script>

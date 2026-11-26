@@ -1254,11 +1254,13 @@ async function openApproveModal(req) {
     const dateEl = document.getElementById('field-datetime-approve');
     const venueEl = document.getElementById('field-venue-approve');
     const durEl = document.getElementById('field-custom-duration-approve');
+    const locTypeEl = document.getElementById('field-location-type-approve');
 
     if (typeEl) typeEl.value = req.event_type || '';
     if (dateEl) dateEl.value = (req.start_time || '').replace(' ', 'T').substring(0, 16);
     if (venueEl) venueEl.value = req.location || req.chapel_id || 0;
     if (durEl) durEl.value = req.custom_duration || 0;
+    if (locTypeEl) locTypeEl.value = (String(req.location_type || '').toLowerCase() === 'outside') ? 'Outside' : 'Church';
 
     // Refresh availability
     if (typeof onFormChange === 'function') {

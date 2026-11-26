@@ -22,7 +22,6 @@ $categoryColors = [
     'Holy Orders'        => ['bg' => 'rgba(197,160,89,0.12)', 'color' => '#c5a059', 'border' => 'rgba(197,160,89,0.3)'],
 ];
 ?>
-<link rel="stylesheet" href="assets/css/workspace.css?v=2.5">
 <!-- chartjs-plugin-datalabels for in-chart count/% labels -->
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 

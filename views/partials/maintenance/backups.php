@@ -35,8 +35,6 @@ $latestBackupTime = !empty($availableBackupFiles)
     : 'No backups yet';
 ?>
 
-<link rel="stylesheet" href="assets/css/workspace.css?v=2.5">
-
 <div class="workspace">
     <!-- ─── Workspace Header ─── -->
     <div class="workspace-header page-header-bar" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 6px;">

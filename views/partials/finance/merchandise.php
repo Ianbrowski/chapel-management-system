@@ -12,7 +12,6 @@ if (!in_array($initialTab, ['catalog', 'sales', 'pos', 'archived'], true)) {
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <!-- PARISH SHOP & MERCHANDISE — Segmented Operational Hub           -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
-<link rel="stylesheet" href="assets/css/workspace.css?v=2.5">
 
 <style>
 /* Local style overrides for Merchandise Management */
@@ -709,9 +708,9 @@ if (!in_array($initialTab, ['catalog', 'sales', 'pos', 'archived'], true)) {
                                 </span>
                             </div>
                             <div style="position: relative;">
-                                <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; font-weight: 700; color: var(--text2); pointer-events: none;">₱</span>
+                                <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; font-weight: 700; color: var(--text2); pointer-events: none; z-index: 2;">₱</span>
                                 <input type="number" step="any" min="0" id="sale-cash-tendered" placeholder="0.00" oninput="calculatePosChange()"
-                                       style="width: 100%; height: 32px; padding-left: 24px; padding-right: 10px; font-size: 13px; font-weight: 700; border: 1px solid var(--border); border-radius: 6px; background: var(--bg2); color: var(--text); box-sizing: border-box;">
+                                       style="width: 100%; height: 32px; padding: 5px 10px 5px 28px !important; font-size: 13px; font-weight: 700; border: 1px solid var(--border); border-radius: 6px; background: var(--bg2); color: var(--text); box-sizing: border-box;">
                             </div>
                             <!-- Quick Tender Amounts Row -->
                             <div style="display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap;">

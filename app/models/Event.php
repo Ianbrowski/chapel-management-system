@@ -200,15 +200,21 @@ class Event
         }
     }
 
+    private function normalizeEventScope($scope, ?int $chapelId): string
+    {
+        $raw = strtolower(trim((string)$scope));
+        if ($raw === 'cathedral' || $raw === 'chapel') {
+            return $raw;
+        }
+        return ($chapelId !== null && $chapelId > 0) ? 'chapel' : 'cathedral';
+    }
+
     public function create($title, $eventType, $startTime, $chapelId, $pastorId, $status, $scope, $customDuration = null, $phone = null, $email = null, $requestedBy = null, $locationType = 'Church', array $meta = [])
     {
         $title = mb_substr(trim((string)$title), 0, $this->getTitleMaxLength());
         $eventType = $this->normalizeEventTypeEnum((string)$eventType);
-        $scope = mb_substr(trim((string)$scope), 0, 20);
-        $phone = $phone !== null ? mb_substr(trim((string)$phone), 0, 30) : null;
-        $email = $email !== null ? mb_substr(trim((string)$email), 0, 150) : null;
-        $cd = ($customDuration !== null && (int)$customDuration > 0) ? (int)$customDuration : null;
         $chapelId = ($chapelId && (int)$chapelId > 0) ? (int)$chapelId : null;
+        $scope = $this->normalizeEventScope($scope, $chapelId);
         $pastorId = ($pastorId !== null && (int)$pastorId > 0) ? (int)$pastorId : null;
         $reqById = ($requestedBy !== null && (int)$requestedBy > 0) ? (int)$requestedBy : null;
         $locType = (strcasecmp(trim((string)$locationType), 'Outside') === 0) ? 'Outside' : 'Church';
@@ -255,11 +261,8 @@ class Event
 
         $title = mb_substr(trim((string)$title), 0, $this->getTitleMaxLength());
         $eventType = $this->normalizeEventTypeEnum((string)$eventType);
-        $scope = mb_substr(trim((string)$scope), 0, 20);
-        $phone = $phone !== null ? mb_substr(trim((string)$phone), 0, 30) : null;
-        $email = $email !== null ? mb_substr(trim((string)$email), 0, 150) : null;
-        $cd = ($customDuration !== null && (int)$customDuration > 0) ? (int)$customDuration : null;
         $chapelId = ($chapelId && (int)$chapelId > 0) ? (int)$chapelId : null;
+        $scope = $this->normalizeEventScope($scope, $chapelId);
         $pastorId = ($pastorId !== null && (int)$pastorId > 0) ? (int)$pastorId : null;
         $locType = (strcasecmp(trim((string)$locationType), 'Outside') === 0) ? 'Outside' : 'Church';
 
@@ -275,6 +278,134 @@ class Event
         }
         $s->close();
         return $res;
+    }
+
+    /**
+     * Update editable certificate request details, optional fee snapshot, and archive link.
+     */
+    public function updateCertificateRequest(int $eventId, array $fields): bool
+    {
+        if ($eventId <= 0) {
+            return false;
+        }
+        $title = mb_substr(trim((string)($fields['title'] ?? '')), 0, $this->getTitleMaxLength());
+        $startTime = trim((string)($fields['start_time'] ?? ''));
+        $chapelId = (!empty($fields['chapel_id']) && (int)$fields['chapel_id'] > 0) ? (int)$fields['chapel_id'] : null;
+        $scope = $this->normalizeEventScope($fields['event_scope'] ?? '', $chapelId);
+        $variantId = (!empty($fields['variant_id']) && (int)$fields['variant_id'] > 0) ? (int)$fields['variant_id'] : null;
+        $serviceFee = (float)($fields['service_fee'] ?? 0);
+        $totalFee = (float)($fields['total_fee'] ?? 0);
+        $phone = isset($fields['requester_phone']) && trim((string)$fields['requester_phone']) !== ''
+            ? mb_substr(trim((string)$fields['requester_phone']), 0, 30)
+            : null;
+        $email = isset($fields['requester_email']) && trim((string)$fields['requester_email']) !== ''
+            ? mb_substr(trim((string)$fields['requester_email']), 0, 150)
+            : null;
+
+        $sql = "UPDATE events
+                   SET title = ?,
+                       variant_id = ?,
+                       start_time = ?,
+                       chapel_id = ?,
+                       event_scope = ?,
+                       requester_phone = ?,
+                       requester_email = ?,
+                       service_fee = ?,
+                       total_fee = ?
+                 WHERE event_id = ? AND is_archived = 0";
+        $s = $this->conn->prepare($sql);
+        if (!$s) {
+            return false;
+        }
+        $s->bind_param('sisisssddi', $title, $variantId, $startTime, $chapelId, $scope, $phone, $email, $serviceFee, $totalFee, $eventId);
+        $res = $s->execute();
+        $s->close();
+
+        if ($res) {
+            if (!empty($fields['meta']) && is_array($fields['meta'])) {
+                $this->persistEventMetadata($eventId, $fields['meta']);
+            }
+            $pastorId = (!empty($fields['pastor_id']) && (int)$fields['pastor_id'] > 0) ? (int)$fields['pastor_id'] : null;
+            $this->syncEventDisplayFields($eventId, $chapelId, $pastorId);
+        }
+        return $res;
+    }
+
+    /**
+     * Find a unique archival record ID when an exact case-insensitive name matches.
+     * Returns null when zero or multiple candidates exist to prevent ambiguous auto-links.
+     */
+    public function findUniqueArchivalRecordMatch(string $personName, string $titleHint = '', ?int $chapelId = null, string $year = ''): ?int
+    {
+        $cleanName = trim(preg_replace('/\s+/', ' ', $personName));
+        if ($cleanName === '') {
+            return null;
+        }
+        $lowerName = mb_strtolower($cleanName);
+
+        $lowerHint = strtolower($titleHint);
+        $recordType = '';
+        if (strpos($lowerHint, 'baptism') !== false) {
+            $recordType = 'Baptism';
+        } elseif (strpos($lowerHint, 'confirmation') !== false) {
+            $recordType = 'Confirmation';
+        } elseif (strpos($lowerHint, 'marriage') !== false || strpos($lowerHint, 'wedding') !== false) {
+            $recordType = 'Wedding';
+        } elseif (strpos($lowerHint, 'burial') !== false || strpos($lowerHint, 'funeral') !== false) {
+            $recordType = 'Funeral';
+        }
+
+        $where = [
+            'sr.is_archived = 0',
+            '(LOWER(TRIM(COALESCE(sr.person_name, \'\'))) = ? OR LOWER(TRIM(COALESCE(sr.child_name, \'\'))) = ? OR LOWER(TRIM(COALESCE(sr.deceased_name, \'\'))) = ?)',
+        ];
+        $params = [$lowerName, $lowerName, $lowerName];
+        $types = 'sss';
+
+        if ($recordType !== '') {
+            $where[] = 'sr.record_type = ?';
+            $params[] = $recordType;
+            $types .= 's';
+        }
+        if ($chapelId !== null && $chapelId > 0) {
+            $where[] = 'sr.chapel_id = ?';
+            $params[] = $chapelId;
+            $types .= 'i';
+        }
+        if (preg_match('/^\d{4}$/', trim($year))) {
+            $where[] = 'YEAR(sr.event_date) = ?';
+            $params[] = (int)trim($year);
+            $types .= 'i';
+        }
+
+        $sql = "SELECT sr.record_id FROM sacramental_records sr WHERE " . implode(' AND ', $where) . " LIMIT 2";
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt) {
+            return null;
+        }
+        $stmt->bind_param($types, ...$params);
+        $matches = [];
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($row = $res->fetch_assoc()) {
+                $matches[] = (int)$row['record_id'];
+            }
+        }
+        $stmt->close();
+
+        return (count($matches) === 1 && $matches[0] > 0) ? $matches[0] : null;
+    }
+
+    /**
+     * Link an existing archival sacramental record to a certificate request.
+     */
+    public function linkCertificateRecord(int $eventId, int $recordId): bool
+    {
+        if ($eventId <= 0 || $recordId <= 0) {
+            return false;
+        }
+        $this->persistEventMetadata($eventId, ['linked_record_id' => $recordId]);
+        return true;
     }
 
     public function delete($id)
@@ -339,11 +470,11 @@ class Event
     {
         $title = mb_substr(trim((string)$title), 0, $this->getTitleMaxLength());
         $eventType = $this->normalizeEventTypeEnum((string)$eventType);
-        $scope = mb_substr(trim((string)$scope), 0, 20);
+        $chapelId = ($chapelId && (int)$chapelId > 0) ? (int)$chapelId : null;
+        $scope = $this->normalizeEventScope($scope, $chapelId);
         $requesterPhone = $requesterPhone !== null ? mb_substr(trim((string)$requesterPhone), 0, 30) : null;
         $requesterEmail = $requesterEmail !== null ? mb_substr(trim((string)$requesterEmail), 0, 150) : null;
         $cd = ($customDuration !== null && (int)$customDuration > 0) ? (int)$customDuration : null;
-        $chapelId = ($chapelId && (int)$chapelId > 0) ? (int)$chapelId : null;
         $pastorId = ($pastorId !== null && (int)$pastorId > 0) ? (int)$pastorId : null;
         $reqBy = ($reqBy !== null && (int)$reqBy > 0) ? (int)$reqBy : null;
         $approvedAt = ($status === 'Confirmed') ? date('Y-m-d H:i:s') : null;
@@ -1765,51 +1896,35 @@ class Event
 
                 $available = true;
                 $conflict  = null;
+                $conflictMasked = null;
+                $conflictLocation = null;
                 $conflictStatus = null;
 
                 if ($dateTime) {
-                    $newStartTs = strtotime($dateTime);
-                    $newEndTs   = $newStartTs + ($this->getEventDuration($eventType, $customDuration) * 60);
-
-                    // 1. Check Priest Duty / Working Hours Schedule
-                    if (!empty($p['duty_start_time']) && !empty($p['duty_end_time'])) {
-                        $eventTimeStr = date('H:i:s', $newStartTs);
-                        $dStart = $p['duty_start_time'];
-                        $dEnd   = $p['duty_end_time'];
-
-                        // If the event starts before duty start or at/after duty end
-                        if ($eventTimeStr < $dStart || $eventTimeStr >= $dEnd) {
-                            $available = false;
-                            $sFmt = date('g:i A', strtotime($dStart));
-                            $eFmt = date('g:i A', strtotime($dEnd));
-                            $conflict = "Off-Duty (Working Hours: {$sFmt} – {$eFmt})";
-                            $conflictStatus = 'Off-Duty';
-                        }
-                    }
-
-                    // 2. Check Overlapping Scheduled Events
-                    if ($available) {
-                        $conflictCheck = $this->conflicts->checkPriestOnly($p['id'], $dateTime, $eventType, $excludeId, $customDuration, true);
-                        if ($conflictCheck['conflict'] && $conflictCheck['type'] === 'Priest') {
-                            $available = false;
-                            $conflict  = $conflictCheck['details'];
-                            $conflictStatus = $conflictCheck['status'] ?? 'Confirmed';
-                        }
+                    $conflictCheck = $this->conflicts->checkPriestOnly($p['id'], $dateTime, $eventType, $excludeId, $customDuration, false);
+                    if (!empty($conflictCheck['conflict']) && ($conflictCheck['type'] ?? '') === 'Priest') {
+                        $available = false;
+                        $conflict  = $conflictCheck['details'] ?? null;
+                        $conflictMasked = $conflictCheck['masked_details'] ?? $conflict;
+                        $conflictLocation = $conflictCheck['location'] ?? null;
+                        $conflictStatus = $conflictCheck['status'] ?? 'Confirmed';
                     }
                 }
 
                 $displayName = !empty($p['full_name']) ? $p['full_name'] : $p['user'];
                 $pastors[] = [
-                    'id'              => $p['id'],
-                    'name'            => $displayName,
-                    'initials'        => (strpos($displayName, ' ') !== false)
+                    'id'                => $p['id'],
+                    'name'              => $displayName,
+                    'initials'          => (strpos($displayName, ' ') !== false)
                         ? strtoupper(substr($displayName, 0, 1) . substr(strrchr($displayName, ' '), 1, 1))
                         : strtoupper(substr($displayName, 0, 2)),
-                    'available'       => $available,
-                    'conflict_reason' => $conflict,
-                    'conflict_status' => $conflictStatus,
-                    'duty_start'      => $p['duty_start_time'] ?? null,
-                    'duty_end'        => $p['duty_end_time'] ?? null
+                    'available'         => $available,
+                    'conflict_reason'   => $conflict,
+                    'conflict_masked'   => $conflictMasked,
+                    'conflict_location' => $conflictLocation,
+                    'conflict_status'   => $conflictStatus,
+                    'duty_start'        => $p['duty_start_time'] ?? null,
+                    'duty_end'          => $p['duty_end_time'] ?? null
                 ];
             }
             $stmt->close();
@@ -1844,10 +1959,6 @@ class Event
                 $conflict  = null;
 
                 if ($dateTime) {
-                    $newStartTs = strtotime($dateTime);
-                    $newEndTs   = $newStartTs + ($this->getEventDuration($eventType, $customDuration) * 60);
-                    $dateStr    = date('Y-m-d', $newStartTs);
-
                     $conflictCheck = $this->conflicts->checkVenueOnly($v['id'], $dateTime, $eventType, $excludeId, $customDuration, null, $locationType);
                     if ($conflictCheck['conflict'] && $conflictCheck['type'] === 'Venue') {
                         $available = false;
@@ -1860,6 +1971,7 @@ class Event
                     'name'           => $v['name'],
                     'available'       => $available,
                     'conflict_reason' => $conflict,
+                    'conflict_location' => $conflict ? ($conflictCheck['location'] ?? $v['name']) : null,
                     'conflict_status' => $conflict ? ($conflictCheck['status'] ?? 'Confirmed') : null
                 ];
             }
@@ -1878,14 +1990,11 @@ class Event
         $response = ['available' => true, 'conflict' => null];
 
         if ($venue !== '' && $dateTime !== '') {
-            $newStartTs = strtotime($dateTime);
-            $newEndTs   = $newStartTs + ($this->getEventDuration($eventType, $customDuration) * 60);
-            $dateStr    = date('Y-m-d', $newStartTs);
-
             $conflictCheck = $this->conflicts->checkVenueOnly($venue, $dateTime, $eventType, $excludeId, $customDuration, null, $locationType);
             if ($conflictCheck['conflict'] && $conflictCheck['type'] === 'Venue') {
                 $response['available']       = false;
                 $response['conflict']        = $conflictCheck['details'];
+                $response['conflict_location'] = $conflictCheck['location'] ?? null;
                 $response['conflict_status'] = $conflictCheck['status'] ?? 'Confirmed';
             }
         }

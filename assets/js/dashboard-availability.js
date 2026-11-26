@@ -44,6 +44,7 @@ function onFormChange(scope) {
         if (!datetimeInput) return;
 
         const type = typeSelect ? typeSelect.value : '';
+        const hasVenueField = !!venueSelect;
         const venue = venueSelect ? venueSelect.value : null;
         const datetime = datetimeInput.value;
         let customDur = customDurInput ? parseInt(customDurInput.value) : 0;
@@ -67,19 +68,22 @@ function onFormChange(scope) {
         const dt = new Date(datetime);
         const hr = dt.getHours();
 
-        // Show timeline and synchronize slot availability (skip sanctuary lock indicator for Outside events)
+        // Show timeline and synchronize slot availability (skip sanctuary lock indicator for Outside events or unselected Location)
         const locTypeEl = document.getElementById('field-location-type-' + scope) || (scope === 'request' ? document.getElementById('field-location-type') : null);
         const isOutsideLoc = locTypeEl && String(locTypeEl.value || '').toLowerCase() === 'outside';
-        if (scope !== 'cathedral' && scope !== 'chapel') {
-            if (isOutsideLoc && timeline) {
-                timeline.style.display = 'none';
-            } else {
-                renderAvailabilityTimeline(venue, datetime, scope, type, customDur);
-            }
+        const isUnselectedVenue = hasVenueField && String(venue || '').trim() === '';
+
+        if (isOutsideLoc || isUnselectedVenue) {
+            if (timeline) timeline.style.display = 'none';
+            resetStaticModalSlots(scope, isOutsideLoc ? 'Outside Parish' : 'Select Location');
+            toggleSubmitButton(scope, false);
+        } else if (scope !== 'cathedral' && scope !== 'chapel') {
+            renderAvailabilityTimeline(venue, datetime, scope, type, customDur);
         }
 
         if (hr < 6 || hr >= 21) {
             setScheduleWarning(scope, 'Operating Hours: Events can only be scheduled between 6:00 AM and 9:00 PM.');
+            toggleSubmitButton(scope, true);
             if (type) loadPastorCards(type, datetime, scope, customDur, venue);
             return;
         }
@@ -89,7 +93,9 @@ function onFormChange(scope) {
         // Trigger updates if sacrament type is picked
         if (type) {
             loadPastorCards(type, datetime, scope, customDur, venue);
-            checkVenueAvailability(venue, datetime, scope, type, customDur);
+            if (!isOutsideLoc && !isUnselectedVenue) {
+                checkVenueAvailability(venue, datetime, scope, type, customDur);
+            }
         }
 
     } catch (e) {
@@ -359,6 +365,10 @@ async function renderAvailabilityTimeline(venue, datetime, scope, eventType, dur
 }
 
 window.selectModalSlot = function(scope, shift, timeStr) {
+    const targetCard = document.getElementById(`slot-card-${shift}-${scope}`);
+    if (targetCard && targetCard.classList.contains('disabled')) {
+        return;
+    }
     const dateInput = document.getElementById(`field-date-${scope}`);
     const dtInput = document.getElementById(`field-datetime-${scope}`);
     if (!dateInput || !dtInput) return;
@@ -446,9 +456,28 @@ window.syncModalDateTimeAndSlots = function(scope) {
     selectModalSlot(scope, shift, timePart);
 };
 
+function resetStaticModalSlots(scope, reasonText = 'Available') {
+    ['morning', 'afternoon'].forEach(shift => {
+        const card = document.getElementById(`slot-card-${shift}-${scope}`);
+        const badge = document.getElementById(`slot-badge-${shift}-${scope}`);
+        const chip = document.getElementById(`slot-chip-${shift}-${scope}`);
+        if (card) card.classList.remove('disabled');
+        if (badge) {
+            badge.className = 'slot-badge available';
+            badge.innerHTML = `<i class="fa-solid fa-circle-info" style="font-size:7px;"></i> ${escapeAvailHtml(reasonText)}`;
+        }
+        if (chip && card && !card.classList.contains('selected')) {
+            chip.innerHTML = '<i class="fa-regular fa-hand-pointer" style="font-size:9px;"></i> <span>Click to Select</span>';
+        }
+    });
+}
+
 function toggleSubmitButton(scope, hasConflict) {
-    const timeline = document.getElementById('timeline-preview-' + scope);
-    const form = timeline ? timeline.closest('form') : null;
+    const anchor = document.getElementById('timeline-preview-' + scope)
+        || document.getElementById('venue-warning-' + scope)
+        || document.getElementById('field-datetime-' + scope)
+        || document.getElementById('selected-pastor-input-' + scope);
+    const form = anchor ? anchor.closest('form') : null;
     const btn = form ? form.querySelector('button[type="submit"]') : null;
     if (!btn) return;
 
@@ -529,6 +558,35 @@ function initDraggableTimeline(block, bar, startHour, endHour, scope, curDur = 6
     });
 }
 
+function getPastorStatusInfo(pastor, datetimeStr = '') {
+    if (!pastor || pastor.available) {
+        return { label: 'Available', dropdownTag: '', statusClass: 'available', color: '#16a34a' };
+    }
+    if (pastor.conflict_status === 'Off-Duty') {
+        return { label: 'Unavailable', dropdownTag: ' (Unavailable - Off-Duty)', statusClass: 'off-duty', color: '#64748b' };
+    }
+    const now = new Date();
+    const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    const targetDate = String(datetimeStr || '').slice(0, 10);
+    const isPresentDay = (targetDate === '' || targetDate === todayStr);
+    const isPending = (pastor.conflict_status === 'Pending');
+
+    if (isPresentDay) {
+        return {
+            label: 'Busy',
+            dropdownTag: isPending ? ' (Busy - Pending)' : ' (Busy)',
+            statusClass: isPending ? 'pending-conflict' : 'unavailable',
+            color: isPending ? '#c5a059' : '#dc2626'
+        };
+    }
+    return {
+        label: 'Not Available',
+        dropdownTag: isPending ? ' (Not Available - Pending)' : ' (Not Available)',
+        statusClass: isPending ? 'pending-conflict' : 'unavailable',
+        color: isPending ? '#c5a059' : '#dc2626'
+    };
+}
+
 function updatePastorSelect(eventType, datetime, selectId, customDuration = 0) {
     const select = document.getElementById(selectId);
     if (!select) return;
@@ -568,9 +626,10 @@ function updatePastorSelect(eventType, datetime, selectId, customDuration = 0) {
             select.innerHTML = '';
             select.appendChild(firstOpt);
             pastors.forEach(p => {
+                const st = getPastorStatusInfo(p, datetime);
                 const opt = document.createElement('option');
                 opt.value = p.id;
-                opt.textContent = p.name + (p.available ? '' : ' (Busy)');
+                opt.textContent = p.name + st.dropdownTag;
                 opt.disabled = !p.available;
                 select.appendChild(opt);
             });
@@ -578,6 +637,11 @@ function updatePastorSelect(eventType, datetime, selectId, customDuration = 0) {
 }
 
 function checkVenueAvailability(venue, datetime, scope, eventType = 'Other', customDuration = 0) {
+    if (venue === null || venue === undefined || String(venue).trim() === '') {
+        setScheduleWarning(scope, '');
+        return;
+    }
+
     let excludeId = '';
     if (scope === 'edit-modal') excludeId = document.getElementById('edit-event-id')?.value || '';
     if (scope === 'approve') excludeId = document.getElementById('approve-req-id')?.value || '';
@@ -599,12 +663,14 @@ function checkVenueAvailability(venue, datetime, scope, eventType = 'Other', cus
     })
         .then(r => r.json())
         .then(data => {
-            if (!data.available) {
+            if (data && !Array.isArray(data) && data.available === false) {
                 const statusLabel = data.conflict_status === 'Pending' ? ' (Pending Request)' : ' (Confirmed)';
                 const color = data.conflict_status === 'Pending' ? '#c5a059' : '#dc2626';
-                setScheduleWarning(scope, `<span style="color:${color}; font-weight:600;">Venue conflict:</span> "${data.conflict}" ${statusLabel} overlaps with this event's scheduled time.`);
+                setScheduleWarning(scope, `<span style="color:${color}; font-weight:600;">Venue conflict:</span> "${escapeAvailHtml(data.conflict || 'Time slot reserved')}" ${statusLabel} overlaps with this event's scheduled time.`);
+                if (scope === 'approve') toggleSubmitButton(scope, true);
             } else {
                 setScheduleWarning(scope, '');
+                if (scope === 'approve') toggleSubmitButton(scope, false);
             }
         })
         .catch(() => {
@@ -649,18 +715,9 @@ function loadPastorCards(eventType, datetime, scope, customDuration = 0, chapelI
             pastors.forEach(pastor => {
                 const isAvailable = pastor.available;
                 const isSelected  = selectedPastor[scope] == pastor.id;
-                
-                let statusClass = 'available';
-                if (!isAvailable) {
-                    if (pastor.conflict_status === 'Off-Duty') {
-                        statusClass = 'off-duty';
-                    } else if (pastor.conflict_status === 'Pending') {
-                        statusClass = 'pending-conflict';
-                    } else {
-                        statusClass = 'unavailable';
-                    }
-                }
-                const dotClass = isSelected ? 'dot-selected' : (isAvailable ? 'dot-available' : (statusClass === 'off-duty' ? 'dot-off-duty' : (statusClass === 'pending-conflict' ? 'dot-pending' : 'dot-unavailable')));
+                const stInfo      = getPastorStatusInfo(pastor, datetime);
+                const statusClass = stInfo.statusClass;
+                const dotClass    = isSelected ? 'dot-selected' : (isAvailable ? 'dot-available' : (statusClass === 'off-duty' ? 'dot-off-duty' : (statusClass === 'pending-conflict' ? 'dot-pending' : 'dot-unavailable')));
 
                 const card = document.createElement('div');
                 card.className = 'pastor-card ' + (isSelected ? 'selected' : statusClass);
@@ -668,15 +725,8 @@ function loadPastorCards(eventType, datetime, scope, customDuration = 0, chapelI
                 card.dataset.name  = pastor.name;
                 card.dataset.scope = scope;
 
-                let conflictLabel = 'Busy';
-                let conflictColor = '#dc2626';
-                if (statusClass === 'off-duty') {
-                    conflictLabel = 'Off-Duty';
-                    conflictColor = '#64748b';
-                } else if (statusClass === 'pending-conflict') {
-                    conflictLabel = 'Pending Request';
-                    conflictColor = '#c5a059';
-                }
+                const conflictLabel = stInfo.label;
+                const conflictColor = stInfo.color;
 
                 // Format duty hours if available
                 let dutyHtml = '';
@@ -699,14 +749,17 @@ function loadPastorCards(eventType, datetime, scope, customDuration = 0, chapelI
                         <span class="pastor-status-dot ${dotClass}"></span>
                     </div>
                     <div class="pastor-info" style="flex:1; min-width:0; text-align:left;">
-                        <div class="pastor-card-name" title="${pastor.name}">${pastor.name}</div>
+                        <div class="pastor-card-name" title="${escapeAvailHtml(pastor.name)}">${escapeAvailHtml(pastor.name)}</div>
                         ${dutyHtml}
+                        ${!isAvailable && pastor.conflict_reason
+                            ? `<div style="font-size:10px; color:${conflictColor}; margin-top:2px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeAvailHtml(pastor.conflict_reason)}"><i class="fa-solid fa-location-dot" style="font-size:8.5px; margin-right:3px;"></i>${escapeAvailHtml(pastor.conflict_reason)}</div>`
+                            : ''}
                     </div>
                     ${!isAvailable
                         ? `<div class="pastor-status-badge" style="font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; background:${statusClass === 'off-duty' ? 'rgba(148,163,184,0.1)' : (statusClass === 'pending-conflict' ? 'rgba(197,160,89,0.1)' : 'rgba(220,38,38,0.1)')}; color:${conflictColor}; border:1px solid ${statusClass === 'off-duty' ? 'rgba(148,163,184,0.25)' : (statusClass === 'pending-conflict' ? 'rgba(197,160,89,0.25)' : 'rgba(220,38,38,0.25)')}; flex-shrink:0;">
                             ${conflictLabel}
                            </div>
-                           <div class="pastor-tooltip">${pastor.conflict_reason || (statusClass === 'off-duty' ? 'Outside working hours' : 'Conflict with existing booking')}</div>`
+                           <div class="pastor-tooltip">${escapeAvailHtml(pastor.conflict_reason || (statusClass === 'off-duty' ? 'Unavailable (outside working hours)' : 'Not available due to an existing booking'))}</div>`
                         : `<div class="pastor-status-badge" style="font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; background:rgba(34,197,94,0.1); color:#16a34a; border:1px solid rgba(34,197,94,0.25); flex-shrink:0;">
                             Available
                            </div>`

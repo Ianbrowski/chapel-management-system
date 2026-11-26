@@ -2,8 +2,8 @@
 <!-- block html dis ->: MY PROFILE                                         -->
 <!-- All roles — change display name, profile pic, password           -->
 <!-- --------------------------------------------------------------- -->
-<div class="section <?php echo ($active_section === 'my_profile') ? 'active' : ''; ?>" id="sec-my_profile" style="padding: 24px 32px 40px; max-width: 1240px; margin: 0 auto;">
-    <div class="page-header-bar" style="margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+<div class="section <?php echo ($active_section === 'my_profile') ? 'active' : ''; ?>" id="sec-my_profile" style="padding: 14px clamp(16px, 1.8vw, 24px) 24px; max-width: 1680px; margin: 0 auto; width: 100%; box-sizing: border-box;">
+    <div class="page-header-bar" style="margin-bottom: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <div style="display: flex; align-items: center; gap: 14px;">
             <div class="page-header-icon" style="width: 38px; height: 38px; border-radius: 9px; background: rgba(201,168,76,0.14); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;">
                 <i class="fa-solid fa-user-circle"></i>
@@ -74,7 +74,18 @@
 
         <!-- Right: Edit form -->
         <div class="card" style="padding: 32px 24px; border-radius: 12px;">
-            <div class="card-title" style="font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px;"><i class="fa-solid fa-pen-to-square"></i> Edit Profile</div>
+            <div class="card-title" style="font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 20px;"><i class="fa-solid fa-pen-to-square"></i> Edit Profile</div>
+
+            <div id="profile-unsaved-banner" role="status" style="display: none; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 18px; border-radius: 8px; background: rgba(217, 119, 6, 0.1); border: 1px solid rgba(217, 119, 6, 0.28); color: #92400e; font-size: 12.5px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span>Unsaved profile changes — click <strong>Save Changes</strong> to update your account.</span>
+                </div>
+                <button type="button" onclick="discardProfileChanges()" style="background: transparent; border: 1px solid currentColor; border-radius: 6px; padding: 3px 10px; font-size: 11.5px; font-weight: 600; color: inherit; cursor: pointer;">
+                    Discard
+                </button>
+            </div>
+
             <form method="POST" enctype="multipart/form-data" id="profile-form">
                 <input type="hidden" name="form_section" value="my_profile">
                 <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
@@ -175,12 +186,79 @@
             if (files.length > 0) {
                 fileInput.files = files;
                 window.previewPic(fileInput);
+                if (typeof updateProfileDirtyUI === 'function') updateProfileDirtyUI();
             }
         }
+    }
+
+    var profileForm = document.getElementById('profile-form');
+    var profileBaseline = '';
+    var profileIsSubmitting = false;
+
+    function getProfileSnapshot() {
+        if (!profileForm) return '';
+        var nameInput = profileForm.querySelector('input[name="full_name"]');
+        var pic = document.getElementById('pic-input');
+        var cur = document.getElementById('cur-pwd');
+        var np = document.getElementById('new-pwd');
+        var cp = document.getElementById('confirm-pwd');
+        return JSON.stringify({
+            full_name: nameInput ? nameInput.value : '',
+            pic: (pic && pic.files && pic.files.length > 0) ? pic.files[0].name : '',
+            cur: cur ? cur.value : '',
+            np: np ? np.value : '',
+            cp: cp ? cp.value : ''
+        });
+    }
+
+    window.updateProfileDirtyUI = function() {
+        if (!profileForm) return;
+        var dirty = profileBaseline !== '' && getProfileSnapshot() !== profileBaseline;
+        var banner = document.getElementById('profile-unsaved-banner');
+        var saveBtn = document.getElementById('save-profile-btn');
+        if (banner) banner.style.display = dirty ? 'flex' : 'none';
+        if (saveBtn) saveBtn.classList.toggle('btn-profile-dirty', dirty);
+    };
+
+    window.discardProfileChanges = function() {
+        if (!profileForm) return;
+        profileForm.reset();
+        var pic = document.getElementById('pic-input');
+        if (pic) pic.value = '';
+        var matchMsg = document.getElementById('pwd-match-msg');
+        if (matchMsg) matchMsg.textContent = '';
+        window.updateProfileDirtyUI();
+    };
+
+    if (profileForm) {
+        profileBaseline = getProfileSnapshot();
+        profileForm.addEventListener('input', window.updateProfileDirtyUI);
+        profileForm.addEventListener('change', window.updateProfileDirtyUI);
+        profileForm.addEventListener('submit', function() { profileIsSubmitting = true; });
+    }
+
+    if (!window.__profileBeforeUnloadBound) {
+        window.__profileBeforeUnloadBound = true;
+        window.addEventListener('beforeunload', function(e) {
+            var pf = document.getElementById('profile-form');
+            if (!profileIsSubmitting && pf && profileBaseline !== '' && getProfileSnapshot() !== profileBaseline) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
     }
 })();
 </script>
 <style>
+.btn-profile-dirty {
+    background: #b45309 !important;
+    border-color: #92400e !important;
+    box-shadow: 0 2px 8px rgba(180, 83, 9, 0.28) !important;
+}
+[data-theme="dark"] #profile-unsaved-banner {
+    background: rgba(245, 158, 11, 0.12) !important;
+    color: #fcd34d !important;
+}
 .pwd-toggle-btn {
     position: absolute;
     right: 12px;

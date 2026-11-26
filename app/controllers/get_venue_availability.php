@@ -32,7 +32,8 @@ if ($venue === '') {
         $vId = isset($v['id']) && $v['id'] !== '' ? (int)$v['id'] : 0;
         $canViewDetails = $isGlobalAdmin || ($isStaffOrClergy && (($sessionChapelId === null || (int)$sessionChapelId === 0) ? $vId === 0 : (int)$sessionChapelId === $vId));
         if (!$canViewDetails && !empty($v['conflict_reason'])) {
-            $v['conflict_reason'] = 'Time slot unavailable';
+            $locLabel = !empty($v['conflict_location']) ? $v['conflict_location'] : (!empty($v['name']) ? $v['name'] : 'selected venue');
+            $v['conflict_reason'] = "Time slot reserved at {$locLabel}";
         }
     }
     unset($v);
@@ -41,7 +42,8 @@ if ($venue === '') {
     $vId = $requestedVenueId ?? 0;
     $canViewDetails = $isGlobalAdmin || ($isStaffOrClergy && (($sessionChapelId === null || (int)$sessionChapelId === 0) ? $vId === 0 : (int)$sessionChapelId === $vId));
     if (!$canViewDetails && !empty($response['conflict'])) {
-        $response['conflict'] = 'Time slot unavailable';
+        $locLabel = !empty($response['conflict_location']) ? $response['conflict_location'] : ($vId === 0 ? 'Main Cathedral' : 'selected venue');
+        $response['conflict'] = "Time slot reserved at {$locLabel}";
     }
 }
 

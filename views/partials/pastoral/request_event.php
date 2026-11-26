@@ -379,14 +379,14 @@ $defaultTab = $_GET['tab'] ?? ($isGuest ? 'catalog' : ($totalReqs > 0 ? 'request
                     </div>
                 </div>
             <?php else: ?>
-            <table class="data-table" id="requests-table" style="width: 100%; min-width: 650px; table-layout: fixed; border-collapse: collapse;">
+            <table class="data-table" id="requests-table" style="width: 100%; min-width: 720px; table-layout: fixed; border-collapse: collapse;">
                 <thead style="position: sticky; top: 0; background: var(--bg3); z-index: 5; border-bottom: 1px solid var(--border);">
                     <tr>
                         <th style="padding: 10px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); font-weight: 700; text-align: left;">Event Title &amp; Location</th>
                         <th style="padding: 10px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); width: 110px; text-align: center; font-weight: 700;">Type</th>
                         <th style="padding: 10px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); width: 140px; font-weight: 700; text-align: left;">Requested Date</th>
-                        <th style="padding: 10px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); width: 110px; text-align: center; font-weight: 700;">Status</th>
-                        <th style="padding: 10px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); width: 100px; text-align: center; font-weight: 700;">Actions</th>
+                        <th style="padding: 10px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); width: 126px; text-align: center; font-weight: 700;">Status</th>
+                        <th style="padding: 10px 16px 10px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); width: 156px; text-align: center; font-weight: 700;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -431,8 +431,8 @@ $defaultTab = $_GET['tab'] ?? ($isGuest ? 'catalog' : ($totalReqs > 0 ? 'request
                                 </span>
                             <?php endif; ?>
                         </td>
-                        <td style="padding: 10px 10px; text-align: center;" onclick="event.stopPropagation()">
-                            <div style="display: flex; gap: 5px; justify-content: center; align-items: center;">
+                        <td style="padding: 10px 16px 10px 10px; text-align: center;" onclick="event.stopPropagation()">
+                            <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
                                 <button type="button" class="btn-action-icon" onclick="viewRequestDetailsFromRow(this.closest('tr'))" title="View Details">
                                     <i class="fa-solid fa-eye"></i>
                                 </button>
@@ -1533,14 +1533,16 @@ async function syncRequestSlots() {
         
         if (!isNonExclusiveIntention && Array.isArray(events)) {
             events.forEach(ev => {
-                const dt = new Date(ev.start_time);
+                const dt = new Date(String(ev.start_time || '').replace(' ', 'T'));
                 const hr = dt.getHours();
+                const statusTag = ev.status === 'Pending' ? 'Pending' : 'Booked';
+                const label = `${ev.title || 'Booked'} (${statusTag})`;
                 if (hr < 12) {
                     morningTaken = true;
-                    morningTitle = ev.title || 'Booked';
+                    morningTitle = label;
                 } else {
                     afternoonTaken = true;
-                    afternoonTitle = ev.title || 'Booked';
+                    afternoonTitle = label;
                 }
             });
         }
@@ -1551,14 +1553,18 @@ async function syncRequestSlots() {
         const cardA = document.getElementById('slot-card-afternoon-request');
         const badgeM = document.getElementById('slot-badge-morning');
         const badgeA = document.getElementById('slot-badge-afternoon');
+        const escSlotText = (s) => String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
         
         // Morning Slot State
         if (morningTaken) {
-            if (overlayM) overlayM.style.display = 'flex';
+            if (overlayM) {
+                overlayM.innerHTML = `<span style="color:#ef4444; font-size:11px; font-weight:700;"><i class="fa-solid fa-lock"></i> Booked</span><span style="color:#64748b; font-size:9.5px; max-width:92%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 4px;">${escSlotText(morningTitle)}</span>`;
+                overlayM.style.display = 'flex';
+            }
             if (cardM) cardM.classList.add('disabled');
             if (badgeM) {
                 badgeM.className = 'slot-badge booked';
-                badgeM.innerHTML = '<i class="fa-solid fa-lock" style="font-size:7px;"></i> Acquired';
+                badgeM.innerHTML = '<i class="fa-solid fa-lock" style="font-size:7px;"></i> Not Available';
             }
         } else {
             if (overlayM) overlayM.style.display = 'none';
@@ -1571,11 +1577,14 @@ async function syncRequestSlots() {
         
         // Afternoon Slot State
         if (afternoonTaken) {
-            if (overlayA) overlayA.style.display = 'flex';
+            if (overlayA) {
+                overlayA.innerHTML = `<span style="color:#ef4444; font-size:11px; font-weight:700;"><i class="fa-solid fa-lock"></i> Booked</span><span style="color:#64748b; font-size:9.5px; max-width:92%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 4px;">${escSlotText(afternoonTitle)}</span>`;
+                overlayA.style.display = 'flex';
+            }
             if (cardA) cardA.classList.add('disabled');
             if (badgeA) {
                 badgeA.className = 'slot-badge booked';
-                badgeA.innerHTML = '<i class="fa-solid fa-lock" style="font-size:7px;"></i> Acquired';
+                badgeA.innerHTML = '<i class="fa-solid fa-lock" style="font-size:7px;"></i> Not Available';
             }
         } else {
             if (overlayA) overlayA.style.display = 'none';
@@ -1806,7 +1815,7 @@ function showConfirmationModal() {
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; border-top:1px solid var(--border); padding-top:12px;">
                 <div><div style="font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:0.05em; font-weight:600; margin-bottom:4px;">Event Type</div><div style="font-size:13px; color:var(--text);">${escapeHtml(typeText)}</div></div>
-                <div><div style="font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:0.05em; font-weight:600; margin-bottom:4px;">Scope</div><div style="font-size:13px; color:var(--text); text-transform:capitalize;">${escapeHtml(data.event_scope || 'N/A')}</div></div>
+                <div><div style="font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:0.05em; font-weight:600; margin-bottom:4px;">Scope</div><div style="font-size:13px; color:var(--text); text-transform:capitalize;">${escapeHtml((String(data.event_scope || '').toLowerCase() === 'chapel' || parseInt(data.chapel_id || 0, 10) > 0) ? 'Chapel' : 'Cathedral')}</div></div>
             </div>
             <div style="border-top:1px solid var(--border); padding-top:12px; margin-top:12px; display:flex; gap:12px; align-items:start;">
                 <i class="fa-solid fa-clock" style="color:#737373; font-size:16px; margin-top:2px;"></i>
@@ -2122,7 +2131,14 @@ function viewRequestDetails(req) {
                 </div>
                 <div style="background: var(--bg2, #F6F6F6); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
                     <div style="font-size: 11px; text-transform: uppercase; color: var(--text2); font-weight: 700; margin-bottom: 3px; letter-spacing: 0.05em;"><i class="fa-solid fa-layer-group" style="color:var(--text); margin-right:4px;"></i> Jurisdiction</div>
-                    <div style="font-size: 12.5px; color: var(--text); font-weight: 600; text-transform: capitalize;">${escapeHtml(req.event_scope || 'Cathedral')}</div>
+                    <div style="font-size: 12.5px; color: var(--text); font-weight: 600;">${(() => {
+                        const rawScope = String(req.event_scope || '').trim().toLowerCase();
+                        const hasChapel = parseInt(req.chapel_id || 0, 10) > 0;
+                        const locType = String(req.location_type || '').trim().toLowerCase();
+                        let label = (rawScope === 'chapel' || (rawScope !== 'cathedral' && hasChapel)) ? 'Chapel' : 'Cathedral';
+                        if (locType === 'outside') label += ' (Outside Venue)';
+                        return escapeHtml(label);
+                    })()}</div>
                 </div>
             </div>
 

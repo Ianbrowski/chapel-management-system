@@ -82,17 +82,40 @@ class PortalController extends BaseController {
         $details = trim($_POST['details'] ?? '');
         $chapel_id = $chapel_id > 0 ? $chapel_id : null;
 
+        $merchItemId = null;
+        $merchQty    = null;
+
         // Handle Specialized Merchandise Reservation
         if ($action === 'reserve_merch') {
-            $itemId   = $_POST['item_id'] ?? '';
-            $itemName = $_POST['item_name'] ?? 'Unknown Item';
-            $qty      = (int)($_POST['quantity'] ?? 1);
-            if ($qty < 1) $qty = 1;
-            if ($qty > 50) $qty = 50; // Human error guard: Max reasonable reservation per request
-            
-            $type     = 'Merchandise';
-            $category = 'Reservation';
-            $details  = "Reservation for {$itemName} x {$qty}. (Item ID: {$itemId})";
+            $rawQty  = (int)($_POST['quantity'] ?? 1);
+            $itemId  = (int)($_POST['item_id'] ?? 0);
+            if ($itemId <= 0 || $rawQty < 1) {
+                return ['type' => 'error', 'message' => 'Please select a valid item and quantity.'];
+            }
+            if ($rawQty > 50) {
+                return ['type' => 'error', 'message' => 'Online reservations are limited to 50 units per request. Please contact the parish office for bulk orders.'];
+            }
+
+            require_once __DIR__ . '/../models/Merchandise.php';
+            $merchM = new Merchandise($this->conn);
+            $item   = $merchM->getItem($itemId);
+            if (!$item) {
+                return ['type' => 'error', 'message' => 'The selected merchandise item is no longer available.'];
+            }
+            $availableStock = (int)($item['stock_quantity'] ?? 0);
+            if ($availableStock <= 0) {
+                return ['type' => 'error', 'message' => '"' . $item['name'] . '" is currently out of stock.'];
+            }
+            if ($rawQty > $availableStock) {
+                return ['type' => 'error', 'message' => 'Only ' . $availableStock . ' unit(s) of "' . $item['name'] . '" are currently in stock.'];
+            }
+
+            $itemName    = (string)$item['name'];
+            $merchItemId = (int)$item['id'];
+            $merchQty    = $rawQty;
+            $type        = 'Merchandise';
+            $category    = 'Reservation';
+            $details     = "Reservation for {$itemName} x {$merchQty}. (Item ID: {$merchItemId})";
         }
 
         // 1. Basic Required Fields
@@ -145,7 +168,7 @@ class PortalController extends BaseController {
         }
 
         // Save to DB
-        $success = $this->inquiryModel->create($name, $email, $phone, $type, $category, $details, $target_date, $chapel_id);
+        $success = $this->inquiryModel->create($name, $email, $phone, $type, $category, $details, $target_date, $chapel_id, $merchItemId, $merchQty);
 
         if ($success) {
             $_SESSION['portal_last_submit'] = time();

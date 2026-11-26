@@ -73,7 +73,7 @@ class PortalController extends BaseController {
         
         $action  = $_POST['action'] ?? '';
         $name    = trim($_POST['full_name'] ?? '');
-        $email   = trim($_POST['email'] ?? '');
+        $email   = mb_strtolower(trim($_POST['email'] ?? ''));
         $phone   = trim($_POST['phone'] ?? '');
         $type    = $_POST['request_type'] ?? '';
         $category = $_POST['service_category'] ?? '';
@@ -142,10 +142,17 @@ class PortalController extends BaseController {
         $phone = preg_replace('/[^0-9+]/', '', $phone);
         if (strlen($phone) > 15) $phone = substr($phone, 0, 15);
 
-        // Spam Prevention: Max Active Pending Requests per Email
-        $pendingCount = $this->inquiryModel->getCountByEmailAndStatus($email, 'Pending');
-        if ($pendingCount >= 5) {
-            return ['type' => 'error', 'message' => 'You already have several pending requests in our queue. Please wait for us to process them before sending more.'];
+        // Spam Prevention: 1 open Merchandise reservation per email; 5 max for other public inquiries
+        if ($action === 'reserve_merch') {
+            $pendingMerch = $this->inquiryModel->getCountByEmailAndStatus($email, 'Pending', 'Merchandise');
+            if ($pendingMerch >= 1) {
+                return ['type' => 'error', 'message' => 'You already have a pending item reservation under this email. Please wait for the parish office to process it before placing another.'];
+            }
+        } else {
+            $pendingCount = $this->inquiryModel->getCountByEmailAndStatus($email, 'Pending');
+            if ($pendingCount >= 5) {
+                return ['type' => 'error', 'message' => 'You already have several pending requests in our queue. Please wait for us to process them before sending more.'];
+            }
         }
 
         // Human Error: Don't allow target dates in the past

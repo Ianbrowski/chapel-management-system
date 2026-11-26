@@ -33,6 +33,7 @@ class FinanceController extends BaseController {
             case 'del_merch':       $this->deleteMerchItem(); break;
             case 'restore_merch':   $this->restoreMerchItem(); break;
             case 'record_sale':     $this->recordMerchSale(); break;
+            case 'void_sale':       $this->voidMerchSale(); break;
             case 'member_reserve':  $this->memberReserve(); break;
         }
     }
@@ -253,9 +254,9 @@ class FinanceController extends BaseController {
         if ($donor === '') {
             $donor = 'Anonymous';
         }
-        $date     = $_POST['date_received'] ?? date('Y-m-d');
-        if (strtotime($date) === false || strtotime($date) > time()) {
-            $this->flash('error', 'Donation date is invalid or cannot be in the future.');
+        $date     = trim((string)($_POST['date_received'] ?? date('Y-m-d')));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || $date > date('Y-m-d') || $date < '1950-01-01') {
+            $this->flash('error', 'Donation date is invalid, too old, or in the future.');
             $this->redirect('dashboard.php?section=donations');
         }
         $allowedMethods = ['Cash', 'GCash', 'Bank Transfer', 'Maya', 'Check', 'Other'];
@@ -263,6 +264,10 @@ class FinanceController extends BaseController {
         $method   = in_array($rawMethod, $allowedMethods, true) ? $rawMethod : 'Cash';
         $chapelId = $this->getAppliedChapelId($_POST['chapel_id'] ?? 0);
         $donorRef = mb_substr(trim((string)($_POST['donor_ref_id'] ?? '')), 0, 100);
+        if ($donorRef !== '' && $this->donationModel->activeDonorRefExists($donorRef)) {
+            $this->flash('error', 'Duplicate payment reference: an active donation with reference "' . $donorRef . '" is already logged.');
+            $this->redirect('dashboard.php?section=donations');
+        }
         $refId    = $this->donationModel->generateRefId();
 
         $id = $this->donationModel->log($chapelId, $amount, $purpose, $donor, $date, $refId, $this->userId, $method, $donorRef);
@@ -503,7 +508,7 @@ class FinanceController extends BaseController {
 
             $this->conn->begin_transaction();
             try {
-                $lockStmt = $this->conn->prepare("SELECT id, email, full_name, phone, service_category, status, is_archived FROM public_inquiries WHERE id = ? FOR UPDATE");
+                $lockStmt = $this->conn->prepare("SELECT inquiry_id, email, full_name, phone, service_category, status, is_archived FROM public_inquiries WHERE inquiry_id = ? FOR UPDATE");
                 if ($lockStmt) {
                     $lockStmt->bind_param('i', $inquiryId);
                     $lockStmt->execute();
@@ -580,6 +585,29 @@ class FinanceController extends BaseController {
             }
         }
         $this->redirect('dashboard.php?section=merchandise');
+    }
+
+    private function voidMerchSale() {
+        if (!in_array($this->role, ['Admin', 'Cathedral Admin'], true)) {
+            $this->flash('error', 'Only Administrators can void merchandise sales.');
+            $this->redirect('dashboard.php?section=merchandise&tab=sales');
+        }
+
+        $saleId = (int)($_POST['id'] ?? 0);
+        $reason = trim((string)($_POST['void_reason'] ?? ''));
+        if ($saleId <= 0 || $reason === '') {
+            $this->flash('error', 'A valid sale ID and void reason are required.');
+            $this->redirect('dashboard.php?section=merchandise&tab=sales');
+        }
+
+        $before = $this->merchModel->getSaleById($saleId);
+        if ($this->merchModel->voidSale($saleId, $reason, (int)$this->userId)) {
+            AuditLogger::logFromSession($this->conn, 'voided', 'Finance', "Voided Merchandise Sale #{$saleId} and restored stock", $before, ['void_reason' => $reason]);
+            $this->flash('success', "Sale #{$saleId} voided and item stock restored.");
+        } else {
+            $this->flash('error', 'Unable to void this sale. It may already be voided.');
+        }
+        $this->redirect('dashboard.php?section=merchandise&tab=sales');
     }
 
     private function sanitizeCsvCell($value): string {

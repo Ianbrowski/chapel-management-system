@@ -354,6 +354,22 @@ class Donation {
         return $found;
     }
 
+    public function activeDonorRefExists(string $donorRefId): bool {
+        $clean = trim($donorRefId);
+        if ($clean === '' || !$this->hasDonorRefId) {
+            return false;
+        }
+        $stmt = $this->conn->prepare("SELECT 1 FROM donations WHERE is_archived = 0 AND voided_at IS NULL AND LOWER(TRIM(donor_ref_id)) = LOWER(?) LIMIT 1");
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param('s', $clean);
+        $stmt->execute();
+        $found = $stmt->get_result()->num_rows > 0;
+        $stmt->close();
+        return $found;
+    }
+
     public function getStats(int|string|null $chapelFilter = null) {
         $stats = ['total_amount' => 0, 'total_count' => 0, 'this_month' => 0];
 

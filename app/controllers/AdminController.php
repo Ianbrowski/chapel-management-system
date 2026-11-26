@@ -595,19 +595,33 @@ class AdminController extends BaseController {
 
             case 'save_history':
                 $id = (int)($_POST['id'] ?? 0);
-                $year = $_POST['year'] ?? '';
+                $year = mb_substr(trim((string)($_POST['year'] ?? '')), 0, 30);
                 $title = $_POST['title'] ?? '';
                 $desc = $_POST['description'] ?? '';
                 $sort = (int)($_POST['sort_order'] ?? 0);
                 $active = isset($_POST['is_active']) ? 1 : 0;
+                $credit = mb_substr(trim((string)($_POST['image_credit'] ?? '')), 0, 150);
 
                 $oldData = $id ? $this->parishModel->getHistoryItemById($id) : null;
+                $uploadMsg = '';
+                $imagePath = $this->handleImageUpload('history_image', 'uploads/history/', 'history_', 5 * 1024 * 1024, $uploadMsg);
+                if ($imagePath === null && isset($_POST['preset_image_path'])) {
+                    $preset = trim((string)$_POST['preset_image_path']);
+                    if ($preset === '__clear__') {
+                        $imagePath = '';
+                    } elseif ($preset !== '' && (str_starts_with($preset, 'assets/img/history/') || str_starts_with($preset, 'storage/uploads/'))) {
+                        $cand = realpath(BASE_PATH . '/' . $preset);
+                        if ($cand && is_file($cand)) {
+                            $imagePath = $preset;
+                        }
+                    }
+                }
 
-                if ($this->parishModel->saveHistory($id, $year, $title, $desc, $sort, $active, $this->userId)) {
-                    $newData = ['year' => $year, 'title' => $title, 'active' => $active];
+                if ($this->parishModel->saveHistory($id, $year, $title, $desc, $sort, $active, $this->userId, $imagePath, $credit)) {
+                    $newData = ['year' => $year, 'title' => $title, 'active' => $active, 'image_path' => $imagePath ?? ($oldData['image_path'] ?? null)];
                     $action = $id ? 'updated' : 'created';
                     AuditLogger::logFromSession($this->conn, $action, 'Records', "History item: $year - $title", $oldData, $newData);
-                    $this->flash('success', 'History item saved.');
+                    $this->flash('success', 'History item saved.' . $uploadMsg);
                 } else {
                     $this->flash('error', 'Failed to save history item.');
                 }

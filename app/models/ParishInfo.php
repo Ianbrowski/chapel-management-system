@@ -2,6 +2,7 @@
 class ParishInfo {
     private $conn;
     private array $tableExistsCache = [];
+    private bool $historySchemaEnsured = false;
 
     public function __construct($conn) {
         $this->conn = $conn;
@@ -108,18 +109,20 @@ class ParishInfo {
     }
 
     public function getHistoryIntro() {
+        $this->ensureHistoryEnhancements();
         if ($this->tableExists('parish_history_intro')) {
             $hi_res = $this->conn->query("SELECT intro_text FROM parish_history_intro ORDER BY intro_id DESC LIMIT 1");
             if ($hi_res && $hi_res->num_rows > 0) return $hi_res->fetch_assoc()['intro_text'];
         }
         
-        return 'The Iglesia Filipina Independiente Cathedral stands as a testament to faith, resilience, and the Filipino spirit of independence. Our cathedral has been a beacon of hope and spiritual guidance for generations.';
+        return 'Rooted in the patriotic and spiritual heritage of Bacoor, Cavite, the Cathedral of St. Michael the Archangel (Iglesia Filipina Independiente) preserves generations of Filipino faith, civic courage, and community stewardship.';
     }
 
     public function getHistoryItems() {
+        $this->ensureHistoryEnhancements();
         $items = [];
         if ($this->tableExists('parish_history')) {
-            $ph_res = $this->conn->query("SELECT * FROM parish_history WHERE is_active=1 ORDER BY sort_order ASC");
+            $ph_res = $this->conn->query("SELECT * FROM parish_history WHERE is_active=1 ORDER BY sort_order ASC, history_id ASC");
             if ($ph_res) while ($row = $ph_res->fetch_assoc()) $items[] = $row;
         }
         return $items;
@@ -188,7 +191,140 @@ class ParishInfo {
         return $res;
     }
 
+    public function ensureHistoryEnhancements(): void {
+        if ($this->historySchemaEnsured) {
+            return;
+        }
+        $this->historySchemaEnsured = true;
+
+        if (!$this->tableExists('parish_history')) {
+            return;
+        }
+
+        // 1. Widen `year` to accommodate ranges like "1980s–1995" and "2020–Present"
+        $yrRes = $this->conn->query("SHOW COLUMNS FROM parish_history LIKE 'year'");
+        if ($yrRes && ($yrCol = $yrRes->fetch_assoc())) {
+            $typeStr = strtolower((string)($yrCol['Type'] ?? ''));
+            if (preg_match('/varchar\((\d+)\)/', $typeStr, $m) && (int)$m[1] < 30) {
+                @$this->conn->query("ALTER TABLE parish_history MODIFY COLUMN `year` VARCHAR(30) NOT NULL");
+            }
+        }
+
+        // 2. Ensure image columns exist on parish_history
+        $histCols = [
+            'image_path'   => 'VARCHAR(255) NULL',
+            'image_credit' => 'VARCHAR(150) NULL',
+        ];
+        foreach ($histCols as $colName => $colDef) {
+            $colRes = $this->conn->query("SHOW COLUMNS FROM parish_history LIKE '{$colName}'");
+            if ($colRes && $colRes->num_rows === 0) {
+                @$this->conn->query("ALTER TABLE parish_history ADD COLUMN {$colName} {$colDef}");
+            }
+        }
+
+        // 3. Upgrade untouched placeholder starter rows cleanly to the researched IFI Bacoor chronicle
+        $existing = [];
+        $res = $this->conn->query("SELECT history_id, year, title FROM parish_history ORDER BY history_id ASC");
+        if ($res) {
+            while ($r = $res->fetch_assoc()) {
+                $existing[] = $r;
+            }
+            $res->free();
+        }
+
+        $isEmpty = empty($existing);
+        $titles = array_map(static fn($r) => trim((string)($r['title'] ?? '')), $existing);
+        $isLegacySeed = (count($existing) === 4 && $titles === ['Foundation', 'Cathedral Built', 'Major Restoration', 'Digital Transformation']);
+
+        if ($isEmpty || $isLegacySeed) {
+            $milestones = [
+                [
+                    'year' => 'Pre-1902',
+                    'title' => 'Revolutionary & GOMBURZA Roots (Bacoor)',
+                    'description' => "Bacoor's deep patriotic consciousness was shaped by Fr. Mariano Gomes (long-serving parish priest of Bacoor and martyr of GOMBURZA, 1872) and the town's vital role in the Philippine Revolution.",
+                    'sort_order' => 1,
+                    'image_path' => 'assets/img/history/pre1902_gomes_monument.jpg',
+                    'image_credit' => 'Plaza Mariano Gomes Monument, Bacoor (Wikimedia Commons, CC BY 4.0)',
+                ],
+                [
+                    'year' => 'Dec 1902',
+                    'title' => 'Embracing the Iglesia Filipina Independiente',
+                    'description' => "Months after the 1902 proclamation of the IFI by Isabelo de los Reyes and Obispo Maximo Gregorio Aglipay, Bacoor's cura parroco Padre Fortunato Clemeña joined the nationalist church alongside the vast majority of Bacoor's faithful (later becoming the first Obispo de Cavite), while revolutionary Gen. Mariano Noriel served as first president of Bacoor's IFI laymen's branch.",
+                    'sort_order' => 2,
+                    'image_path' => 'assets/img/history/1902_bishop_aglipay.jpg',
+                    'image_credit' => 'Obispo Maximo Gregorio Aglipay, c. 1905 (Wikimedia Commons, Public Domain)',
+                ],
+                [
+                    'year' => '1906–1912',
+                    'title' => 'Steadfast Faith & Building Our Sanctuary',
+                    'description' => 'Following the legal turnover of Spanish-era stone parish structures (Barlin v. Ramirez), the IFI congregation worshiped in temporary chapels (including Barrio Maliksi) and constructed their own parish sanctuary and chapels across major phases from 1906 to 1912.',
+                    'sort_order' => 3,
+                    'image_path' => 'assets/img/history/1906_ifi_bacoor_bell.jpg',
+                    'image_credit' => 'Historic Bacoor IFI Church Bell, Digman (Ralff Nestor Nacor, CC BY-SA 4.0)',
+                ],
+                [
+                    'year' => '1950–1965',
+                    'title' => 'Parish Growth & Bacoor Parish School',
+                    'description' => 'Mid-century infrastructure expansion (~1950), episcopal milestones under diocesan leadership (e.g., Bishop Montenegro, consecrated 1957), and the founding of Bacoor Parish School (1965) for youth and community formation.',
+                    'sort_order' => 4,
+                    'image_path' => 'assets/img/history/1950_ifi_bacoor_2.jpg',
+                    'image_credit' => 'Cathedral Sanctuary & Belltower, Digman, Bacoor (Ralff Nestor Nacor, CC BY-SA 4.0)',
+                ],
+                [
+                    'year' => '1980s–1995',
+                    'title' => 'Renewal & Seat of the Cathedral',
+                    'description' => 'Navigating periods of institutional consolidation in the 1980s and episcopal stewardship (e.g., Bishop Lucea, consecrated 1995), the Parish of St. Michael the Archangel grew as the Cathedral seat serving Digman and partner chapels across Bacoor.',
+                    'sort_order' => 5,
+                    'image_path' => 'assets/img/history/1980_ifi_bacoor_1.jpg',
+                    'image_credit' => 'IFI Cathedral of St. Michael the Archangel Facade (Ralff Nestor Nacor, CC BY-SA 4.0)',
+                ],
+                [
+                    'year' => '2020–Present',
+                    'title' => 'Preserving Archives & Digital Stewardship',
+                    'description' => 'Safeguarding multi-generational sacramental registries alongside modern parish scheduling, certificate issuance, and community ministries.',
+                    'sort_order' => 6,
+                    'image_path' => 'storage/uploads/main_chapel_i.png',
+                    'image_credit' => 'Cathedral of St. Michael the Archangel, Digman, Bacoor',
+                ],
+            ];
+
+            $this->conn->begin_transaction();
+            try {
+                if ($isLegacySeed) {
+                    @$this->conn->query("DELETE FROM parish_history");
+                }
+                $ins = $this->conn->prepare("INSERT INTO parish_history (year, title, description, sort_order, is_active, image_path, image_credit) VALUES (?, ?, ?, ?, 1, ?, ?)");
+                if ($ins) {
+                    foreach ($milestones as $ms) {
+                        $ins->bind_param('sssiss', $ms['year'], $ms['title'], $ms['description'], $ms['sort_order'], $ms['image_path'], $ms['image_credit']);
+                        $ins->execute();
+                    }
+                    $ins->close();
+                }
+
+                if ($this->tableExists('parish_history_intro')) {
+                    $this->ensureIntroRecord('parish_history_intro');
+                    $introRes = $this->conn->query("SELECT intro_text FROM parish_history_intro ORDER BY intro_id DESC LIMIT 1");
+                    $curIntro = $introRes ? trim((string)($introRes->fetch_assoc()['intro_text'] ?? '')) : '';
+                    if ($curIntro === '' || stripos($curIntro, 'The Iglesia Filipina Independiente Cathedral stands as a testament') === 0) {
+                        $newIntro = 'Rooted in Bacoor\'s patriotic heritage and the 1902 proclamation of the Iglesia Filipina Independiente, the Cathedral of St. Michael the Archangel in Digman continues over a century of faith, civic courage, and community stewardship.';
+                        $upIntro = $this->conn->prepare("UPDATE parish_history_intro SET intro_text = ?, updated_at = NOW() WHERE intro_id = 1");
+                        if ($upIntro) {
+                            $upIntro->bind_param('s', $newIntro);
+                            $upIntro->execute();
+                            $upIntro->close();
+                        }
+                    }
+                }
+                $this->conn->commit();
+            } catch (Throwable $e) {
+                $this->conn->rollback();
+            }
+        }
+    }
+
     public function getHistoryItemById($id) {
+        $this->ensureHistoryEnhancements();
         $stmt = $this->conn->prepare("SELECT * FROM parish_history WHERE history_id=?");
         if (!$stmt) return null;
         $stmt->bind_param("i", $id);
@@ -216,16 +352,26 @@ class ParishInfo {
         return $res;
     }
 
-    public function saveHistory($id, $year, $title, $description, $sort, $active, $userId) {
+    public function saveHistory($id, $year, $title, $description, $sort, $active, $userId, $imagePath = null, $imageCredit = null) {
+        $this->ensureHistoryEnhancements();
         $uid = ((int)$userId > 0) ? (int)$userId : null;
+        $credit = ($imageCredit !== null && trim((string)$imageCredit) !== '') ? trim((string)$imageCredit) : null;
         if ($id) {
-            $stmt = $this->conn->prepare("UPDATE parish_history SET year=?, title=?, description=?, sort_order=?, is_active=?, updated_at=NOW() WHERE history_id=?");
-            if (!$stmt) return false;
-            $stmt->bind_param("sssiii", $year, $title, $description, $sort, $active, $id);
+            if ($imagePath !== null) {
+                $imgVal = ($imagePath !== '') ? $imagePath : null;
+                $stmt = $this->conn->prepare("UPDATE parish_history SET year=?, title=?, description=?, sort_order=?, is_active=?, image_path=?, image_credit=?, updated_at=NOW() WHERE history_id=?");
+                if (!$stmt) return false;
+                $stmt->bind_param("sssiissi", $year, $title, $description, $sort, $active, $imgVal, $credit, $id);
+            } else {
+                $stmt = $this->conn->prepare("UPDATE parish_history SET year=?, title=?, description=?, sort_order=?, is_active=?, image_credit=?, updated_at=NOW() WHERE history_id=?");
+                if (!$stmt) return false;
+                $stmt->bind_param("sssiisi", $year, $title, $description, $sort, $active, $credit, $id);
+            }
         } else {
-            $stmt = $this->conn->prepare("INSERT INTO parish_history (year, title, description, sort_order, is_active, created_by) VALUES (?,?,?,?,?,?)");
+            $imgVal = ($imagePath !== null && $imagePath !== '') ? $imagePath : null;
+            $stmt = $this->conn->prepare("INSERT INTO parish_history (year, title, description, sort_order, is_active, created_by, image_path, image_credit) VALUES (?,?,?,?,?,?,?,?)");
             if (!$stmt) return false;
-            $stmt->bind_param("sssiii", $year, $title, $description, $sort, $active, $uid);
+            $stmt->bind_param("sssiiiss", $year, $title, $description, $sort, $active, $uid, $imgVal, $credit);
         }
         $res = $stmt->execute();
         $stmt->close();

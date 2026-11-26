@@ -1088,9 +1088,15 @@ document.addEventListener('keydown', function(e) {
                              data-history="<?php echo htmlspecialchars(json_encode($hiPayload, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
                              onclick="openHistoryModal(this)"
                              style="cursor:pointer; display:flex; align-items:flex-start; gap:14px; border-radius:var(--radius-md); border:1px solid var(--border); border-left:3.5px solid var(--accent);">
-                            <div style="width:42px; height:42px; border-radius:10px; background:rgba(197,160,89,0.14); border:1px solid rgba(197,160,89,0.3); color:var(--gold); display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; margin-top:2px;">
-                                <i class="<?php echo $hIcon; ?>"></i>
-                            </div>
+                            <?php if (!empty($hi['image_path'])): ?>
+                                <div style="width:68px; height:68px; border-radius:10px; overflow:hidden; border:1px solid rgba(197,160,89,0.35); background:var(--bg-surface); flex-shrink:0; margin-top:2px; box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+                                    <img src="<?php echo htmlspecialchars($hi['image_path']); ?>" alt="<?php echo htmlspecialchars($hi['title']); ?>" loading="lazy" style="width:100%; height:100%; object-fit:cover; object-position:center 20%; display:block;">
+                                </div>
+                            <?php else: ?>
+                                <div style="width:42px; height:42px; border-radius:10px; background:rgba(197,160,89,0.14); border:1px solid rgba(197,160,89,0.3); color:var(--gold); display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; margin-top:2px;">
+                                    <i class="<?php echo $hIcon; ?>"></i>
+                                </div>
+                            <?php endif; ?>
                             <div style="flex:1; min-width:0;">
                                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:5px;">
                                     <span class="timeline-year" style="display:inline-flex; align-items:center; gap:5px; padding:2px 10px; border-radius:999px; background:rgba(197,160,89,0.14); border:1px solid rgba(197,160,89,0.28); margin:0;">
@@ -1591,6 +1597,11 @@ document.addEventListener('keydown', function(e) {
                     <span id="hModalStep" style="display:inline-flex; align-items:center; background:var(--bg-surface); border:1px solid var(--border); color:var(--text-muted); padding:4px 10px; border-radius:999px; font-size:0.74rem; font-weight:600;">Milestone</span>
                 </div>
                 <h2 id="hModalTitle" style="font-family:var(--font-family); font-weight:700; margin:2px 0 0; font-size:1.42rem; line-height:1.25; color:var(--text-main);">Era Milestone</h2>
+            </div>
+
+            <div id="hModalImageWrap" style="display:none; margin-bottom:16px; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--border); background:var(--bg-surface);">
+                <img id="hModalImage" src="" alt="" style="width:100%; max-height:240px; object-fit:cover; object-position:center 20%; display:block;">
+                <div id="hModalCredit" style="display:none; padding:6px 12px; font-size:0.74rem; color:var(--text-muted); border-top:1px solid var(--border); background:var(--bg-surface);"></div>
             </div>
 
             <div style="background:var(--bg-surface); padding:20px 22px; border-radius:var(--radius-md); text-align:left; border:1px solid var(--border); border-left:4px solid var(--accent); margin-bottom:20px;">
@@ -2171,6 +2182,31 @@ document.addEventListener('keydown', function(e) {
         if (descEl) descEl.innerText = data.description || 'This era marks a significant chapter in the building of our spiritual sanctuary.';
         const iconEl = document.getElementById('hModalIcon');
         if (iconEl) iconEl.className = data.icon || 'fa-solid fa-landmark';
+
+        const imgWrap = document.getElementById('hModalImageWrap');
+        const imgEl = document.getElementById('hModalImage');
+        const creditEl = document.getElementById('hModalCredit');
+        const iconWrap = document.getElementById('hModalIconWrap');
+        if (imgWrap && imgEl) {
+            if (data.image_path) {
+                imgEl.src = data.image_path;
+                imgEl.alt = data.title || 'Historical Milestone';
+                imgWrap.style.display = 'block';
+                if (iconWrap) iconWrap.style.display = 'none';
+                if (creditEl) {
+                    if (data.image_credit) {
+                        creditEl.innerText = data.image_credit;
+                        creditEl.style.display = 'block';
+                    } else {
+                        creditEl.style.display = 'none';
+                    }
+                }
+            } else {
+                imgEl.removeAttribute('src');
+                imgWrap.style.display = 'none';
+                if (iconWrap) iconWrap.style.display = 'flex';
+            }
+        }
 
         const total = (typeof data.total === 'number' && data.total > 0) ? data.total : cards.length;
         const idx = (typeof data.index === 'number') ? data.index : clickedIdx;

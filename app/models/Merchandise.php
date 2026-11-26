@@ -2,10 +2,29 @@
 class Merchandise {
     private $conn;
     private bool $supportsArchive;
+    private bool $saleVoidEnsured = false;
 
     public function __construct($conn) {
         $this->conn = $conn;
         $this->supportsArchive = $this->columnExists('merchandise_items', 'is_archived');
+    }
+
+    private function ensureSaleVoidColumns(): void {
+        if ($this->saleVoidEnsured) {
+            return;
+        }
+        $this->saleVoidEnsured = true;
+        $cols = [
+            'is_voided'   => 'TINYINT(1) NOT NULL DEFAULT 0',
+            'void_reason' => 'VARCHAR(255) NULL',
+            'voided_by'   => 'INT(11) NULL',
+            'voided_at'   => 'TIMESTAMP NULL',
+        ];
+        foreach ($cols as $colName => $colDef) {
+            if (!$this->columnExists('merchandise_sales', $colName)) {
+                @$this->conn->query("ALTER TABLE merchandise_sales ADD COLUMN {$colName} {$colDef}");
+            }
+        }
     }
 
     public function supportsArchiveFeature(): bool {
@@ -171,7 +190,8 @@ class Merchandise {
     }
 
     public function getSalesPaginated(int $page = 1, int $perPage = 20): array {
-        $res = $this->conn->query("SELECT COUNT(*) as cnt FROM merchandise_sales");
+        $this->ensureSaleVoidColumns();
+        $res = $this->conn->query("SELECT COUNT(*) as cnt FROM merchandise_sales WHERE is_voided = 0");
         $total = $res ? (int)($res->fetch_assoc()['cnt'] ?? 0) : 0;
         $pages = (int) ceil($total / $perPage);
         $page = max(1, min($page, $pages ?: 1));
@@ -188,11 +208,13 @@ class Merchandise {
     }
 
     public function getSales($limit = 50, $offset = 0) {
+        $this->ensureSaleVoidColumns();
         $sql = "SELECT s.*, i.name as item_name, u.full_name as processor_name 
                 FROM merchandise_sales s 
                 LEFT JOIN merchandise_items i ON s.item_id = i.id 
                 LEFT JOIN users u ON s.processed_by = u.id 
-                ORDER BY s.sale_date DESC LIMIT ? OFFSET ?";
+                WHERE s.is_voided = 0
+                ORDER BY s.sale_date DESC, s.id DESC LIMIT ? OFFSET ?";
         $stmt = $this->conn->prepare($sql);
         $stmt->bind_param("ii", $limit, $offset);
         $stmt->execute();
@@ -208,8 +230,64 @@ class Merchandise {
     }
 
     public function getTotalSalesRevenue(): float {
-        $res = $this->conn->query("SELECT COALESCE(SUM(total_price), 0) AS total FROM merchandise_sales");
+        $this->ensureSaleVoidColumns();
+        $res = $this->conn->query("SELECT COALESCE(SUM(total_price), 0) AS total FROM merchandise_sales WHERE is_voided = 0");
         return $res ? (float)($res->fetch_assoc()['total'] ?? 0) : 0.0;
+    }
+
+    public function voidSale(int $saleId, string $reason, int $voidedBy): bool {
+        $this->ensureSaleVoidColumns();
+        $reason = mb_substr(trim($reason), 0, 255);
+        if ($saleId <= 0 || $reason === '') {
+            return false;
+        }
+
+        $this->conn->begin_transaction();
+        try {
+            $lock = $this->conn->prepare("SELECT id, item_id, quantity, is_voided FROM merchandise_sales WHERE id = ? FOR UPDATE");
+            if (!$lock) {
+                throw new RuntimeException('Unable to lock sale record.');
+            }
+            $lock->bind_param('i', $saleId);
+            $lock->execute();
+            $sale = $lock->get_result()->fetch_assoc();
+            $lock->close();
+
+            if (!$sale || !empty($sale['is_voided'])) {
+                throw new RuntimeException('Sale record not found or already voided.');
+            }
+
+            $uid = $voidedBy > 0 ? $voidedBy : null;
+            $upSale = $this->conn->prepare("UPDATE merchandise_sales SET is_voided = 1, void_reason = ?, voided_by = ?, voided_at = NOW() WHERE id = ? AND is_voided = 0");
+            if (!$upSale) {
+                throw new RuntimeException('Unable to void sale.');
+            }
+            $upSale->bind_param('sii', $reason, $uid, $saleId);
+            $upSale->execute();
+            $affected = $upSale->affected_rows;
+            $upSale->close();
+            if ($affected <= 0) {
+                throw new RuntimeException('Sale was already voided.');
+            }
+
+            $itemId = (int)($sale['item_id'] ?? 0);
+            $qty = max(0, (int)($sale['quantity'] ?? 0));
+            if ($itemId > 0 && $qty > 0) {
+                $restock = $this->conn->prepare("UPDATE merchandise_items SET stock_quantity = stock_quantity + ? WHERE id = ?");
+                if (!$restock) {
+                    throw new RuntimeException('Unable to restore item stock.');
+                }
+                $restock->bind_param('ii', $qty, $itemId);
+                $restock->execute();
+                $restock->close();
+            }
+
+            $this->conn->commit();
+            return true;
+        } catch (Throwable $e) {
+            $this->conn->rollback();
+            return false;
+        }
     }
 
     public function getSaleById($id) {

@@ -3,8 +3,9 @@
 $totalItems     = count($merchandise_items);
 $lowStockItems  = array_filter($merchandise_items, fn($i) => $i['stock_quantity'] <= 5 && $i['stock_quantity'] > 0);
 $outOfStock     = array_filter($merchandise_items, fn($i) => $i['stock_quantity'] == 0);
-$totalSalesQty  = array_sum(array_column($merchandise_sales ?? [], 'quantity'));
-$initialTab     = $_GET['tab'] ?? 'catalog';
+$totalSalesQty     = array_sum(array_column($merchandise_sales ?? [], 'quantity'));
+$canVoidMerchSale  = in_array($_SESSION['role'] ?? '', ['Admin', 'Cathedral Admin'], true);
+$initialTab        = $_GET['tab'] ?? 'catalog';
 if (!in_array($initialTab, ['catalog', 'sales', 'pos', 'archived'], true)) {
     $initialTab = 'catalog';
 }
@@ -480,7 +481,7 @@ if (!in_array($initialTab, ['catalog', 'sales', 'pos', 'archived'], true)) {
                             <th style="padding: 8px 14px; width: 220px; text-align: left;">Buyer</th>
                             <th style="padding: 8px 14px; width: 70px; text-align: center;">Qty</th>
                             <th style="padding: 8px 14px; width: 120px; text-align: right;">Total Amount</th>
-                            <th style="padding: 8px 14px; width: 110px; text-align: center;">Receipt</th>
+                            <th style="padding: 8px 14px; width: <?php echo $canVoidMerchSale ? '160px' : '110px'; ?>; text-align: center;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -516,9 +517,23 @@ if (!in_array($initialTab, ['catalog', 'sales', 'pos', 'archived'], true)) {
                                     ₱<?php echo number_format($sale['total_price'], 2); ?>
                                 </td>
                                 <td style="padding: 8px 14px; text-align: center;" onclick="event.stopPropagation()">
-                                    <a href="views/pages/merchandise_receipt.php?id=<?php echo $sale['id']; ?>" target="_blank" class="btn-sm btn-ghost" style="color: var(--accent); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; text-decoration: none; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;" title="Print Receipt">
-                                        <i class="fa-solid fa-print"></i> Receipt
-                                    </a>
+                                    <div style="display: inline-flex; align-items: center; gap: 5px;">
+                                        <a href="views/pages/merchandise_receipt.php?id=<?php echo $sale['id']; ?>" target="_blank" class="btn-sm btn-ghost" style="color: var(--accent); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; text-decoration: none; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;" title="Print Receipt">
+                                            <i class="fa-solid fa-print"></i> Receipt
+                                        </a>
+                                        <?php if ($canVoidMerchSale): ?>
+                                        <button type="button" class="btn-sm btn-ghost"
+                                                data-id="<?php echo (int)$sale['id']; ?>"
+                                                data-item="<?php echo htmlspecialchars($sale['item_name'] ?? 'Item', ENT_QUOTES, 'UTF-8'); ?>"
+                                                data-qty="<?php echo (int)$sale['quantity']; ?>"
+                                                data-total="<?php echo number_format((float)$sale['total_price'], 2); ?>"
+                                                onclick="openVoidSaleModal(this)"
+                                                style="color: #dc2626; border: 1px solid rgba(220,38,38,0.28); border-radius: 6px; padding: 4px 7px; font-size: 11px; cursor: pointer;"
+                                                title="Void sale &amp; restore stock">
+                                            <i class="fa-solid fa-ban"></i>
+                                        </button>
+                                        <?php endif; ?>
+                                    </div>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -806,6 +821,35 @@ if (!in_array($initialTab, ['catalog', 'sales', 'pos', 'archived'], true)) {
 </div><!-- /.workspace -->
 
 <!-- ── Modals ─────────────────────────────────────────────────────────────── -->
+
+<!-- Void Sale Modal -->
+<?php if ($canVoidMerchSale): ?>
+<div class="modal-overlay" id="modal-void-merch-sale">
+    <div class="modal" style="max-width: 430px;">
+        <div class="modal-header">
+            <div class="modal-title" style="color: #dc2626;"><i class="fa-solid fa-ban"></i> Void Merchandise Sale</div>
+            <button type="button" class="modal-close" onclick="closeModal('modal-void-merch-sale')">×</button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="form_section" value="merchandise">
+            <input type="hidden" name="action" value="void_sale">
+            <input type="hidden" name="id" id="void-sale-id">
+            <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+            <div class="modal-body">
+                <p id="void-sale-summary" style="font-size: 12.5px; color: var(--text); margin: 0 0 12px; padding: 10px 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;"></p>
+                <div class="form-group">
+                    <label class="form-label">Reason for Voiding <span style="color: #ef4444;">*</span></label>
+                    <input type="text" name="void_reason" id="void-sale-reason" required maxlength="255" placeholder="e.g. Wrong quantity entered, returned item">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-gray" onclick="closeModal('modal-void-merch-sale')">Cancel</button>
+                <button type="submit" class="btn btn-danger"><i class="fa-solid fa-ban"></i> Void &amp; Restore Stock</button>
+            </div>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Add Item Modal -->
 <div class="modal-overlay" id="modal-add-merch-item">
@@ -1371,6 +1415,23 @@ function viewMerchSaleDetails(input) {
     openModal('modal-sale-detail');
 }
 window.viewMerchSaleDetails = viewMerchSaleDetails;
+
+function openVoidSaleModal(btn) {
+    if (!btn) return;
+    const idInp = document.getElementById('void-sale-id');
+    const sumEl = document.getElementById('void-sale-summary');
+    const rsnEl = document.getElementById('void-sale-reason');
+    if (idInp) idInp.value = btn.getAttribute('data-id') || '';
+    if (sumEl) {
+        const item = btn.getAttribute('data-item') || 'Item';
+        const qty  = btn.getAttribute('data-qty') || '1';
+        const tot  = btn.getAttribute('data-total') || '0.00';
+        sumEl.textContent = `Void Sale #${idInp.value}: ${item} (${qty} pcs — ₱${tot}) and return ${qty} unit(s) to inventory?`;
+    }
+    if (rsnEl) rsnEl.value = '';
+    openModal('modal-void-merch-sale');
+}
+window.openVoidSaleModal = openVoidSaleModal;
 
 document.addEventListener('DOMContentLoaded', () => {
     applyMerchSalePrefill();

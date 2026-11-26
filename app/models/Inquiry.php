@@ -291,11 +291,16 @@ class Inquiry {
      * Count pending requests for a specific email.
      * Used for rate-limiting and spam prevention.
      */
-    public function getCountByEmailAndStatus($email, $status) {
+    public function getCountByEmailAndStatus($email, $status, ?string $requestType = null) {
         $archiveClause = $this->hasIsArchived() ? " AND is_archived = 0" : "";
-        $stmt = $this->conn->prepare("SELECT COUNT(*) as c FROM public_inquiries WHERE email = ? AND status = ?{$archiveClause}");
+        $typeClause    = ($requestType !== null && $requestType !== '') ? " AND request_type = ?" : "";
+        $stmt = $this->conn->prepare("SELECT COUNT(*) as c FROM public_inquiries WHERE email = ? AND status = ?{$typeClause}{$archiveClause}");
         if (!$stmt) return 0;
-        $stmt->bind_param('ss', $email, $status);
+        if ($typeClause !== '') {
+            $stmt->bind_param('sss', $email, $status, $requestType);
+        } else {
+            $stmt->bind_param('ss', $email, $status);
+        }
         $stmt->execute();
         $res = (int)($stmt->get_result()->fetch_assoc()['c'] ?? 0);
         $stmt->close();

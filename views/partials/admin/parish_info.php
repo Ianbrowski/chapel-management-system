@@ -672,6 +672,9 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
                     <?php foreach ($history_items as $h): ?>
                         <div class="parish-list-card">
                             <div style="display: flex; align-items: flex-start; gap: 14px; flex: 1;">
+                                <?php if (!empty($h['image_path'])): ?>
+                                    <img src="<?php echo htmlspecialchars($h['image_path']); ?>" alt="" style="width: 56px; height: 56px; border-radius: 8px; object-fit: cover; object-position: center 20%; border: 1px solid var(--border); flex-shrink: 0;">
+                                <?php endif; ?>
                                 <div style="padding: 4px 10px; border-radius: 6px; background: #F6F6F6; border: 1px solid var(--border); color: #111111; font-weight: 700; font-size: 13px; font-family: var(--font-family, 'Inter', sans-serif); flex-shrink: 0;">
                                     <?php echo htmlspecialchars($h['year']); ?>
                                 </div>
@@ -696,6 +699,8 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
                                             'description' => (string)$h['description'],
                                             'sort_order' => (int)$h['sort_order'],
                                             'is_active' => (int)$h['is_active'],
+                                            'image_path' => (string)($h['image_path'] ?? ''),
+                                            'image_credit' => (string)($h['image_credit'] ?? ''),
                                         ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
                                         onclick="openHistoryModalFromEl(this)" title="Edit milestone">
                                     <i class="fa-solid fa-pen-to-square mr-1"></i> Edit
@@ -1114,8 +1119,9 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
             </div>
             <button type="button" class="modal-close" onclick="closePIModal('history')">×</button>
         </div>
-        <form method="POST">
+        <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="form_section" value="parish_info">
+            <input type="hidden" name="redirect_tab" value="history">
             <input type="hidden" name="action" value="save_history">
             <input type="hidden" name="id" id="pi-hist-id" value="0">
             <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
@@ -1124,7 +1130,7 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
                 <div class="parish-grid-2">
                     <div class="parish-form-group">
                         <label><i class="fa-solid fa-calendar"></i> Year / Date <span class="req-star">*</span></label>
-                        <input type="text" name="year" id="pi-hist-year" placeholder="e.g. 1902" required>
+                        <input type="text" name="year" id="pi-hist-year" maxlength="30" placeholder="e.g. Dec 1902" required>
                     </div>
                     <div class="parish-form-group">
                         <label><i class="fa-solid fa-arrow-down-1-9"></i> Sort Order</label>
@@ -1138,6 +1144,35 @@ if (!in_array($active_tab, ['contact', 'mass', 'history', 'leaders', 'email'], t
                 <div class="parish-form-group">
                     <label><i class="fa-solid fa-align-left"></i> Description Narrative <span class="req-star">*</span></label>
                     <textarea name="description" id="pi-hist-desc" style="min-height: 90px;" placeholder="Detailed historical narrative..." required></textarea>
+                </div>
+                <div class="parish-grid-2">
+                    <div class="parish-form-group">
+                        <label><i class="fa-solid fa-image"></i> Upload Historical Photo</label>
+                        <input type="file" name="history_image" accept="image/*" style="font-size: 12px; padding: 6px;">
+                    </div>
+                    <div class="parish-form-group">
+                        <label><i class="fa-solid fa-photo-film"></i> Or Pick Heritage Asset</label>
+                        <select name="preset_image_path" id="pi-hist-preset">
+                            <option value="">— Keep current —</option>
+                            <option value="assets/img/history/pre1902_gomes_monument.jpg">Plaza Mariano Gomes Monument (Bacoor)</option>
+                            <option value="assets/img/history/pre1902_gomburza.jpg">GOMBURZA Archive Portrait (1872)</option>
+                            <option value="assets/img/history/1902_bishop_aglipay.jpg">Obispo Maximo Gregorio Aglipay (1905)</option>
+                            <option value="assets/img/history/1902_gen_noriel.jpg">Gen. Mariano Noriel (Bacoor)</option>
+                            <option value="assets/img/history/1906_ifi_bacoor_bell.jpg">Bacoor IFI Church Bell (Digman)</option>
+                            <option value="assets/img/history/1950_ifi_bacoor_2.jpg">Cathedral Sanctuary &amp; Belltower</option>
+                            <option value="assets/img/history/1980_ifi_bacoor_1.jpg">IFI Cathedral Exterior Facade</option>
+                            <option value="storage/uploads/main_chapel_i.png">Main Cathedral Complex (Present)</option>
+                            <option value="__clear__">Remove Image</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="parish-form-group">
+                    <label><i class="fa-solid fa-quote-right"></i> Photo Caption / Attribution</label>
+                    <input type="text" name="image_credit" id="pi-hist-credit" maxlength="150" placeholder="e.g. Wikimedia Commons / Cathedral Archives">
+                </div>
+                <div id="pi-hist-img-preview" style="display: none; align-items: center; gap: 10px; padding: 8px 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;">
+                    <img id="pi-hist-img-src" src="" alt="Preview" style="width: 60px; height: 48px; border-radius: 6px; object-fit: cover; object-position: center 20%;">
+                    <span style="font-size: 11.5px; color: var(--text2);">Current milestone photo</span>
                 </div>
                 <div class="parish-form-group">
                     <label style="cursor: pointer; user-select: none;">
@@ -1310,7 +1345,7 @@ function openScheduleModalFromEl(el) {
 function openHistoryModalFromEl(el) {
     try {
         const d = JSON.parse(el.getAttribute('data-history') || '{}');
-        openHistoryModal(d.id || 0, d.year || '', d.title || '', d.description || '', d.sort_order || 0, d.is_active ?? 1);
+        openHistoryModal(d.id || 0, d.year || '', d.title || '', d.description || '', d.sort_order || 0, d.is_active ?? 1, d.image_path || '', d.image_credit || '');
     } catch (e) { console.error(e); }
 }
 
@@ -1331,13 +1366,27 @@ function openScheduleModal(id, day='', time='', sort=0, active=1) {
     document.getElementById('pi-modal-schedule').classList.add('open');
 }
 
-function openHistoryModal(id, year='', title='', desc='', sort=0, active=1) {
+function openHistoryModal(id, year='', title='', desc='', sort=0, active=1, imagePath='', imageCredit='') {
     document.getElementById('pi-hist-id').value = id;
     document.getElementById('pi-hist-year').value = year;
     document.getElementById('pi-hist-title').value = title;
     document.getElementById('pi-hist-desc').value = desc;
     document.getElementById('pi-hist-sort').value = sort;
     document.getElementById('pi-hist-active').checked = !!active;
+    const creditEl = document.getElementById('pi-hist-credit');
+    if (creditEl) creditEl.value = imageCredit || '';
+    const presetEl = document.getElementById('pi-hist-preset');
+    if (presetEl) presetEl.value = '';
+    const prevWrap = document.getElementById('pi-hist-img-preview');
+    const prevImg = document.getElementById('pi-hist-img-src');
+    if (prevWrap && prevImg) {
+        if (imagePath) {
+            prevImg.src = imagePath;
+            prevWrap.style.display = 'flex';
+        } else {
+            prevWrap.style.display = 'none';
+        }
+    }
     document.getElementById('pi-history-mtitle').innerText = id ? 'Edit Timeline Milestone' : 'Add Timeline Milestone';
     document.getElementById('pi-modal-history').classList.add('open');
 }

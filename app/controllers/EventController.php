@@ -1108,6 +1108,11 @@ class EventController extends BaseController {
             AuditLogger::logFromSession($this->conn, 'completed', $isCertRecord ? 'Certificates' : 'Event Requests', "Marked ID {$id} as Completed/Released");
             $this->flash('success', $isCertRecord ? 'Certificate marked as released.' : 'Event marked as completed.');
         } elseif ($action === 'record_payment') {
+            if (in_array($record['status'] ?? '', ['Cancelled', 'Rejected'], true)) {
+                $this->flash('error', 'Cannot record payment for a cancelled or declined request.');
+                $this->redirect($redirectUrl);
+            }
+
             $amount = round((float)($_POST['amount'] ?? 0), 2);
             $method = trim((string)($_POST['payment_method'] ?? 'Cash'));
             $allowedMethods = ['Cash', 'GCash', 'Bank Transfer', 'Maya', 'Other'];
@@ -1115,13 +1120,35 @@ class EventController extends BaseController {
                 $method = 'Cash';
             }
             $dateRecv = trim((string)($_POST['date_received'] ?? date('Y-m-d')));
-            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateRecv)) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateRecv) || $dateRecv > date('Y-m-d') || $dateRecv < '1950-01-01') {
                 $dateRecv = date('Y-m-d');
             }
             $donorRef = mb_substr(trim((string)($_POST['donor_ref_id'] ?? '')), 0, 120);
 
-            if ($amount <= 0) {
+            if ($amount <= 0 || $amount > 100000000) {
                 $this->flash('error', 'Payment amount must be greater than zero.');
+                $this->redirect($redirectUrl);
+            }
+
+            $totalFee = (float)($record['total_fee'] ?? 0);
+            if ($totalFee > 0) {
+                $paidMap = $this->eventModel->getPaidAmountsMap([$id]);
+                $alreadyPaid = (float)($paidMap[$id] ?? 0);
+                $remaining = round($totalFee - $alreadyPaid, 2);
+                if ($remaining <= 0.01) {
+                    $this->flash('error', 'This request has already been paid in full.');
+                    $this->redirect($redirectUrl);
+                }
+                if ($amount > ($remaining + 0.01)) {
+                    $this->flash('error', 'Payment amount (PHP ' . number_format($amount, 2) . ') exceeds the remaining balance of PHP ' . number_format($remaining, 2) . '.');
+                    $this->redirect($redirectUrl);
+                }
+            }
+
+            require_once __DIR__ . '/../models/Donation.php';
+            $donationModel = new Donation($this->conn);
+            if ($donorRef !== '' && $donationModel->activeDonorRefExists($donorRef)) {
+                $this->flash('error', 'Duplicate payment reference: an active payment with reference "' . $donorRef . '" already exists.');
                 $this->redirect($redirectUrl);
             }
 
@@ -1149,8 +1176,6 @@ class EventController extends BaseController {
             $purposePrefix = $isCertRecord ? 'Certificate Fee: ' : 'Service Fee: ';
             $purpose = mb_substr($purposePrefix . trim((string)($record['title'] ?? 'Service Request')), 0, 100);
 
-            require_once __DIR__ . '/../models/Donation.php';
-            $donationModel = new Donation($this->conn);
             $donId = $donationModel->create([
                 'chapel_id'      => !empty($record['chapel_id']) ? (int)$record['chapel_id'] : null,
                 'amount'         => $amount,

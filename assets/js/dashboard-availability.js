@@ -785,19 +785,25 @@ function loadPastorCards(eventType, datetime, scope, customDuration = 0, chapelI
 }
 
 function selectPastor(id, scope) {
+    const isBlockedCard = (card) =>
+        card.classList.contains('unavailable') ||
+        card.classList.contains('pending-conflict') ||
+        card.classList.contains('off-duty');
+
+    const restoreAvailableCard = (card) => {
+        if (isBlockedCard(card)) return;
+        card.className = 'pastor-card available';
+        const dot = card.querySelector('.pastor-status-dot');
+        if (dot) dot.className = 'pastor-status-dot dot-available';
+    };
+
     // Toggle deselection if already selected
     if (selectedPastor[scope] == id) {
         selectedPastor[scope] = null;
         const input = document.getElementById('selected-pastor-input-' + scope);
         if (input) input.value = '';
 
-        document.querySelectorAll('.pastor-card[data-scope="' + scope + '"]').forEach(card => {
-            if (!card.classList.contains('unavailable') && !card.classList.contains('pending-conflict')) {
-                card.className = 'pastor-card available';
-                const dot = card.querySelector('.pastor-status-dot');
-                if (dot) dot.className = 'pastor-status-dot dot-available';
-            }
-        });
+        document.querySelectorAll('.pastor-card[data-scope="' + scope + '"]').forEach(restoreAvailableCard);
         return;
     }
 
@@ -807,12 +813,12 @@ function selectPastor(id, scope) {
 
     document.querySelectorAll('.pastor-card[data-scope="' + scope + '"]').forEach(card => {
         if (card.dataset.id == id) {
+            if (isBlockedCard(card)) return;
             card.className = 'pastor-card selected';
-            card.querySelector('.pastor-status-dot').className = 'pastor-status-dot dot-selected';
-        } else if (!card.classList.contains('unavailable')) {
-            card.className = 'pastor-card available';
             const dot = card.querySelector('.pastor-status-dot');
-            if (dot) dot.className = 'pastor-status-dot dot-available';
+            if (dot) dot.className = 'pastor-status-dot dot-selected';
+        } else {
+            restoreAvailableCard(card);
         }
     });
 }

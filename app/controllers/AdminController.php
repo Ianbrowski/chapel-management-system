@@ -285,14 +285,15 @@ class AdminController extends BaseController {
             return;
         }
         $id       = (int)($_POST['id'] ?? 0);
-        $name     = $_POST['chapel_name'] ?? '';
-        $loc      = $_POST['location'] ?? '';
-        $patron   = $_POST['patron_saint'] ?? '';
-        $capacity = (int)($_POST['seating_capacity'] ?? 50);
-        $coord    = $_POST['coordinator_name'] ?? '';
-        $phone    = $_POST['coordinator_phone'] ?? '';
-        $status   = $_POST['status'] ?? 'Active';
-        $sundayServiceTime = $_POST['sunday_service_time'] ?? 'Check Parish Schedule';
+        $name     = trim((string)($_POST['chapel_name'] ?? ''));
+        $loc      = trim((string)($_POST['location'] ?? ''));
+        $patron   = trim((string)($_POST['patron_saint'] ?? ''));
+        $capacity = max(1, min(10000, (int)($_POST['seating_capacity'] ?? 50)));
+        $coord    = trim((string)($_POST['coordinator_name'] ?? ''));
+        $phone    = trim((string)($_POST['coordinator_phone'] ?? ''));
+        $rawStatus = trim((string)($_POST['status'] ?? 'Active'));
+        $status   = in_array($rawStatus, ['Active', 'Maintenance', 'Inactive'], true) ? $rawStatus : 'Active';
+        $sundayServiceTime = trim((string)($_POST['sunday_service_time'] ?? 'Check Parish Schedule')) ?: 'Check Parish Schedule';
         $themeColor = $_POST['theme_color'] ?? '#4f46e5';
 
         $smtp = [
@@ -306,11 +307,17 @@ class AdminController extends BaseController {
         ];
 
         if ($this->role === 'Chapel Admin') {
-            if ($action !== 'update' || $this->chapelId === null || $id !== (int)$this->chapelId) {
+            if ($action !== 'update' || $this->chapelId === null || (int)$this->chapelId <= 0 || $id !== (int)$this->chapelId) {
                 $this->flash('error', 'Chapel Admins can only update their assigned chapel.');
                 $this->redirect('dashboard.php?section=chapels');
                 return;
             }
+        }
+
+        if (in_array($action, ['create', 'update'], true) && $name === '') {
+            $this->flash('error', 'Chapel name is required.');
+            $this->redirect('dashboard.php?section=chapels');
+            return;
         }
 
         // 1. Handle Chapel Image Upload
@@ -694,7 +701,7 @@ class AdminController extends BaseController {
         $perPage = 30;
 
         if ($section === 'users') {
-            $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin']) ? $this->chapelId : null;
+            $chapelFilter = $this->resolveScopedChapelFilter();
             $result = $this->userModel->getPaginated($page, $perPage, $chapelFilter);
             $data['users'] = $result['records'];
             $data['total_pages'] = $result['pages'];
@@ -703,7 +710,7 @@ class AdminController extends BaseController {
             $data['user_stats'] = $this->userModel->getMemberStats($chapelFilter);
             $data['pending_count'] = $this->userModel->getPendingCount($chapelFilter);
         } elseif ($section === 'chapels') {
-            $chapelFilter = !in_array($this->role, ['Admin', 'Cathedral Admin']) ? $this->chapelId : null;
+            $chapelFilter = $this->resolveScopedChapelFilter();
             // Since there are few chapels, we might not strictly NEED pagination, but for consistency:
             $data['chapels'] = $this->enrichChapelsWithFiesta($this->chapelModel->getAll($chapelFilter));
         } elseif ($section === 'parish_info') {

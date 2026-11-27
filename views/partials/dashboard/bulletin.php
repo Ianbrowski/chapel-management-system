@@ -1,86 +1,123 @@
 <!-- ═══════════════════════════════════════════════════════════════ -->
-<!-- BULLETIN BOARD (UNIFIED STANDARD DASHBOARD LAYOUT)            -->
+<!-- PARISH BULLETIN (OFFICIAL BULLETED ANNOUNCEMENT SHEET)          -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <?php
-$totalPosts  = count($bulletin_posts ?? []);
-$activePosts = count(array_filter($bulletin_posts ?? [], fn($p) => !empty($p['is_active'])));
+$bulletinPosts = $bulletin_posts ?? [];
+$totalPosts  = count($bulletinPosts);
+$activePosts = count(array_filter($bulletinPosts, fn($p) => !empty($p['is_active'])));
 $hiddenPosts = $totalPosts - $activePosts;
 $curBFilter  = (string)($bulletin_filter ?? ($_GET['bulletin_chapel'] ?? 'all'));
+$isGlobalBulletinMgr = in_array($role ?? '', ['Admin', 'Cathedral Admin'], true);
 
-$dot_colors = [
-    '#c9a84c' => 'Gold',
-    '#22c55e' => 'Green',
-    '#ef4444' => 'Red',
-    '#0b0f19' => 'Black',
-    '#64748b' => 'Slate',
+$bulletinCategories = [
+    '#c9a84c' => ['name' => 'Parish Notice'],
+    '#22c55e' => ['name' => 'Schedule & Events'],
+    '#ef4444' => ['name' => 'Urgent / Important'],
+    '#0b0f19' => ['name' => 'Pastoral Advisory'],
+    '#64748b' => ['name' => 'Community Update'],
 ];
+
+$visiblePosts = [];
+foreach ($bulletinPosts as $bp) {
+    if (empty($can_post_bulletin) && empty($bp['is_active'])) continue;
+    $visiblePosts[] = $bp;
+}
+
+$canManagePostRow = static function (array $post) use ($can_post_bulletin, $isGlobalBulletinMgr, $chapel_id): bool {
+    if (empty($can_post_bulletin)) return false;
+    if ($isGlobalBulletinMgr) return true;
+    $postChapel = $post['chapel_id'] ?? null;
+    if ($postChapel === null || $postChapel === '' || (int)$postChapel === 0) {
+        return empty($chapel_id) || (int)$chapel_id === 0;
+    }
+    return !empty($chapel_id) && (int)$chapel_id === (int)$postChapel;
+};
+
+$scopedChapelLabel = 'Cathedral / Parish-Wide';
+if (!$isGlobalBulletinMgr && !empty($chapel_id)) {
+    foreach (($chapels ?? []) as $ch) {
+        if ((int)$ch['chapel_id'] === (int)$chapel_id) {
+            $scopedChapelLabel = $ch['chapel_name'] . ' (Assigned Chapel)';
+            break;
+        }
+    }
+}
 ?>
 
-<div class="workspace workspace-fluid" id="sec-bulletin" style="display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 1680px; margin: 0 auto; box-sizing: border-box; padding: 14px clamp(16px, 1.8vw, 24px) 24px;">
+<div class="workspace workspace-fluid" id="sec-bulletin" style="display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 1320px; margin: 0 auto; box-sizing: border-box; padding: 14px clamp(16px, 2vw, 28px) 28px;">
 
-    <!-- ─── 1. TOP HEADER BAR: TITLE + STAT BADGES (PINNED TOP-RIGHT) ─── -->
-    <div class="bulletin-header-bar page-header-bar" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 6px; flex-wrap: wrap; gap: 10px;">
+    <!-- ─── 1. PAGE HEADER ─── -->
+    <div class="bulletin-header-bar page-header-bar" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px; flex-wrap: wrap; gap: 10px;">
         <div class="bulletin-header-left" style="display: flex; align-items: center; gap: 14px;">
             <div class="bulletin-header-icon page-header-icon" style="width: 38px; height: 38px; border-radius: 9px; background: rgba(201,168,76,0.14); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;">
                 <i class="fa-solid fa-bullhorn"></i>
             </div>
             <div>
                 <h1 class="page-title" style="font-family: var(--font-family, 'Inter', sans-serif); font-size: var(--font-page-title, 20px); font-weight: 700; color: var(--text); margin: 0; line-height: 1.2;">
-                    Bulletin
+                    Parish Bulletin
                 </h1>
                 <p class="page-subtitle" style="font-size: var(--font-page-subtitle, 14px); color: var(--text2); margin: 3px 0 0 0;">
-                    <?php echo $can_post_bulletin ? 'Manage official parish announcements, schedules, and priority order' : 'Official parish announcements, liturgical schedules, and cathedral updates'; ?>
+                    <?php echo !empty($can_post_bulletin) ? 'Manage official parish and chapel announcements' : 'Weekly parish notices and pulpit announcements'; ?>
                 </p>
             </div>
         </div>
 
-        <!-- Right: Stat Badges + Add Action -->
-        <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <span class="badge" style="background: var(--bg3, #F4F4F5); border: 1px solid var(--border); color: var(--text2); font-size: 11.5px; font-weight: 600; padding: 4px 12px; border-radius: 999px;">
-                <?php echo (int)$totalPosts; ?> Notices
+                <?php echo (int)$activePosts; ?> Active
             </span>
-            <?php if ($hiddenPosts > 0): ?>
-            <span class="badge" style="background: var(--bg3, #F4F4F5); border: 1px solid var(--border); color: var(--muted); font-size: 11.5px; font-weight: 600; padding: 4px 12px; border-radius: 999px;" title="Hidden Notices">
+            <?php if (!empty($can_post_bulletin) && $hiddenPosts > 0): ?>
+            <span class="badge" style="background: var(--bg3, #F4F4F5); border: 1px solid var(--border); color: var(--muted); font-size: 11.5px; font-weight: 600; padding: 4px 12px; border-radius: 999px;">
                 <?php echo (int)$hiddenPosts; ?> Hidden
             </span>
             <?php endif; ?>
-            <?php if ($can_post_bulletin): ?>
-                <button type="button" class="btn btn-primary btn-sm" onclick="openModal('modal-add-bulletin')" 
-                        style="height: 32px; font-weight: 600; font-size: 11.5px; display: inline-flex; align-items: center; gap: 6px; background: #111111; color: #FFFFFF; border: 1px solid #111111; border-radius: 6px; padding: 6px 14px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.12); margin-left: 4px;">
+            <?php if (!empty($can_post_bulletin)): ?>
+                <button type="button" class="btn btn-primary btn-sm" onclick="openModal('modal-add-bulletin')"
+                        style="height: 33px; font-weight: 600; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; background: #111111; color: #FFFFFF; border: 1px solid #111111; border-radius: 999px; padding: 6px 16px; cursor: pointer;">
                     <i class="fa-solid fa-plus text-gold"></i> New Announcement
                 </button>
             <?php endif; ?>
         </div>
     </div>
 
-    <!-- ─── 2. MAIN ANNOUNCEMENT BOARD CONTAINER ─── -->
-    <div class="panel bulletin-board-panel" style="border-radius: 12px; background: var(--surface, #FFFFFF); border: 1px solid var(--border); box-shadow: none; display: flex; flex-direction: column; width: 100%; padding: 0 !important;">
-        
-        <!-- Compact Filter & Search Toolbar inside panel header -->
-        <div style="padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface, #FFFFFF); flex-shrink: 0;">
-            
-            <!-- Left: Search and Location Filter -->
-            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 280px; max-width: 540px; flex-wrap: wrap;">
-                <!-- Search Input with Clear Button -->
-                <div style="position: relative; flex: 1; min-width: 190px;">
-                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text2, #737373); font-size: 11px; pointer-events: none; z-index: 2;"></i>
-                    <input type="text" id="bulletinSearchInput" data-ac-mode="dom" data-ac-target="#bulletinFeedContainer .bulletin-feed-row" data-ac-extract="bulletin" placeholder="Search announcements..." oninput="filterBulletinTable()" 
-                           style="width: 100%; height: 32px; padding-left: 30px !important; padding-right: 24px !important; background: var(--bg2, #FAFAFA); border: 1px solid var(--border); border-radius: 6px; color: var(--text, #111111); font-size: 12px; outline: none; box-sizing: border-box;">
+    <!-- ─── 2. OFFICIAL BULLETIN SHEET ─── -->
+    <section class="panel pb-sheet-container" style="padding: 0 !important; overflow: hidden !important; flex: none !important; height: auto !important;">
+
+        <!-- Bulletin Letterhead -->
+        <header class="pb-letterhead">
+            <div class="pb-letterhead-brand">
+                <img src="assets/img/2323.png" alt="IFI Cathedral Seal" class="pb-letterhead-seal">
+                <div>
+                    <div class="pb-letterhead-diocese">Iglesia Filipina Independiente &bull; Cathedral of St. Michael the Archangel</div>
+                    <h2 class="pb-letterhead-title">Parish Bulletin &amp; Announcements</h2>
+                </div>
+            </div>
+            <div class="pb-letterhead-date">
+                <?php echo date('l, F j, Y'); ?>
+            </div>
+        </header>
+
+        <!-- Discreet Filter Bar -->
+        <div class="pb-filter-strip">
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 240px; max-width: 520px; flex-wrap: wrap;">
+                <div style="position: relative; flex: 1; min-width: 180px;">
+                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text2); font-size: 11px; pointer-events: none; z-index: 2;"></i>
+                    <input type="text" id="bulletinSearchInput" data-ac-mode="dom" data-ac-target="#bulletinFeedContainer .bulletin-feed-row" data-ac-extract="bulletin" placeholder="Search bulletin announcements..." oninput="filterBulletinTable()"
+                           style="width: 100%; height: 32px; padding-left: 30px !important; padding-right: 24px !important; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 12px; outline: none; box-sizing: border-box;">
                     <span id="bulletin-clear-search" onclick="clearBulletinSearch()" title="Clear search" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text2); font-size: 14px; line-height: 1;">&times;</span>
                 </div>
 
-                <!-- Chapel Location Filter Dropdown -->
-                <select id="bulletinScopeSelect" 
+                <select id="bulletinScopeSelect"
                         onchange="window.location.href='dashboard.php?section=bulletin&amp;bulletin_chapel=' + encodeURIComponent(this.value)"
-                        style="height: 32px; font-size: 12px; font-weight: 500; border-radius: 6px; background: var(--bg2, #FAFAFA); border: 1px solid var(--border); color: var(--text); padding: 0 28px 0 10px; width: auto; max-width: 200px;"
-                        title="Filter by jurisdiction">
+                        style="height: 32px; font-size: 12px; font-weight: 500; border-radius: 6px; background: var(--bg2); border: 1px solid var(--border); color: var(--text); padding: 0 26px 0 10px; width: auto; max-width: 210px;"
+                        title="Filter by location">
                     <option value="all" <?php echo ($curBFilter === 'all') ? 'selected' : ''; ?>>All Locations (<?php echo $totalPosts; ?>)</option>
-                    <option value="parish_wide" <?php echo ($curBFilter === 'parish_wide' || $curBFilter === '0') ? 'selected' : ''; ?>>🌐 Parish-Wide Only</option>
+                    <option value="parish_wide" <?php echo ($curBFilter === 'parish_wide' || $curBFilter === '0') ? 'selected' : ''; ?>>Parish-Wide Only</option>
                     <?php if (!empty($chapels)): ?>
                     <optgroup label="Chapels">
                         <?php foreach ($chapels as $ch): ?>
-                        <option value="<?php echo $ch['chapel_id']; ?>" <?php echo ($curBFilter === (string)$ch['chapel_id']) ? 'selected' : ''; ?>>
-                            ⛪ <?php echo htmlspecialchars($ch['chapel_name']); ?>
+                        <option value="<?php echo (int)$ch['chapel_id']; ?>" <?php echo ($curBFilter === (string)$ch['chapel_id']) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($ch['chapel_name']); ?>
                         </option>
                         <?php endforeach; ?>
                     </optgroup>
@@ -88,219 +125,193 @@ $dot_colors = [
                 </select>
             </div>
 
-            <!-- Right: Segmented Capsule Filter Tabs -->
-            <div style="display: inline-flex; align-items: center; gap: 4px; background: var(--bg3, #F4F4F5); padding: 3px; border-radius: 999px; border: 1px solid var(--border);" id="bulletin-status-tabs">
-                <button type="button" class="tab-btn active" data-status-filter="all" onclick="setBulletinStatusFilter('all', this)" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: var(--text);">
-                    All (<?php echo $totalPosts; ?>)
-                </button>
-                <button type="button" class="tab-btn" data-status-filter="recent" onclick="setBulletinStatusFilter('recent', this)" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: var(--text2);" title="Announcements published in the last 30 days">
-                    Recently Added
-                </button>
-                <button type="button" class="tab-btn" data-status-filter="active" onclick="setBulletinStatusFilter('active', this)" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: var(--text2);">
-                    Active (<?php echo $activePosts; ?>)
-                </button>
-                <?php if ($hiddenPosts > 0): ?>
-                <button type="button" class="tab-btn" data-status-filter="hidden" onclick="setBulletinStatusFilter('hidden', this)" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: var(--text2);">
-                    Hidden (<?php echo $hiddenPosts; ?>)
-                </button>
+            <div class="pb-tabs" id="bulletin-status-tabs">
+                <button type="button" class="tab-btn active" data-status-filter="all" onclick="setBulletinStatusFilter('all', this)">All (<?php echo count($visiblePosts); ?>)</button>
+                <button type="button" class="tab-btn" data-status-filter="recent" onclick="setBulletinStatusFilter('recent', this)">Recent</button>
+                <button type="button" class="tab-btn" data-status-filter="active" onclick="setBulletinStatusFilter('active', this)">Active (<?php echo $activePosts; ?>)</button>
+                <?php if (!empty($can_post_bulletin) && $hiddenPosts > 0): ?>
+                <button type="button" class="tab-btn" data-status-filter="hidden" onclick="setBulletinStatusFilter('hidden', this)">Hidden (<?php echo $hiddenPosts; ?>)</button>
                 <?php endif; ?>
             </div>
         </div>
 
-        <!-- ─── ANNOUNCEMENT BOARD (PINNED HERO + 2-COLUMN NOTICE CARDS) ─── -->
-        <div style="padding: 16px; background: var(--bg2, #FAFAFA); flex: 1; min-height: 0;">
-            <?php
-                $visiblePosts = [];
-                foreach ($bulletin_posts ?? [] as $bp) {
-                    if (!$can_post_bulletin && empty($bp['is_active'])) continue;
-                    $visiblePosts[] = $bp;
-                }
-            ?>
+        <!-- Bulleted Announcement Body -->
+        <div class="pb-sheet-body-wrap">
             <?php if (empty($visiblePosts)): ?>
-                <div style="text-align: center; padding: 56px 20px; color: var(--text2); background: var(--surface, #FFFFFF); border: 1px dashed var(--border); border-radius: 12px;">
-                    <i class="fa-solid fa-bullhorn" style="font-size: 34px; opacity: 0.3; margin-bottom: 10px; display: block; color: var(--accent);"></i>
-                    <div style="font-size: 14px; font-weight: 700; color: var(--text);">No announcements found for this filter.</div>
-                    <div style="font-size: 12px; margin-top: 4px; color: var(--text2);">
-                        <?php echo $can_post_bulletin ? 'Click "+ New Announcement" above to publish a notice.' : 'Check back later for upcoming parish notices and schedules.'; ?>
+                <div class="pb-empty">
+                    <i class="fa-solid fa-scroll" style="font-size: 28px; color: var(--accent); opacity: 0.45; margin-bottom: 8px;"></i>
+                    <div style="font-family: 'Playfair Display', Georgia, serif; font-size: 16px; font-weight: 700; color: var(--text);">No Announcements Currently Posted</div>
+                    <div style="font-size: 12.5px; color: var(--text2); margin-top: 4px;">
+                        <?php echo !empty($can_post_bulletin) ? 'Use "New Announcement" above to add a bullet to the parish sheet.' : 'Check back soon for new parish notices.'; ?>
                     </div>
                 </div>
             <?php else: ?>
-                <div id="bulletinFeedContainer" class="bulletin-cards-grid">
+                <ul id="bulletinFeedContainer" class="pb-bullet-list">
                     <?php
                     $sevenDaysAgo = time() - (7 * 86400);
                     foreach ($visiblePosts as $idx => $bp):
-                        $isPinnedHero = ($idx === 0 && !empty($bp['is_active']));
                         $dotColor = $bp['dot_color'] ?? '#c9a84c';
-                        $createdTs = !empty($bp['created_at']) ? strtotime($bp['created_at']) : 0;
+                        $catName = $bulletinCategories[$dotColor]['name'] ?? 'Parish Notice';
+                        $createdTs = !empty($bp['created_at']) ? strtotime($bp['created_at']) : time();
                         $isNewNotice = ($createdTs > 0 && $createdTs >= $sevenDaysAgo);
-                        $dateLabel = $createdTs > 0 ? date('M j, Y', $createdTs) : 'Official Notice';
-                        $postJson = htmlspecialchars(json_encode($bp, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
+                        $dateStr = date('M j, Y', $createdTs);
+                        $scopeLabel = !empty($bp['chapel_name']) ? $bp['chapel_name'] : 'Parish-Wide';
+                        $canEditThis = $canManagePostRow($bp);
+
+                        $bpEnriched = $bp;
+                        $bpEnriched['category_label'] = $catName;
+                        $postJson = htmlspecialchars(json_encode($bpEnriched, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
                     ?>
-                    <article class="bulletin-feed-row bulletin-notice-card <?php echo $isPinnedHero ? 'is-pinned-hero' : ''; ?> <?php echo empty($bp['is_active']) ? 'is-hidden-row' : ''; ?>"
-                             data-post-id="<?php echo intval($bp['post_id']); ?>"
-                             data-post="<?php echo $postJson; ?>"
-                             data-created="<?php echo $createdTs; ?>"
-                             data-status="<?php echo !empty($bp['is_active']) ? 'active' : 'hidden'; ?>"
-                             onclick="openViewBulletinModal(this)"
-                             style="<?php echo empty($bp['is_active']) ? 'opacity: 0.68;' : ''; ?>">
+                    <li class="bulletin-feed-row pb-bullet-item <?php echo empty($bp['is_active']) ? 'is-hidden-bullet' : ''; ?>"
+                        data-post-id="<?php echo (int)$bp['post_id']; ?>"
+                        data-sort-idx="<?php echo (int)$idx; ?>"
+                        data-post="<?php echo $postJson; ?>"
+                        data-created="<?php echo (int)$createdTs; ?>"
+                        data-status="<?php echo !empty($bp['is_active']) ? 'active' : 'hidden'; ?>"
+                        onclick="openViewBulletinModal(this)"
+                        tabindex="0"
+                        role="button"
+                        aria-label="Announcement: <?php echo htmlspecialchars($bp['title']); ?>">
 
-                        <!-- Top Priority Accent Strip -->
-                        <div style="height: <?php echo $isPinnedHero ? '4px' : '3px'; ?>; background: <?php echo htmlspecialchars($dotColor); ?>; width: 100%; flex-shrink: 0;"></div>
+                        <!-- Left Bullet Marker -->
+                        <span class="pb-bullet-marker" aria-hidden="true" style="color: <?php echo htmlspecialchars($dotColor); ?>;">
+                            <span class="pb-bullet-dot" style="background: <?php echo htmlspecialchars($dotColor); ?>;"></span>
+                        </span>
 
-                        <div style="padding: <?php echo $isPinnedHero ? '18px 20px' : '15px 17px'; ?>; display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0;">
-                            <!-- Card Meta Header -->
-                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
-                                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0;">
-                                    <?php if ($isPinnedHero): ?>
-                                        <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 9px; border-radius: 999px; background: rgba(201,168,76,0.16); color: #9a7418; border: 1px solid rgba(201,168,76,0.35);">
-                                            <i class="fa-solid fa-thumbtack" style="font-size: 9.5px;"></i> Pinned Notice
-                                        </span>
-                                    <?php endif; ?>
-
-                                    <?php if (!empty($bp['chapel_name'])): ?>
-                                        <span class="bulletin-audience-badge" title="Jurisdiction: <?php echo htmlspecialchars($bp['chapel_name']); ?>" style="font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--bg2, #f6f6f6); border: 1px solid var(--border); color: var(--text2); display: inline-flex; align-items: center; gap: 5px; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                            <i class="fa-solid fa-church text-gold" style="font-size: 10px; flex-shrink: 0;"></i>
-                                            <span style="overflow: hidden; text-overflow: ellipsis;"><?php echo htmlspecialchars($bp['chapel_name']); ?></span>
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="bulletin-audience-badge" title="Jurisdiction: Parish-Wide Notice" style="font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--bg2, #f6f6f6); border: 1px solid var(--border); color: var(--text2); display: inline-flex; align-items: center; gap: 5px;">
-                                            <i class="fa-solid fa-globe text-gold" style="font-size: 10px; flex-shrink: 0;"></i> Parish-Wide
-                                        </span>
-                                    <?php endif; ?>
-
-                                    <?php if ($isNewNotice): ?>
-                                        <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 7px; border-radius: 999px; background: rgba(34,197,94,0.12); color: #15803d; border: 1px solid rgba(34,197,94,0.28);">
-                                            New
-                                        </span>
-                                    <?php endif; ?>
-                                </div>
-
-                                <span style="font-size: 11px; color: var(--text2); font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;">
-                                    <i class="fa-regular fa-calendar" style="font-size: 10.5px; opacity: 0.75;"></i>
-                                    <?php echo htmlspecialchars($dateLabel); ?>
-                                </span>
-                            </div>
-
-                            <!-- Headline & Excerpt -->
-                            <div style="flex: 1; min-width: 0;">
-                                <div class="bulletin-row-title" style="font-family: var(--font-family-base, 'Inter', sans-serif); font-size: <?php echo $isPinnedHero ? '16.5px' : '14.5px'; ?>; font-weight: 700; color: var(--text); line-height: 1.35; display: flex; align-items: flex-start; gap: 8px;">
-                                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: <?php echo htmlspecialchars($dotColor); ?>; margin-top: <?php echo $isPinnedHero ? '7px' : '6px'; ?>; flex-shrink: 0;"></span>
-                                    <span><?php echo htmlspecialchars($bp['title']); ?></span>
-                                </div>
-                                <div class="bulletin-row-subtitle" style="font-size: <?php echo $isPinnedHero ? '13px' : '12.5px'; ?>; color: var(--text2); margin-top: 6px; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: <?php echo $isPinnedHero ? '4' : '3'; ?>; -webkit-box-orient: vertical; overflow: hidden; padding-left: 16px;">
-                                    <?php echo htmlspecialchars($bp['subtitle'] ?? 'No additional details provided.'); ?>
-                                </div>
-                            </div>
-
-                            <!-- Card Footer: Read More + Admin Controls -->
-                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); flex-wrap: wrap;" onclick="event.stopPropagation();">
-                                <div style="display: inline-flex; align-items: center; gap: 8px;">
-                                    <button type="button"
-                                            class="btn-bulletin-view"
-                                            data-post="<?php echo $postJson; ?>"
-                                            onclick="openViewBulletinModal(this)"
-                                            style="background: none; border: none; padding: 0; font-size: 12px; font-weight: 600; color: var(--accent, #c9a84c); cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
-                                        <span>Read full notice</span>
-                                        <i class="fa-solid fa-arrow-right" style="font-size: 10px;"></i>
-                                    </button>
-                                </div>
-
-                                <?php if ($can_post_bulletin): ?>
-                                <div style="display: inline-flex; align-items: center; gap: 5px;">
-                                    <span style="font-size: 11px; font-weight: 600; color: var(--text2); margin-right: 2px;">#<?php echo $idx + 1; ?></span>
-
-                                    <?php if ($idx > 0): ?>
-                                    <form method="POST" style="display:inline;margin:0;">
-                                        <input type="hidden" name="form_section" value="bulletin">
-                                        <input type="hidden" name="action" value="reorder_post">
-                                        <input type="hidden" name="id" value="<?php echo intval($bp['post_id']); ?>">
-                                        <input type="hidden" name="direction" value="up">
-                                        <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                                        <button type="submit" title="Move Up" style="width: 26px; height: 26px; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; cursor: pointer; color: var(--text2); font-size: 10px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-chevron-up"></i></button>
-                                    </form>
-                                    <?php endif; ?>
-
-                                    <?php if ($idx < count($visiblePosts) - 1): ?>
-                                    <form method="POST" style="display:inline;margin:0;">
-                                        <input type="hidden" name="form_section" value="bulletin">
-                                        <input type="hidden" name="action" value="reorder_post">
-                                        <input type="hidden" name="id" value="<?php echo intval($bp['post_id']); ?>">
-                                        <input type="hidden" name="direction" value="down">
-                                        <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                                        <button type="submit" title="Move Down" style="width: 26px; height: 26px; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; cursor: pointer; color: var(--text2); font-size: 10px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-chevron-down"></i></button>
-                                    </form>
-                                    <?php endif; ?>
-
-                                    <form method="POST" style="display: inline; margin: 0;">
-                                        <input type="hidden" name="form_section" value="bulletin">
-                                        <input type="hidden" name="action" value="toggle_post">
-                                        <input type="hidden" name="id" value="<?php echo intval($bp['post_id']); ?>">
-                                        <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                                        <button type="submit"
-                                                class="badge"
-                                                style="border: 1px solid <?php echo $bp['is_active'] ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'; ?>; background: <?php echo $bp['is_active'] ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)'; ?>; color: <?php echo $bp['is_active'] ? '#16a34a' : '#dc2626'; ?>; font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;"
-                                                title="Click to toggle visibility">
-                                            <i class="fa-solid <?php echo $bp['is_active'] ? 'fa-eye' : 'fa-eye-slash'; ?>"></i>
-                                            <?php echo $bp['is_active'] ? 'Active' : 'Hidden'; ?>
-                                        </button>
-                                    </form>
-
-                                    <button type="button"
-                                            class="btn btn-ghost btn-sm btn-bulletin-edit"
-                                            data-post="<?php echo $postJson; ?>"
-                                            onclick="openEditBulletinModal(this)"
-                                            title="Edit announcement"
-                                            style="width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--accent);">
-                                        <i class="fa-solid fa-pen" style="font-size: 10.5px; pointer-events: none;"></i>
-                                    </button>
-
-                                    <form method="POST" style="display: inline; margin: 0;" onsubmit="return confirm('Delete this announcement permanently?')">
-                                        <input type="hidden" name="form_section" value="bulletin">
-                                        <input type="hidden" name="action" value="delete_post">
-                                        <input type="hidden" name="id" value="<?php echo intval($bp['post_id']); ?>">
-                                        <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                                        <button type="submit"
-                                                class="btn btn-ghost btn-sm"
-                                                title="Delete announcement"
-                                                style="width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid rgba(239,68,68,0.25); background: var(--surface); color: #ef4444;">
-                                            <i class="fa-solid fa-trash" style="font-size: 10.5px; pointer-events: none;"></i>
-                                        </button>
-                                    </form>
-                                </div>
+                        <!-- Center Announcement Text -->
+                        <div class="pb-bullet-content">
+                            <div class="pb-bullet-headline-line">
+                                <span class="bulletin-row-title pb-bullet-title"><?php echo htmlspecialchars($bp['title']); ?></span>
+                                <?php if ($idx === 0 && !empty($bp['is_active'])): ?>
+                                    <span class="pb-inline-tag pb-tag-pinned"><i class="fa-solid fa-thumbtack"></i> Pinned</span>
+                                <?php endif; ?>
+                                <?php if ($isNewNotice && !empty($bp['is_active'])): ?>
+                                    <span class="pb-inline-tag pb-tag-new">New</span>
+                                <?php endif; ?>
+                                <?php if (empty($bp['is_active'])): ?>
+                                    <span class="pb-inline-tag pb-tag-hidden">Hidden</span>
                                 <?php endif; ?>
                             </div>
-                        </div>
-                    </article>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
-        </div>
 
-        <!-- Empty search results notice inside panel -->
-        <div id="bulletinSearchEmpty" style="display: none; text-align: center; color: var(--text2); padding: 36px 20px;">
-            <i class="fa-solid fa-magnifying-glass" style="font-size: 26px; opacity: 0.35; margin-bottom: 8px; display: block; color: var(--accent);"></i>
-            <div style="font-size: 13px; font-weight: 700; color: var(--text);">No matching announcements found.</div>
-            <div style="font-size: 11.5px; margin-top: 3px; color: var(--text2);">Try searching for a different keyword or location.</div>
+                            <?php if (!empty($bp['subtitle'])): ?>
+                            <p class="bulletin-row-subtitle pb-bullet-text"><?php echo htmlspecialchars($bp['subtitle']); ?></p>
+                            <?php endif; ?>
+
+                            <div class="pb-bullet-meta">
+                                <span class="pb-meta-item" style="color: <?php echo htmlspecialchars($dotColor); ?>; font-weight: 600;">
+                                    <?php echo htmlspecialchars($catName); ?>
+                                </span>
+                                <span class="pb-meta-sep">&bull;</span>
+                                <span class="bulletin-audience-badge pb-meta-item">
+                                    <?php echo htmlspecialchars($scopeLabel); ?>
+                                </span>
+                                <span class="pb-meta-sep">&bull;</span>
+                                <span class="pb-meta-item"><?php echo htmlspecialchars($dateStr); ?></span>
+                            </div>
+                        </div>
+
+                        <!-- Right Action Controls -->
+                        <div class="pb-bullet-actions" onclick="event.stopPropagation();">
+                            <button type="button"
+                                    class="btn-bulletin-view pb-view-text-btn"
+                                    data-post="<?php echo $postJson; ?>"
+                                    onclick="openViewBulletinModal(this)"
+                                    title="Open full notice sheet">
+                                Open
+                            </button>
+
+                            <?php if ($canEditThis): ?>
+                                <?php if ($idx > 0): ?>
+                                <form method="POST" style="display:inline;margin:0;">
+                                    <input type="hidden" name="form_section" value="bulletin">
+                                    <input type="hidden" name="action" value="reorder_post">
+                                    <input type="hidden" name="id" value="<?php echo (int)$bp['post_id']; ?>">
+                                    <input type="hidden" name="direction" value="up">
+                                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                                    <button type="submit" class="pb-ctrl-btn" title="Move Up"><i class="fa-solid fa-chevron-up"></i></button>
+                                </form>
+                                <?php endif; ?>
+
+                                <?php if ($idx < count($visiblePosts) - 1): ?>
+                                <form method="POST" style="display:inline;margin:0;">
+                                    <input type="hidden" name="form_section" value="bulletin">
+                                    <input type="hidden" name="action" value="reorder_post">
+                                    <input type="hidden" name="id" value="<?php echo (int)$bp['post_id']; ?>">
+                                    <input type="hidden" name="direction" value="down">
+                                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                                    <button type="submit" class="pb-ctrl-btn" title="Move Down"><i class="fa-solid fa-chevron-down"></i></button>
+                                </form>
+                                <?php endif; ?>
+
+                                <form method="POST" style="display:inline;margin:0;">
+                                    <input type="hidden" name="form_section" value="bulletin">
+                                    <input type="hidden" name="action" value="toggle_post">
+                                    <input type="hidden" name="id" value="<?php echo (int)$bp['post_id']; ?>">
+                                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                                    <button type="submit"
+                                            class="pb-ctrl-btn <?php echo !empty($bp['is_active']) ? 'is-live' : 'is-hidden'; ?>"
+                                            title="<?php echo !empty($bp['is_active']) ? 'Published (click to hide)' : 'Hidden (click to publish)'; ?>">
+                                        <i class="fa-solid <?php echo !empty($bp['is_active']) ? 'fa-eye' : 'fa-eye-slash'; ?>"></i>
+                                    </button>
+                                </form>
+
+                                <button type="button"
+                                        class="pb-ctrl-btn pb-ctrl-edit btn-bulletin-edit"
+                                        data-post="<?php echo $postJson; ?>"
+                                        onclick="openEditBulletinModal(this)"
+                                        title="Edit Announcement">
+                                    <i class="fa-solid fa-pen" style="pointer-events:none;"></i>
+                                </button>
+
+                                <form method="POST" style="display:inline;margin:0;" onsubmit="return confirm('Delete this announcement permanently?')">
+                                    <input type="hidden" name="form_section" value="bulletin">
+                                    <input type="hidden" name="action" value="delete_post">
+                                    <input type="hidden" name="id" value="<?php echo (int)$bp['post_id']; ?>">
+                                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                                    <button type="submit" class="pb-ctrl-btn pb-ctrl-del" title="Delete Announcement">
+                                        <i class="fa-solid fa-trash" style="pointer-events:none;"></i>
+                                    </button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
+                    </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+
+            <div id="bulletinSearchEmpty" style="display: none; text-align: center; color: var(--text2); padding: 36px 20px;">
+                <i class="fa-solid fa-magnifying-glass" style="font-size: 24px; opacity: 0.35; margin-bottom: 8px; display: block; color: var(--accent);"></i>
+                <div style="font-size: 13px; font-weight: 700; color: var(--text);">No matching bulletin entries found.</div>
+                <div style="font-size: 12px; margin-top: 3px; color: var(--text2);">Try another keyword or clear the filter.</div>
+            </div>
         </div>
-    </div>
+    </section>
 </div>
 
-<!-- ─── BULLETIN READER MODAL (HIGH AESTHETICS & ACCESSIBILITY) ─── -->
+<!-- ─── OFFICIAL BULLETIN READER MODAL ─── -->
 <div class="modal-overlay" id="modal-view-bulletin" style="z-index: 9999;">
-    <div class="modal" style="max-width: 520px; width: 92%; padding: 0; overflow: hidden; border-radius: 14px; background: var(--surface, #FFFFFF); border: 1px solid var(--border); box-shadow: 0 16px 40px rgba(0,0,0,0.25);">
-        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg2, #FAFAFA);">
-            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                <span id="bulletin-view-dot" style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent);"></span>
-                <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; color: var(--text2);" id="bulletin-view-badge">Parish Announcement</span>
-                <span style="font-size: 11px; color: var(--text2);" id="bulletin-view-date"></span>
+    <div class="modal" style="max-width: 560px; width: 92%; padding: 0; overflow: hidden; border-radius: 14px; background: var(--surface, #FFFFFF); border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,0.3);">
+        <div id="bulletin-view-stripe" style="height: 5px; width: 100%; background: var(--accent, #c9a84c);"></div>
+        <div style="padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg2);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <img src="assets/img/2323.png" alt="Cathedral Seal" style="width: 32px; height: 32px; border-radius: 7px; object-fit: cover;">
+                <div>
+                    <div style="font-family: 'Cinzel', Georgia, serif; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent);">Iglesia Filipina Independiente</div>
+                    <div style="font-size: 12px; font-weight: 600; color: var(--text2);" id="bulletin-view-badge">Parish-Wide Announcement</div>
+                </div>
             </div>
-            <button type="button" class="btn-icon" onclick="closeModal('modal-view-bulletin')" style="border: none; background: transparent; cursor: pointer; color: var(--text2); font-size: 18px; line-height: 1;" aria-label="Close">&times;</button>
+            <button type="button" class="btn-icon" onclick="closeModal('modal-view-bulletin')" style="border: 1px solid var(--border); background: var(--surface); width: 28px; height: 28px; border-radius: 7px; cursor: pointer; color: var(--text2); font-size: 16px; line-height: 1;" aria-label="Close">&times;</button>
         </div>
-        <div style="padding: 24px 22px;">
-            <h3 id="bulletin-view-title" style="font-family: var(--font-family-base, 'Inter', sans-serif); font-size: 16px; font-weight: 700; color: var(--text); margin: 0 0 14px; line-height: 1.4;"></h3>
-            <div id="bulletin-view-subtitle" style="font-size: 13px; color: var(--text2); line-height: 1.65; background: var(--bg2, #F8F9FA); border: 1px solid var(--border); border-radius: 10px; padding: 16px; white-space: pre-wrap; word-break: break-word;"></div>
+        <div style="padding: 22px 24px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
+                <span id="bulletin-view-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent);"></span>
+                <span id="bulletin-view-category" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2);">Parish Notice</span>
+                <span style="font-size: 11.5px; color: var(--text2);" id="bulletin-view-date"></span>
+            </div>
+            <h3 id="bulletin-view-title" style="font-family: 'Playfair Display', Georgia, serif; font-size: 20px; font-weight: 700; color: var(--text); margin: 0 0 12px; line-height: 1.32;"></h3>
+            <div id="bulletin-view-subtitle" style="font-size: 13.5px; color: var(--text); line-height: 1.7; background: var(--bg2); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 14px 16px; white-space: pre-wrap; word-break: break-word;"></div>
         </div>
-        <div style="padding: 12px 20px; background: var(--bg2, #FAFAFA); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+        <div style="padding: 12px 20px; background: var(--bg2); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 8px;">
             <button type="button" id="bulletin-copy-btn" class="btn btn-ghost btn-sm" onclick="copyBulletinNotice()" style="padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 12px; border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 6px;">
                 <i class="fa-regular fa-copy"></i> Copy Notice
             </button>
@@ -309,16 +320,16 @@ $dot_colors = [
     </div>
 </div>
 
-<?php if ($can_post_bulletin): ?>
+<?php if (!empty($can_post_bulletin)): ?>
 <!-- ─── MODAL: ADD BULLETIN NOTICE ─── -->
 <div class="modal-overlay" id="modal-add-bulletin" style="z-index: 9999;">
     <div class="modal" style="max-width: 520px; width: 92%; padding: 0; overflow: hidden; border-radius: 14px; background: var(--surface, #FFFFFF); border: 1px solid var(--border); box-shadow: 0 16px 40px rgba(0,0,0,0.25);">
-        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg2, #FAFAFA);">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg2);">
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span style="display: inline-flex; width: 28px; height: 28px; border-radius: 6px; background: rgba(201,168,76,0.15); color: var(--accent); align-items: center; justify-content: center; font-size: 13px;">
                     <i class="fa-solid fa-bullhorn"></i>
                 </span>
-                <span style="font-size: 14px; font-weight: 700; color: var(--text);">New Announcement</span>
+                <span style="font-size: 14px; font-weight: 700; color: var(--text);">New Bulletin Announcement</span>
             </div>
             <button type="button" class="btn-icon" onclick="closeModal('modal-add-bulletin')" style="border: none; background: transparent; cursor: pointer; color: var(--text2); font-size: 18px; line-height: 1;" aria-label="Close">&times;</button>
         </div>
@@ -331,46 +342,51 @@ $dot_colors = [
                     <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 5px;">
                         Announcement Title <span style="color: #ef4444;">*</span>
                     </label>
-                    <input type="text" name="title" required placeholder="e.g. Cathedral Sunday Holy Mass Schedule" 
+                    <input type="text" name="title" required maxlength="100" placeholder="e.g. Cathedral Sunday Holy Mass Schedule"
                            style="width: 100%; height: 36px; padding: 0 10px; font-size: 13px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); box-sizing: border-box;">
                 </div>
                 <div>
                     <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 5px;">
-                        Details &amp; Schedule <span style="color: var(--text2); font-weight: 400; font-size: 11px;">(optional)</span>
+                        Details &amp; Schedule <span style="color: var(--text2); font-weight: 400; font-size: 11px;">(optional, max 255 chars)</span>
                     </label>
-                    <textarea name="subtitle" rows="3" placeholder="Provide schedule, briefing times, or instructions for parishioners..." 
+                    <textarea name="subtitle" rows="3" maxlength="255" placeholder="Provide times, venue notes, or parish instructions..."
                               style="width: 100%; padding: 8px 10px; font-size: 13px; line-height: 1.5; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); box-sizing: border-box; resize: vertical;"></textarea>
                 </div>
                 <div>
                     <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 5px;">
                         Jurisdiction / Audience
                     </label>
+                    <?php if ($isGlobalBulletinMgr): ?>
                     <select name="chapel_id" style="width: 100%; height: 36px; padding: 0 10px; font-size: 12.5px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); box-sizing: border-box;">
-                        <option value="">🌐 Parish-Wide (All Chapels &amp; Portals)</option>
+                        <option value="">Parish-Wide (All Chapels &amp; Portals)</option>
                         <?php foreach (($chapels ?? []) as $ch): ?>
-                            <option value="<?php echo $ch['chapel_id']; ?>">⛪ <?php echo htmlspecialchars($ch['chapel_name']); ?></option>
+                            <option value="<?php echo (int)$ch['chapel_id']; ?>"><?php echo htmlspecialchars($ch['chapel_name']); ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <?php else: ?>
+                    <input type="hidden" name="chapel_id" value="<?php echo !empty($chapel_id) ? (int)$chapel_id : ''; ?>">
+                    <div style="height: 36px; padding: 0 10px; font-size: 12.5px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text2); display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-lock text-gold" style="font-size: 11px;"></i>
+                        <span><?php echo htmlspecialchars($scopedChapelLabel); ?></span>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <div>
                     <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 6px;">
-                        Priority Indicator Color
+                        Bullet Color &amp; Category
                     </label>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <?php
-                        $dot_colors_add = ['#c9a84c'=>'Gold','#22c55e'=>'Green','#ef4444'=>'Red','#0b0f19'=>'Dark','#64748b'=>'Slate'];
-                        foreach ($dot_colors_add as $hex => $label):
-                        ?>
-                        <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2); color: var(--text2);">
-                            <input type="radio" name="dot_color" value="<?php echo $hex; ?>" <?php echo $hex === '#c9a84c' ? 'checked' : ''; ?> style="accent-color: <?php echo $hex; ?>;">
-                            <span style="width: 10px; height: 10px; border-radius: 50%; background: <?php echo $hex; ?>; display: inline-block;"></span>
-                            <?php echo $label; ?>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <?php foreach ($bulletinCategories as $hex => $cMeta): ?>
+                        <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11.5px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2); color: var(--text2);">
+                            <input type="radio" name="dot_color" value="<?php echo $hex; ?>" <?php echo $hex === '#c9a84c' ? 'checked' : ''; ?> onchange="updateRadioSelection(this)" style="accent-color: <?php echo $hex; ?>;">
+                            <span style="width: 9px; height: 9px; border-radius: 50%; background: <?php echo $hex; ?>; display: inline-block;"></span>
+                            <?php echo htmlspecialchars($cMeta['name']); ?>
                         </label>
                         <?php endforeach; ?>
                     </div>
                 </div>
             </div>
-            <div style="padding: 12px 20px; background: var(--bg2, #FAFAFA); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px;">
+            <div style="padding: 12px 20px; background: var(--bg2); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px;">
                 <button type="button" class="btn btn-gray btn-sm" onclick="closeModal('modal-add-bulletin')" style="padding: 6px 16px; border-radius: 6px; font-weight: 600; font-size: 12px;">Cancel</button>
                 <button type="submit" class="btn btn-primary btn-sm" style="padding: 6px 18px; border-radius: 6px; font-weight: 600; font-size: 12px; background: #111111; color: #FFFFFF; border: 1px solid #111111; display: inline-flex; align-items: center; gap: 6px;">
                     <i class="fa-solid fa-plus text-gold"></i> Publish Notice
@@ -383,7 +399,7 @@ $dot_colors = [
 <!-- ─── MODAL: EDIT BULLETIN NOTICE ─── -->
 <div class="modal-overlay" id="modal-edit-bulletin" style="z-index: 9999;">
     <div class="modal" style="max-width: 520px; width: 92%; padding: 0; overflow: hidden; border-radius: 14px; background: var(--surface, #FFFFFF); border: 1px solid var(--border); box-shadow: 0 16px 40px rgba(0,0,0,0.25);">
-        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg2, #FAFAFA);">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg2);">
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span style="display: inline-flex; width: 28px; height: 28px; border-radius: 6px; background: rgba(201,168,76,0.15); color: var(--accent); align-items: center; justify-content: center; font-size: 13px;">
                     <i class="fa-solid fa-pen"></i>
@@ -402,46 +418,51 @@ $dot_colors = [
                     <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 5px;">
                         Announcement Title <span style="color: #ef4444;">*</span>
                     </label>
-                    <input type="text" name="title" id="edit-bulletin-title" required 
+                    <input type="text" name="title" id="edit-bulletin-title" required maxlength="100"
                            style="width: 100%; height: 36px; padding: 0 10px; font-size: 13px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); box-sizing: border-box;">
                 </div>
                 <div>
                     <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 5px;">
-                        Details &amp; Schedule <span style="color: var(--text2); font-weight: 400; font-size: 11px;">(optional)</span>
+                        Details &amp; Schedule <span style="color: var(--text2); font-weight: 400; font-size: 11px;">(optional, max 255 chars)</span>
                     </label>
-                    <textarea name="subtitle" id="edit-bulletin-subtitle" rows="3" placeholder="Provide schedule, briefing times, or instructions for parishioners..." 
+                    <textarea name="subtitle" id="edit-bulletin-subtitle" rows="3" maxlength="255" placeholder="Provide times, venue notes, or parish instructions..."
                               style="width: 100%; padding: 8px 10px; font-size: 13px; line-height: 1.5; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); box-sizing: border-box; resize: vertical;"></textarea>
                 </div>
                 <div>
                     <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 5px;">
                         Jurisdiction / Audience
                     </label>
+                    <?php if ($isGlobalBulletinMgr): ?>
                     <select name="chapel_id" id="edit-bulletin-chapel-id" style="width: 100%; height: 36px; padding: 0 10px; font-size: 12.5px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); box-sizing: border-box;">
-                        <option value="">🌐 Parish-Wide (All Chapels &amp; Portals)</option>
+                        <option value="">Parish-Wide (All Chapels &amp; Portals)</option>
                         <?php foreach (($chapels ?? []) as $ch): ?>
-                            <option value="<?php echo $ch['chapel_id']; ?>">⛪ <?php echo htmlspecialchars($ch['chapel_name']); ?></option>
+                            <option value="<?php echo (int)$ch['chapel_id']; ?>"><?php echo htmlspecialchars($ch['chapel_name']); ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <?php else: ?>
+                    <input type="hidden" name="chapel_id" id="edit-bulletin-chapel-id" value="<?php echo !empty($chapel_id) ? (int)$chapel_id : ''; ?>">
+                    <div style="height: 36px; padding: 0 10px; font-size: 12.5px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text2); display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-lock text-gold" style="font-size: 11px;"></i>
+                        <span><?php echo htmlspecialchars($scopedChapelLabel); ?></span>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <div>
                     <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 6px;">
-                        Priority Indicator Color
+                        Bullet Color &amp; Category
                     </label>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;" id="edit-bulletin-colors">
-                        <?php
-                        $dot_colors_edit = ['#c9a84c'=>'Gold','#22c55e'=>'Green','#ef4444'=>'Red','#0b0f19'=>'Dark','#64748b'=>'Slate'];
-                        foreach ($dot_colors_edit as $hex => $label):
-                        ?>
-                        <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2); color: var(--text2);">
-                            <input type="radio" name="dot_color" value="<?php echo $hex; ?>" style="accent-color: <?php echo $hex; ?>;">
-                            <span style="width: 10px; height: 10px; border-radius: 50%; background: <?php echo $hex; ?>; display: inline-block;"></span>
-                            <?php echo $label; ?>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="edit-bulletin-colors">
+                        <?php foreach ($bulletinCategories as $hex => $cMeta): ?>
+                        <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11.5px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2); color: var(--text2);">
+                            <input type="radio" name="dot_color" value="<?php echo $hex; ?>" onchange="updateRadioSelection(this)" style="accent-color: <?php echo $hex; ?>;">
+                            <span style="width: 9px; height: 9px; border-radius: 50%; background: <?php echo $hex; ?>; display: inline-block;"></span>
+                            <?php echo htmlspecialchars($cMeta['name']); ?>
                         </label>
                         <?php endforeach; ?>
                     </div>
                 </div>
             </div>
-            <div style="padding: 12px 20px; background: var(--bg2, #FAFAFA); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px;">
+            <div style="padding: 12px 20px; background: var(--bg2); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px;">
                 <button type="button" class="btn btn-gray btn-sm" onclick="closeModal('modal-edit-bulletin')" style="padding: 6px 16px; border-radius: 6px; font-weight: 600; font-size: 12px;">Cancel</button>
                 <button type="submit" class="btn btn-primary btn-sm" style="padding: 6px 18px; border-radius: 6px; font-weight: 600; font-size: 12px; background: #111111; color: #FFFFFF; border: 1px solid #111111; display: inline-flex; align-items: center; gap: 6px;">
                     <i class="fa-solid fa-check text-gold"></i> Save Changes
@@ -458,42 +479,277 @@ $dot_colors = [
     min-height: 0 !important;
     overflow: visible !important;
 }
-#sec-bulletin .bulletin-board-panel {
-    padding: 0 !important;
-    margin-bottom: 0 !important;
-    overflow: visible !important;
-    flex: none !important;
-    height: auto !important;
-}
-.bulletin-cards-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-}
-.bulletin-notice-card {
+.pb-sheet-container {
     background: var(--surface, #FFFFFF);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
+    border-radius: 14px;
     display: flex;
     flex-direction: column;
+    width: 100%;
+    box-shadow: none;
+}
+
+/* Official Bulletin Letterhead */
+.pb-letterhead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 16px 24px;
+    border-bottom: 2px solid rgba(201,168,76,0.45);
+    background: linear-gradient(135deg, rgba(201,168,76,0.10) 0%, transparent 65%);
+}
+.pb-letterhead-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.pb-letterhead-seal {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid rgba(201,168,76,0.45);
+    flex-shrink: 0;
+}
+.pb-letterhead-diocese {
+    font-family: 'Cinzel', Georgia, serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent, #c9a84c);
+}
+.pb-letterhead-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 1px 0 0 0;
+    line-height: 1.25;
+}
+.pb-letterhead-date {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text2);
+    white-space: nowrap;
+}
+
+/* Filter Strip */
+.pb-filter-strip {
+    padding: 10px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    background: var(--bg2, #FAFAFA);
+}
+.pb-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: var(--bg3, #F4F4F5);
+    padding: 3px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+}
+.pb-tabs .tab-btn {
+    padding: 4px 12px;
+    font-size: 11.5px;
+    border-radius: 999px;
+    border: none;
+    background: transparent;
     cursor: pointer;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    font-weight: 600;
+    color: var(--text2);
 }
-.bulletin-notice-card:hover {
-    border-color: rgba(201,168,76,0.55);
-    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
-    transform: translateY(-1px);
+.pb-tabs .tab-btn.active {
+    background: var(--surface, #FFFFFF);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 }
-.bulletin-notice-card.is-pinned-hero {
-    grid-column: 1 / -1;
-    border-color: rgba(201,168,76,0.45);
-    background: linear-gradient(180deg, rgba(201,168,76,0.05) 0%, var(--surface, #FFFFFF) 45%);
+
+/* Single-Column Bulleted Announcement List */
+.pb-sheet-body-wrap {
+    padding: 6px 24px 20px;
+    background: var(--surface, #FFFFFF);
 }
-@media (max-width: 820px) {
-    .bulletin-cards-grid {
-        grid-template-columns: 1fr;
+.pb-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 48px 20px;
+}
+.pb-bullet-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.pb-bullet-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 18px 8px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.14s ease;
+    border-radius: 8px;
+}
+.pb-bullet-item:last-child {
+    border-bottom: none;
+}
+.pb-bullet-item:hover {
+    background: rgba(201,168,76,0.04);
+}
+.pb-bullet-item.is-hidden-bullet {
+    opacity: 0.58;
+}
+
+/* Genuine Bullet Marker */
+.pb-bullet-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    padding-top: 7px;
+    flex-shrink: 0;
+}
+.pb-bullet-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 0 4px rgba(201,168,76,0.12);
+}
+
+/* Content Column */
+.pb-bullet-content {
+    flex: 1;
+    min-width: 0;
+}
+.pb-bullet-headline-line {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.pb-bullet-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 16.5px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.35;
+}
+.pb-bullet-text {
+    font-size: 13.5px;
+    color: var(--text2);
+    line-height: 1.62;
+    margin: 5px 0 7px 0;
+    max-width: 82ch;
+}
+.pb-bullet-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--text2);
+}
+.pb-meta-sep {
+    opacity: 0.45;
+}
+.pb-inline-tag {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 7px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.pb-tag-pinned {
+    background: rgba(201,168,76,0.16);
+    color: #9a7418;
+}
+.pb-tag-new {
+    background: rgba(34,197,94,0.14);
+    color: #15803d;
+}
+.pb-tag-hidden {
+    background: rgba(239,68,68,0.12);
+    color: #dc2626;
+}
+
+/* Right Action Cluster */
+.pb-bullet-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    padding-top: 2px;
+}
+.pb-view-text-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--accent, #c9a84c);
+    cursor: pointer;
+}
+.pb-view-text-btn:hover {
+    border-color: var(--accent, #c9a84c);
+    background: rgba(201,168,76,0.08);
+}
+.pb-ctrl-btn {
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text2);
+    font-size: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.pb-ctrl-btn:hover {
+    border-color: var(--accent);
+    color: var(--text);
+}
+.pb-ctrl-btn.is-live { color: #16a34a; }
+.pb-ctrl-btn.is-hidden { color: #dc2626; }
+.pb-ctrl-edit { color: var(--accent); }
+.pb-ctrl-del { color: #ef4444; }
+.pb-ctrl-del:hover { border-color: #ef4444; }
+
+[data-theme="dark"] .pb-tag-pinned { color: #facc15; }
+[data-theme="dark"] .pb-tag-new { color: #4ade80; }
+[data-theme="dark"] .pb-bullet-dot { box-shadow: 0 0 0 4px rgba(255,255,255,0.06); }
+
+@media (max-width: 720px) {
+    .pb-letterhead,
+    .pb-filter-strip,
+    .pb-sheet-body-wrap {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+    .pb-bullet-item {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .pb-bullet-actions {
+        width: 100%;
+        padding-left: 28px;
+        justify-content: flex-start;
     }
 }
 </style>
@@ -514,27 +770,32 @@ function openViewBulletinModal(input) {
     }
     if (!bp || typeof bp !== 'object') return;
 
+    const stripe = document.getElementById('bulletin-view-stripe');
     const dot = document.getElementById('bulletin-view-dot');
+    const catEl = document.getElementById('bulletin-view-category');
     const badge = document.getElementById('bulletin-view-badge');
     const dateEl = document.getElementById('bulletin-view-date');
     const title = document.getElementById('bulletin-view-title');
     const sub = document.getElementById('bulletin-view-subtitle');
-    
-    if (dot) dot.style.background = bp.dot_color || 'var(--accent)';
-    if (badge) badge.textContent = bp.chapel_name ? '⛪ ' + bp.chapel_name : '🌐 Parish-Wide Notice';
+
+    const color = bp.dot_color || 'var(--accent, #c9a84c)';
+    if (stripe) stripe.style.background = color;
+    if (dot) dot.style.background = color;
+    if (catEl) catEl.textContent = bp.category_label || 'Parish Notice';
+    if (badge) badge.textContent = bp.chapel_name ? (bp.chapel_name + ' • Official Notice') : 'Parish-Wide Official Announcement';
     if (dateEl) {
         let dText = '';
         if (bp.created_at) {
             const dt = new Date(String(bp.created_at).replace(/-/g, '/'));
             if (!isNaN(dt.getTime())) {
-                dText = '• ' + dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                dText = '• ' + dt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
             }
         }
         dateEl.textContent = dText;
     }
     if (title) title.textContent = bp.title || 'Announcement';
     if (sub) sub.textContent = bp.subtitle || 'No additional details provided.';
-    
+
     openModal('modal-view-bulletin');
 }
 window.openViewBulletinModal = openViewBulletinModal;
@@ -593,36 +854,34 @@ function openEditBulletinModal(input) {
 }
 window.openEditBulletinModal = openEditBulletinModal;
 
-// Delegated click listener: guaranteed activation for SPA and dynamically rendered rows
-document.addEventListener('click', function(e) {
-    const editBtn = e.target.closest('.btn-bulletin-edit');
-    if (editBtn) {
-        e.preventDefault();
-        openEditBulletinModal(editBtn);
-        return;
-    }
-    const viewBtn = e.target.closest('.btn-bulletin-view');
-    if (viewBtn) {
-        e.preventDefault();
-        openViewBulletinModal(viewBtn);
-        return;
-    }
-});
+if (!window._bulletinDelegatedClickBound) {
+    window._bulletinDelegatedClickBound = true;
+    document.addEventListener('click', function(e) {
+        const editBtn = e.target.closest('.btn-bulletin-edit');
+        if (editBtn) {
+            e.preventDefault();
+            openEditBulletinModal(editBtn);
+            return;
+        }
+        const viewBtn = e.target.closest('.btn-bulletin-view');
+        if (viewBtn) {
+            e.preventDefault();
+            openViewBulletinModal(viewBtn);
+            return;
+        }
+    });
+    document.addEventListener('keydown', function(e) {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('pb-bullet-item')) {
+            e.preventDefault();
+            openViewBulletinModal(e.target);
+        }
+    });
+}
 
 function setBulletinStatusFilter(status, btn) {
     currentBulletinStatusFilter = status;
-    const tabs = document.querySelectorAll('#bulletin-status-tabs .tab-btn');
-    tabs.forEach(t => {
-        t.classList.remove('active');
-        t.style.background = 'transparent';
-        t.style.color = 'var(--text2)';
-    });
-    if (btn) {
-        btn.classList.add('active');
-        btn.style.background = 'var(--surface, #FFFFFF)';
-        btn.style.color = 'var(--text, #111111)';
-        btn.style.boxShadow = '0 1px 2px rgba(0,0,0,0.06)';
-    }
+    document.querySelectorAll('#bulletin-status-tabs .tab-btn').forEach(t => t.classList.remove('active'));
+    if (btn) btn.classList.add('active');
     filterBulletinTable();
 }
 
@@ -651,7 +910,7 @@ function filterBulletinTable() {
         const created = parseInt(row.getAttribute('data-created') || '0', 10);
 
         const matchesQuery = !q || title.includes(q) || text.includes(q) || badge.includes(q);
-        const matchesStatus = (currentBulletinStatusFilter === 'all') 
+        const matchesStatus = (currentBulletinStatusFilter === 'all')
             || (currentBulletinStatusFilter === 'recent' ? (created >= thirtyDaysAgo || created === 0) : (rowStatus === currentBulletinStatusFilter));
 
         if (matchesQuery && matchesStatus) {
@@ -662,17 +921,23 @@ function filterBulletinTable() {
         }
     });
 
-    if (currentBulletinStatusFilter === 'recent') {
-        const tbody = document.getElementById('bulletinFeedContainer');
-        if (tbody) {
-            const rowArr = Array.from(tbody.querySelectorAll('.bulletin-feed-row'));
+    const container = document.getElementById('bulletinFeedContainer');
+    if (container) {
+        const rowArr = Array.from(container.querySelectorAll('.bulletin-feed-row'));
+        if (currentBulletinStatusFilter === 'recent') {
             rowArr.sort((a, b) => {
                 const cA = parseInt(a.getAttribute('data-created') || a.getAttribute('data-post-id') || '0', 10);
                 const cB = parseInt(b.getAttribute('data-created') || b.getAttribute('data-post-id') || '0', 10);
-                return cB - cA; // Newest first
+                return cB - cA;
             });
-            rowArr.forEach(r => tbody.appendChild(r));
+        } else {
+            rowArr.sort((a, b) => {
+                const iA = parseInt(a.getAttribute('data-sort-idx') || '0', 10);
+                const iB = parseInt(b.getAttribute('data-sort-idx') || '0', 10);
+                return iA - iB;
+            });
         }
+        rowArr.forEach(r => container.appendChild(r));
     }
 
     const emptyMsg = document.getElementById('bulletinSearchEmpty');
@@ -686,12 +951,12 @@ function updateRadioSelection(input) {
         const parent = r.closest('label');
         if (parent) {
             parent.style.borderColor = r.checked ? 'var(--accent)' : 'var(--border)';
+            parent.style.color = r.checked ? 'var(--text)' : 'var(--text2)';
         }
     });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const checked = document.querySelector('input[name="dot_color"]:checked');
-    if (checked) updateRadioSelection(checked);
+    document.querySelectorAll('input[name="dot_color"]:checked').forEach(checked => updateRadioSelection(checked));
 });
 </script>

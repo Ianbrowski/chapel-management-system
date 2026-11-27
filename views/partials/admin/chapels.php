@@ -69,7 +69,7 @@ $inactiveChapels = $totalChapels - $activeChapels;
                 <h1 class="page-title" style="font-family: var(--font-family, 'Inter', sans-serif); font-size: var(--font-page-title, 20px); font-weight: 700; color: var(--text); margin: 0; line-height: 1.2;">
                     <?php echo ($role === 'Chapel Admin') ? 'My Chapel Profile' : 'Chapels'; ?>
                 </h1>
-                <p class="page-subtitle" style="font-size: var(--font-page-subtitle, 14px); color: var(--text2); margin: 3px 0 0 0;">Parish chapel jurisdictions, leadership contacts, and location assignments</p>
+                <p class="page-subtitle" style="font-size: var(--font-page-subtitle, 14px); color: var(--text2); margin: 3px 0 0 0;"><?php echo ($role === 'Chapel Admin') ? 'Manage your assigned chapel profile, service schedule, feasts, and coordinator details' : 'Parish chapel jurisdictions, leadership contacts, and location assignments'; ?></p>
             </div>
         </div>
         <!-- Right Side: Stat Badges Pinned Top-Right -->
@@ -150,13 +150,15 @@ $inactiveChapels = $totalChapels - $activeChapels;
                         <tr>
                             <td colspan="5" style="padding: 50px 20px; text-align: center; color: var(--text2);">
                                 <i class="fa-solid fa-church" style="font-size: 42px; opacity: 0.3; margin-bottom: 12px; display: block; color: var(--accent);"></i>
-                                <div style="font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px;">No Chapels Registered</div>
-                                <div style="font-size: 13px;">Get started by adding your first chapel location.</div>
+                                <div style="font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px;"><?php echo ($role === 'Chapel Admin') ? 'No Assigned Chapel Profile' : 'No Chapels Registered'; ?></div>
+                                <div style="font-size: 13px;"><?php echo ($role === 'Chapel Admin') ? 'Your account is not assigned to a chapel yet. Please contact the Cathedral Admin.' : 'Get started by adding your first chapel location.'; ?></div>
                             </td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($chapels as $ch): 
                             $is_near_fiesta = $ch['is_near_fiesta'] ?? false;
+                            $chModal = $ch;
+                            unset($chModal['smtp_pass']);
                         ?>
                         <tr class="chapel-table-row" 
                             data-id="<?php echo (int)$ch['chapel_id']; ?>"
@@ -166,7 +168,7 @@ $inactiveChapels = $totalChapels - $activeChapels;
                             style="border-bottom: 1px solid var(--border); transition: background 0.15s; <?php echo $is_near_fiesta ? 'background: rgba(201,168,76,0.08);' : ''; ?>">
                             <td style="padding: 10px 12px; text-align: center;">
                                 <?php if (!empty($ch['chapel_image'])): ?>
-                                    <img src="storage/<?php echo $ch['chapel_image']; ?>" style="width: 40px; height: 40px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border);">
+                                    <img src="storage/<?php echo htmlspecialchars($ch['chapel_image'], ENT_QUOTES, 'UTF-8'); ?>" style="width: 40px; height: 40px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border);">
                                 <?php else: ?>
                                     <div style="width: 40px; height: 40px; background: var(--bg3); display: flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--text2); border: 1px solid var(--border); margin: 0 auto;">
                                         <i class="fa-solid fa-church" style="font-size: 16px; color: var(--accent);"></i>
@@ -222,7 +224,7 @@ $inactiveChapels = $totalChapels - $activeChapels;
                             <td style="text-align: center; padding: 10px 12px;">
                                 <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
                                     <button class="btn-sm btn-ghost" 
-                                            data-chapel="<?php echo htmlspecialchars(json_encode($ch, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-chapel="<?php echo htmlspecialchars(json_encode($chModal, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>"
                                             onclick="openEditChapelModal(this)" 
                                             title="Edit Chapel Profile" 
                                             style="width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: #FFFFFF; border: 1px solid var(--border); color: #111111;">

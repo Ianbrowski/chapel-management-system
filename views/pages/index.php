@@ -905,9 +905,6 @@ document.addEventListener('keydown', function(e) {
             <button type="button" id="bModalCopyBtn" onclick="copyBulletinNotice()" class="btn-outline bmodal-print-btn" title="Copy announcement text">
                 <i class="fa-regular fa-copy"></i> Copy Info
             </button>
-            <button type="button" onclick="window.print()" class="btn-outline bmodal-print-btn" title="Print official notice flyer">
-                <i class="fa-solid fa-print"></i> Print Notice
-            </button>
             <button type="button" onclick="closeBulletinModal()" class="btn-gold bmodal-dismiss-btn">
                 Close Notice
             </button>

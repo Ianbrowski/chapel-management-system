@@ -186,7 +186,10 @@ class BaseController {
                 return false;
 
             case 'Chapel Admin':
-                if (in_array($resource, ['backups', 'users'], true)) {
+                if (in_array($resource, ['backups', 'users', 'parish_info', 'services'], true)) {
+                    return false;
+                }
+                if ($resource === 'chapels' && in_array($action, ['create', 'delete'], true)) {
                     return false;
                 }
                 // Full visibility and control strictly within their chapel
@@ -270,7 +273,7 @@ class BaseController {
             // Executive Monitoring & System Governance
             'can_manage_users'     => $isAdmin,
             'can_backups'          => $isSuperAdmin, // Super Admin executive monitor only
-            'can_manage_chapels'   => $isAdmin,
+            'can_manage_chapels'   => ($isAdmin || $isChapelAdmin),
             'can_audit_log'        => ($isAdmin || $isChapelAdmin),
             'can_audit_health'     => ($isAdmin || $isChapelAdmin),
 

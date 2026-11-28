@@ -809,6 +809,8 @@ class Event
             $where = "WHERE e.status IN ('Rejected', 'Cancelled') AND e.is_archived = 0 AND " . self::NON_CERT_E_SQL;
         } elseif ($st === 'urgent') {
             $where = "WHERE e.status = 'Pending' AND e.is_archived = 0 AND " . self::NON_CERT_E_SQL . " AND (e.start_time < NOW() OR e.start_time <= DATE_ADD(NOW(), INTERVAL 3 DAY))";
+        } elseif ($st === 'unassigned' || $st === 'needs_priest') {
+            $where = "WHERE e.status IN ('Pending', 'Confirmed') AND e.is_archived = 0 AND (e.pastor_id IS NULL OR e.pastor_id = 0) AND " . self::NON_CERT_E_SQL;
         } else {
             $where = "WHERE e.status = 'Pending' AND e.is_archived = 0 AND " . self::NON_CERT_E_SQL;
         }
@@ -940,6 +942,7 @@ class Event
                 COUNT(*) as total,
                 SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending,
                 SUM(CASE WHEN status = 'Pending' AND (start_time < NOW() OR start_time <= DATE_ADD(NOW(), INTERVAL 3 DAY)) THEN 1 ELSE 0 END) as urgent,
+                SUM(CASE WHEN status IN ('Pending', 'Confirmed') AND (pastor_id IS NULL OR pastor_id = 0) THEN 1 ELSE 0 END) as unassigned,
                 SUM(CASE WHEN status = 'Confirmed' THEN 1 ELSE 0 END) as confirmed,
                 SUM(CASE WHEN status IN ('Rejected', 'Cancelled') THEN 1 ELSE 0 END) as rejected
             FROM events
@@ -947,7 +950,7 @@ class Event
         ";
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) {
-            return ['total' => 0, 'pending' => 0, 'urgent' => 0, 'confirmed' => 0, 'rejected' => 0];
+            return ['total' => 0, 'pending' => 0, 'urgent' => 0, 'unassigned' => 0, 'confirmed' => 0, 'rejected' => 0];
         }
         if (!empty($params)) {
             $stmt->bind_param($types, ...$params);
@@ -956,11 +959,12 @@ class Event
         $res = $stmt->get_result()->fetch_assoc();
         $stmt->close();
         return [
-            'total'     => (int)($res['total'] ?? 0),
-            'pending'   => (int)($res['pending'] ?? 0),
-            'urgent'    => (int)($res['urgent'] ?? 0),
-            'confirmed' => (int)($res['confirmed'] ?? 0),
-            'rejected'  => (int)($res['rejected'] ?? 0),
+            'total'      => (int)($res['total'] ?? 0),
+            'pending'    => (int)($res['pending'] ?? 0),
+            'urgent'     => (int)($res['urgent'] ?? 0),
+            'unassigned' => (int)($res['unassigned'] ?? 0),
+            'confirmed'  => (int)($res['confirmed'] ?? 0),
+            'rejected'   => (int)($res['rejected'] ?? 0),
         ];
     }
 

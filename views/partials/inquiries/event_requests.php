@@ -18,6 +18,7 @@ $qCounts = $queue_counts ?? [];
 $totalCount = (int)($qCounts['total'] ?? $total_count ?? count($pending_requests ?? []));
 $pCount = (int)($qCounts['pending'] ?? $pending_count ?? count($pending_requests ?? []));
 $urgentCount = (int)($qCounts['urgent'] ?? 0);
+$unassignedCount = (int)($qCounts['unassigned'] ?? 0);
 $confirmedCount = (int)($qCounts['confirmed'] ?? 0);
 $rejectedCount = (int)($qCounts['rejected'] ?? 0);
 $overdueCount = (int)($overdue_request_count ?? 0);
@@ -44,10 +45,18 @@ $tp = (int)($total_pages ?? 1);
         </div>
 
         <!-- Right Side: Stat Badges (always top-right) -->
-        <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
             <span class="badge" style="background: var(--bg3, #F4F4F5); border: 1px solid var(--border); color: var(--text2); font-size: 11.5px; font-weight: 600; padding: 4px 12px; border-radius: 999px;">
                 <?php echo (int)$pCount; ?> Pending
             </span>
+            <?php if ($unassignedCount > 0): ?>
+            <a href="dashboard.php?section=event_requests&amp;status=unassigned<?php echo !empty($searchQuery) ? '&amp;search='.urlencode($searchQuery) : ''; ?><?php echo $timeParam . $sortParam; ?>"
+               class="badge"
+               style="background: rgba(245,158,11,0.14); border: 1px solid rgba(245,158,11,0.35); color: #b45309; font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; text-decoration: none;"
+               title="Active bookings waiting for a priest assignment">
+                <i class="fa-solid fa-user-clock"></i> <?php echo (int)$unassignedCount; ?> Needs Priest
+            </a>
+            <?php endif; ?>
             <?php if ($overdueCount > 0): ?>
             <span class="badge badge-danger" style="font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px;" title="<?php echo (int)$overdueCount; ?> requests past due date">
                 <?php echo (int)$overdueCount; ?> Overdue
@@ -67,6 +76,11 @@ $tp = (int)($total_pages ?? 1);
                 <a href="dashboard.php?section=event_requests&amp;status=urgent<?php echo !empty($searchQuery) ? '&amp;search='.urlencode($searchQuery) : ''; ?><?php echo $timeParam . $sortParam; ?>" 
                    class="req-tab-btn <?php echo ($curStatus === 'urgent') ? 'active' : ''; ?>">
                     Urgent<?php if ($urgentCount > 0): ?> (<?php echo (int)$urgentCount; ?>)<?php endif; ?>
+                </a>
+                <a href="dashboard.php?section=event_requests&amp;status=unassigned<?php echo !empty($searchQuery) ? '&amp;search='.urlencode($searchQuery) : ''; ?><?php echo $timeParam . $sortParam; ?>"
+                   class="req-tab-btn <?php echo ($curStatus === 'unassigned' || $curStatus === 'needs_priest') ? 'active' : ''; ?>"
+                   title="Active bookings without an assigned priest">
+                    Needs Priest<?php if ($unassignedCount > 0): ?> (<?php echo (int)$unassignedCount; ?>)<?php endif; ?>
                 </a>
                 <a href="dashboard.php?section=event_requests&amp;status=confirmed<?php echo !empty($searchQuery) ? '&amp;search='.urlencode($searchQuery) : ''; ?><?php echo $timeParam . $sortParam; ?>" 
                    class="req-tab-btn <?php echo ($curStatus === 'confirmed') ? 'active' : ''; ?>">
@@ -301,6 +315,23 @@ $tp = (int)($total_pages ?? 1);
                             <div style="font-size: 11.5px; color: var(--text2, #737373); margin-top: 2px; display: flex; align-items: center; gap: 4px;">
                                 <i class="fa-solid fa-place-of-worship" style="color: var(--accent); font-size: 11px;"></i>
                                 <?php echo htmlspecialchars($req['chapel_location'] ?: 'Main Cathedral'); ?>
+                            </div>
+                            <?php
+                                $hasAssignedPastor = !empty($req['pastor_id']) && (int)$req['pastor_id'] > 0 && !empty($req['pastor_assigned']);
+                                $rowSt = $req['status'] ?? 'Pending';
+                            ?>
+                            <div style="margin-top: 3px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                                <?php if ($hasAssignedPastor): ?>
+                                    <span style="font-size: 11px; color: var(--text2, #737373); display: inline-flex; align-items: center; gap: 4px;">
+                                        <i class="fa-solid fa-user-tie" style="color: var(--accent); font-size: 10px;"></i>
+                                        <?php echo htmlspecialchars($req['pastor_assigned']); ?>
+                                    </span>
+                                <?php elseif (in_array($rowSt, ['Pending', 'Confirmed'], true)): ?>
+                                    <span style="font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; <?php echo $rowSt === 'Confirmed' ? 'background: rgba(220,38,38,0.1); color: #dc2626; border: 1px solid rgba(220,38,38,0.28);' : 'background: rgba(245,158,11,0.12); color: #b45309; border: 1px solid rgba(245,158,11,0.3);'; ?>">
+                                        <i class="fa-solid fa-user-clock" style="font-size: 9.5px;"></i>
+                                        <?php echo $rowSt === 'Confirmed' ? 'Unassigned Priest' : 'Needs Priest'; ?>
+                                    </span>
+                                <?php endif; ?>
                             </div>
                         </td>
 

@@ -168,6 +168,118 @@ class User {
         return $res;
     }
 
+    public function getPriestEventCounts(int $userId): array {
+        $counts = ['upcoming_active' => 0, 'past_or_closed' => 0, 'total' => 0];
+        if ($userId <= 0) return $counts;
+        $stmt = $this->prepareStmt(
+            "SELECT
+                SUM(CASE WHEN start_time >= NOW() AND status IN ('Pending', 'Confirmed') THEN 1 ELSE 0 END) AS upcoming_active,
+                COUNT(*) AS total
+             FROM events
+             WHERE pastor_id = ? AND is_archived = 0"
+        );
+        if (!$stmt) return $counts;
+        $stmt->bind_param('i', $userId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        $total = (int)($row['total'] ?? 0);
+        $upcoming = (int)($row['upcoming_active'] ?? 0);
+        return [
+            'upcoming_active' => $upcoming,
+            'past_or_closed'  => max(0, $total - $upcoming),
+            'total'           => $total,
+        ];
+    }
+
+    public function getEventStatsByUserIds(array $userIds): array {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $userIds), fn($v) => $v > 0)));
+        if (empty($ids)) return [];
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $types = str_repeat('i', count($ids));
+        $sql = "SELECT pastor_id,
+                       SUM(CASE WHEN start_time >= NOW() AND status IN ('Pending', 'Confirmed') THEN 1 ELSE 0 END) AS upcoming_active,
+                       COUNT(*) AS total
+                FROM events
+                WHERE is_archived = 0 AND pastor_id IN ({$placeholders})
+                GROUP BY pastor_id";
+        $stmt = $this->prepareStmt($sql);
+        if (!$stmt) return [];
+        $stmt->bind_param($types, ...$ids);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $map = [];
+        while ($row = $res->fetch_assoc()) {
+            $pid = (int)$row['pastor_id'];
+            $total = (int)($row['total'] ?? 0);
+            $upcoming = (int)($row['upcoming_active'] ?? 0);
+            $map[$pid] = [
+                'upcoming_active' => $upcoming,
+                'past_or_closed'  => max(0, $total - $upcoming),
+                'total'           => $total,
+            ];
+        }
+        $stmt->close();
+        return $map;
+    }
+
+    public function setUserStatus(int $id, string $status): bool {
+        if ($id <= 0 || !in_array($status, ['active', 'inactive'], true)) {
+            return false;
+        }
+        $s = $this->prepareStmt("UPDATE users SET `status` = ? WHERE id = ?");
+        if (!$s) return false;
+        $s->bind_param('si', $status, $id);
+        $res = $s->execute();
+        $s->close();
+        return $res;
+    }
+
+    public function reassignUpcomingEvents(int $fromPastorId, ?int $toPastorId): int {
+        if ($fromPastorId <= 0) {
+            throw new Exception('Invalid source priest account.');
+        }
+        $newPastorId = ($toPastorId !== null && $toPastorId > 0) ? $toPastorId : null;
+        $newDisplayName = null;
+
+        if ($newPastorId !== null) {
+            if ($newPastorId === $fromPastorId) {
+                throw new Exception('Replacement priest must be a different account.');
+            }
+            $target = $this->getById($newPastorId);
+            if (!$target || !in_array($target['role'] ?? '', ['Priest', 'Pastor'], true) || strtolower(trim((string)($target['status'] ?? 'active'))) !== 'active') {
+                throw new Exception('Replacement must be an active Priest account.');
+            }
+            $newDisplayName = !empty($target['full_name']) ? $target['full_name'] : ($target['user'] ?? 'Priest');
+        }
+
+        $this->conn->begin_transaction();
+        try {
+            $stmt = $this->prepareStmt(
+                "UPDATE events
+                    SET pastor_id = ?, pastor_assigned = ?
+                  WHERE pastor_id = ?
+                    AND start_time >= NOW()
+                    AND is_archived = 0
+                    AND status IN ('Pending', 'Confirmed')"
+            );
+            if (!$stmt) {
+                throw new Exception($this->conn->error ?: 'Unable to prepare bulk reassignment.');
+            }
+            $stmt->bind_param('isi', $newPastorId, $newDisplayName, $fromPastorId);
+            if (!$stmt->execute()) {
+                throw new Exception($this->conn->error ?: 'Failed to reassign upcoming events.');
+            }
+            $affected = (int)$stmt->affected_rows;
+            $stmt->close();
+            $this->conn->commit();
+            return $affected;
+        } catch (Throwable $e) {
+            $this->conn->rollback();
+            throw $e;
+        }
+    }
+
     public function delete($id) {
         $id = (int)$id;
 
@@ -175,13 +287,13 @@ class User {
         // 1. Events requested by the user
         $res = $this->conn->query("SELECT event_id FROM events WHERE requested_by = $id LIMIT 1");
         if ($res && $res->num_rows > 0) {
-            throw new Exception("Cannot delete: This user has requested events in the system.");
+            throw new Exception("Cannot delete: This user has requested events in the system. Consider deactivating the account instead.");
         }
 
         // 2. Events assigned to the user as a pastor
-        $res = $this->conn->query("SELECT event_id FROM events WHERE pastor_id = $id LIMIT 1");
-        if ($res && $res->num_rows > 0) {
-            throw new Exception("Cannot delete: This priest has assigned events in the system.");
+        $evCounts = $this->getPriestEventCounts($id);
+        if ($evCounts['total'] > 0) {
+            throw new Exception("Cannot delete: This priest has {$evCounts['upcoming_active']} upcoming active and {$evCounts['past_or_closed']} past/closed event(s) assigned. Deactivate the account (or bulk-reassign upcoming events) instead so parish records remain intact.");
         }
 
         // 3. Donations logged by the user
@@ -422,15 +534,16 @@ class User {
         return true;
     }
 
-    public function getPriestsWithPrefs() {
+    public function getPriestsWithPrefs(bool $activeOnly = true) {
         $priests = [];
+        $activeSql = $activeOnly ? " AND LOWER(COALESCE(u.status, 'active')) = 'active'" : "";
         $pr = $this->conn->query("
-            SELECT u.id, u.user, u.full_name, u.chapel_coverage, u.duty_start_time, u.duty_end_time,
+            SELECT u.id, u.user, u.full_name, u.status, u.chapel_coverage, u.duty_start_time, u.duty_end_time,
                    GROUP_CONCAT(pet.event_type ORDER BY pet.event_type SEPARATOR ',') AS event_types
             FROM users u
             LEFT JOIN pastor_event_types pet ON pet.pastor_id = u.id
-            WHERE u.role = 'Priest'
-            GROUP BY u.id, u.user, u.full_name, u.chapel_coverage, u.duty_start_time, u.duty_end_time
+            WHERE u.role = 'Priest'{$activeSql}
+            GROUP BY u.id, u.user, u.full_name, u.status, u.chapel_coverage, u.duty_start_time, u.duty_end_time
             ORDER BY u.user ASC
         ");
         if ($pr) while ($p = $pr->fetch_assoc()) $priests[] = $p;
@@ -479,6 +592,7 @@ class User {
                     SUM(CASE WHEN role = 'Member' THEN 1 ELSE 0 END) as member_count,
                     SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_count,
                     SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected_count,
+                    SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactive_count,
                     SUM(CASE WHEN role = 'Staff' THEN 1 ELSE 0 END) as staff_count,
                     SUM(CASE WHEN role IN ('Priest', 'Pastor') THEN 1 ELSE 0 END) as priest_count,
                     SUM(CASE WHEN role IN ('Priest', 'Pastor') THEN 1 ELSE 0 END) as pastor_count,

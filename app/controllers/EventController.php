@@ -1263,7 +1263,7 @@ class EventController extends BaseController {
         if (!empty($stagedList)) {
             $savedNames = [];
             $allOk = true;
-            $chkStmt = $this->conn->prepare("SELECT COALESCE(NULLIF(full_name, ''), user) AS display_name FROM users WHERE id = ? AND role IN ('Priest', 'Pastor') LIMIT 1");
+            $chkStmt = $this->conn->prepare("SELECT COALESCE(NULLIF(full_name, ''), user) AS display_name FROM users WHERE id = ? AND role IN ('Priest', 'Pastor') AND LOWER(COALESCE(status, 'active')) = 'active' LIMIT 1");
             foreach ($stagedList as $pid => $payload) {
                 $pName = 'Priest #' . $pid;
                 if ($chkStmt) {

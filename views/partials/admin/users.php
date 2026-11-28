@@ -152,6 +152,24 @@
     border-color: #D64545 !important;
     color: #B91C1C !important;
 }
+.user-action-btn.btn-deactivate {
+    color: #b45309 !important;
+    border-color: #E5E5E5 !important;
+}
+.user-action-btn.btn-deactivate:hover {
+    background: #FEF3C7 !important;
+    border-color: #d97706 !important;
+    color: #92400e !important;
+}
+.user-action-btn.btn-reassign {
+    color: #2563eb !important;
+    border-color: #E5E5E5 !important;
+}
+.user-action-btn.btn-reassign:hover {
+    background: #EFF6FF !important;
+    border-color: #3b82f6 !important;
+    color: #1d4ed8 !important;
+}
 /* Vertical divider between verification decisions and standard actions */
 .user-action-divider {
     width: 1px !important;
@@ -192,6 +210,14 @@
     background: rgba(214, 69, 69, 0.22) !important;
     border-color: #EF4444 !important;
 }
+[data-theme="dark"] .user-action-btn.btn-deactivate {
+    color: #fbbf24 !important;
+    border-color: rgba(245, 158, 11, 0.35) !important;
+}
+[data-theme="dark"] .user-action-btn.btn-reassign {
+    color: #60a5fa !important;
+    border-color: rgba(59, 130, 246, 0.35) !important;
+}
 [data-theme="dark"] .user-action-divider {
     background: #334155 !important;
 }
@@ -200,7 +226,10 @@
 <div class="workspace" style="display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; box-sizing: border-box;">
     
     <!-- ─── UNIFIED HEADER & CONTROLS (ROW 1: TITLE + STAT BADGES PINNED TOP-RIGHT) ─── -->
-    <?php $pendingCount = $pending_count ?? ($user_stats['pending_count'] ?? 0); ?>
+    <?php
+        $pendingCount  = $pending_count ?? ($user_stats['pending_count'] ?? 0);
+        $inactiveCount = (int)($user_stats['inactive_count'] ?? count(array_filter($users ?? [], fn($r) => strtolower($r['status'] ?? '') === 'inactive')));
+    ?>
     <div class="page-header-bar" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px; flex-shrink: 0; flex-wrap: wrap; gap: 10px; margin-bottom: 6px;">
         <div style="display: flex; align-items: center; gap: 12px;">
             <div class="page-header-icon" style="width: 38px; height: 38px; border-radius: 9px; background: rgba(201,168,76,0.14); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;">
@@ -220,6 +249,11 @@
             <?php if ($pendingCount > 0): ?>
             <span class="badge badge-warning" style="font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; cursor: pointer;" onclick="document.querySelector('#role-filter-tabs button[data-filter=\'pending\']')?.click()">
                 <i class="fa-solid fa-clock"></i> <?php echo number_format($pendingCount); ?> Pending
+            </span>
+            <?php endif; ?>
+            <?php if ($inactiveCount > 0): ?>
+            <span class="badge" style="background: var(--bg3, #F4F4F5); border: 1px solid var(--border); color: var(--text2); font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; cursor: pointer;" onclick="document.querySelector('#role-filter-tabs button[data-filter=\'inactive\']')?.click()">
+                <i class="fa-solid fa-user-slash"></i> <?php echo number_format($inactiveCount); ?> Deactivated
             </span>
             <?php endif; ?>
             <button type="button" class="btn btn-primary btn-sm" onclick="openModal('modal-add-user')" style="height: 32px; font-weight: 600; font-size: 11.5px; display: inline-flex; align-items: center; gap: 6px; background: #111111; color: #FFFFFF; border: 1px solid #111111; border-radius: 6px; margin-left: 6px;">
@@ -276,6 +310,11 @@
                 <button type="button" class="tab-btn" data-filter="admin" onclick="setRoleFilter('admin', this)">
                     Admins
                 </button>
+                <?php if ($inactiveCount > 0): ?>
+                <button type="button" class="tab-btn" data-filter="inactive" onclick="setRoleFilter('inactive', this)">
+                    Deactivated (<?php echo number_format($inactiveCount); ?>)
+                </button>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -304,6 +343,9 @@
                         $status = strtolower($u['status'] ?? 'active');
                         $isPending = ($status === 'pending');
                         $isRejected = ($status === 'rejected');
+                        $isInactive = ($status === 'inactive');
+                        $evStats = ($user_event_counts ?? [])[(int)$u['id']] ?? ['upcoming_active' => 0, 'past_or_closed' => 0, 'total' => 0];
+                        $isPriestRole = in_array($u['role'] ?? '', ['Priest', 'Pastor'], true);
 
                         $cname = '—';
                         if (!empty($u['chapel_id'])) {
@@ -313,7 +355,7 @@
                         }
                         $rowFilter = strtolower($u['role'] . ' ' . $status . ' ' . $u['user'] . ' ' . ($u['full_name'] ?? '') . ' ' . ($u['email'] ?? ''));
                         ?>
-                        <tr class="user-table-row" style="border-bottom: 1px solid var(--border); transition: background 0.15s; <?php echo $isPending ? 'background: rgba(201,168,76,0.06);' : ''; ?>" 
+                        <tr class="user-table-row" style="border-bottom: 1px solid var(--border); transition: background 0.15s; <?php echo $isPending ? 'background: rgba(201,168,76,0.06);' : ($isInactive ? 'opacity: 0.68;' : ''); ?>"
                             data-id="<?php echo (int)$u['id']; ?>"
                             data-created="<?php echo !empty($u['created_at']) ? strtotime($u['created_at']) : 0; ?>"
                             data-name="<?php echo strtolower(htmlspecialchars(($u['full_name'] ?? '') . ' ' . $u['user'])); ?>"
@@ -337,6 +379,10 @@
                                                 <span class="badge" style="background: #FFFFFF; color: #D64545; border: 1px solid #D64545; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600; text-transform: uppercase;">
                                                     <i class="fa-solid fa-ban"></i> Declined
                                                 </span>
+                                            <?php elseif ($isInactive): ?>
+                                                <span class="badge" style="background: rgba(148,163,184,0.14); color: #64748b; border: 1px solid rgba(148,163,184,0.35); font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600; text-transform: uppercase;">
+                                                    <i class="fa-solid fa-user-slash"></i> Deactivated
+                                                </span>
                                             <?php endif; ?>
                                         </div>
                                         <div style="font-size: 11.5px; color: #737373; margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
@@ -359,6 +405,13 @@
                                     <?php if ($cname !== '—'): ?>
                                         <span style="font-size: 11.5px; color: #737373; display: flex; align-items: center; gap: 4px; background: #FFFFFF; padding: 2px 8px; border-radius: 4px; border: 1px solid #E5E5E5;">
                                             <i class="fa-solid fa-location-dot" style="color: var(--accent); font-size: 11px;"></i> <?php echo $cname; ?>
+                                        </span>
+                                    <?php endif; ?>
+                                    <?php if ($isPriestRole && $evStats['total'] > 0): ?>
+                                        <span style="font-size: 11px; color: <?php echo $evStats['upcoming_active'] > 0 ? '#b45309' : '#737373'; ?>; background: <?php echo $evStats['upcoming_active'] > 0 ? 'rgba(245,158,11,0.12)' : '#F6F6F6'; ?>; padding: 2px 8px; border-radius: 4px; border: 1px solid <?php echo $evStats['upcoming_active'] > 0 ? 'rgba(245,158,11,0.3)' : '#E5E5E5'; ?>; font-weight: 600;"
+                                              title="<?php echo (int)$evStats['upcoming_active']; ?> upcoming active, <?php echo (int)$evStats['past_or_closed']; ?> past/closed event(s)">
+                                            <i class="fa-solid fa-calendar-check" style="font-size: 10px;"></i>
+                                            <?php echo $evStats['upcoming_active'] > 0 ? ((int)$evStats['upcoming_active'] . ' upcoming') : ((int)$evStats['total'] . ' past'); ?>
                                         </span>
                                     <?php endif; ?>
                                 </div>
@@ -432,12 +485,60 @@
                                             title="Edit User">
                                         <i class="fa-solid fa-pen-to-square"></i>
                                     </button>
+                                    <?php if ($isPriestRole && $evStats['upcoming_active'] > 0): ?>
+                                    <button type="button"
+                                            class="user-action-btn btn-reassign"
+                                            data-id="<?php echo (int)$u['id']; ?>"
+                                            data-username="<?php echo htmlspecialchars($u['user'], ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-fullname="<?php echo htmlspecialchars($u['full_name'] ?: $u['user'], ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-upcoming="<?php echo (int)$evStats['upcoming_active']; ?>"
+                                            data-past="<?php echo (int)$evStats['past_or_closed']; ?>"
+                                            data-status="<?php echo htmlspecialchars($status, ENT_QUOTES, 'UTF-8'); ?>"
+                                            onclick="openReassignEventsModal(this)"
+                                            title="Bulk Reassign Upcoming Events (<?php echo (int)$evStats['upcoming_active']; ?>)">
+                                        <i class="fa-solid fa-people-arrows"></i>
+                                    </button>
+                                    <?php endif; ?>
+
+                                    <?php if ((int)$u['id'] !== (int)($user_id ?? 0)): ?>
+                                        <?php if ($isInactive): ?>
+                                        <button type="button"
+                                                class="user-action-btn btn-restore"
+                                                data-id="<?php echo (int)$u['id']; ?>"
+                                                data-username="<?php echo htmlspecialchars($u['user'], ENT_QUOTES, 'UTF-8'); ?>"
+                                                onclick="submitUserAction('reactivate', this)"
+                                                title="Reactivate Account">
+                                            <i class="fa-solid fa-user-check"></i>
+                                        </button>
+                                        <?php elseif ($status === 'active'): ?>
+                                        <button type="button"
+                                                class="user-action-btn btn-deactivate"
+                                                data-id="<?php echo (int)$u['id']; ?>"
+                                                data-username="<?php echo htmlspecialchars($u['user'], ENT_QUOTES, 'UTF-8'); ?>"
+                                                data-fullname="<?php echo htmlspecialchars($u['full_name'] ?: $u['user'], ENT_QUOTES, 'UTF-8'); ?>"
+                                                data-role="<?php echo htmlspecialchars($u['role'], ENT_QUOTES, 'UTF-8'); ?>"
+                                                data-upcoming="<?php echo (int)$evStats['upcoming_active']; ?>"
+                                                data-past="<?php echo (int)$evStats['past_or_closed']; ?>"
+                                                data-total-events="<?php echo (int)$evStats['total']; ?>"
+                                                onclick="openUserRemovalModal('deactivate', this)"
+                                                title="Deactivate Account">
+                                            <i class="fa-solid fa-user-slash"></i>
+                                        </button>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+
                                     <button type="button" 
                                             class="user-action-btn btn-delete" 
                                             data-id="<?php echo (int)$u['id']; ?>"
                                             data-username="<?php echo htmlspecialchars($u['user'], ENT_QUOTES, 'UTF-8'); ?>"
-                                            onclick="submitUserAction('delete', this)" 
-                                            title="Delete User">
+                                            data-fullname="<?php echo htmlspecialchars($u['full_name'] ?: $u['user'], ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-role="<?php echo htmlspecialchars($u['role'], ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-status="<?php echo htmlspecialchars($status, ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-upcoming="<?php echo (int)$evStats['upcoming_active']; ?>"
+                                            data-past="<?php echo (int)$evStats['past_or_closed']; ?>"
+                                            data-total-events="<?php echo (int)$evStats['total']; ?>"
+                                            onclick="openUserRemovalModal('delete', this)"
+                                            title="Delete / Remove User">
                                         <i class="fa-solid fa-trash-can"></i>
                                     </button>
                                 </div>
@@ -490,6 +591,103 @@
             <i class="fa-solid fa-user-lock" style="color: var(--accent); font-size: 12px;"></i>
             <span>Self-account deletion is disabled to prevent lockout.</span>
         </div>
+    </div>
+</div>
+
+<!-- ACCOUNT IMPACT / DEACTIVATION / DELETE GUARD MODAL -->
+<div class="modal-overlay" id="modal-user-removal-guard" style="z-index: 9999;">
+    <div class="modal" style="max-width: 500px; width: 92%; padding: 0; overflow: hidden; border-radius: 14px; background: var(--surface, #FFFFFF); border: 1px solid var(--border); box-shadow: 0 18px 46px rgba(0,0,0,0.28);">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg2, #FAFAFA);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="guard-modal-icon" style="width: 30px; height: 30px; border-radius: 8px; background: rgba(245,158,11,0.16); color: #d97706; display: inline-flex; align-items: center; justify-content: center; font-size: 14px;">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </span>
+                <div>
+                    <div id="guard-modal-title" style="font-size: 14.5px; font-weight: 700; color: var(--text);">Account Safeguard</div>
+                    <div id="guard-modal-subtitle" style="font-size: 11.5px; color: var(--text2);">Review event &amp; record impact before proceeding</div>
+                </div>
+            </div>
+            <button type="button" class="modal-close" onclick="closeModal('modal-user-removal-guard')" style="border: none; background: transparent; font-size: 18px; cursor: pointer; color: var(--text2);">&times;</button>
+        </div>
+
+        <div style="padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;">
+            <div id="guard-impact-banner" style="display: none; padding: 12px 14px; border-radius: 10px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.35); color: var(--text); font-size: 12.5px; line-height: 1.55;"></div>
+            <div id="guard-description" style="font-size: 13px; color: var(--text2); line-height: 1.55;"></div>
+        </div>
+
+        <div style="padding: 12px 20px; background: var(--bg2, #FAFAFA); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <button type="button" id="guard-btn-reassign" class="btn btn-ghost btn-sm" style="display: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; border: 1px solid #3b82f6; color: #2563eb; background: rgba(59,130,246,0.08); cursor: pointer;">
+                    <i class="fa-solid fa-people-arrows"></i> Reassign Upcoming Events
+                </button>
+                <button type="button" id="guard-btn-deactivate" class="btn btn-sm" style="display: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; background: #d97706; color: #FFFFFF; border: 1px solid #b45309; cursor: pointer;">
+                    <i class="fa-solid fa-user-slash"></i> Deactivate Account
+                </button>
+                <button type="button" id="guard-btn-delete" class="btn btn-sm" style="display: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; background: #dc2626; color: #FFFFFF; border: 1px solid #b91c1c; cursor: pointer;">
+                    <i class="fa-solid fa-trash-can"></i> Delete Permanently
+                </button>
+            </div>
+            <button type="button" class="btn btn-gray btn-sm" onclick="closeModal('modal-user-removal-guard')" style="padding: 6px 14px; border-radius: 6px; font-size: 12px;">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- BULK REASSIGN UPCOMING EVENTS MODAL -->
+<div class="modal-overlay" id="modal-reassign-events" style="z-index: 9999;">
+    <div class="modal" style="max-width: 500px; width: 92%; padding: 0; overflow: hidden; border-radius: 14px; background: var(--surface, #FFFFFF); border: 1px solid var(--border); box-shadow: 0 18px 46px rgba(0,0,0,0.28);">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg2, #FAFAFA);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="width: 30px; height: 30px; border-radius: 8px; background: rgba(59,130,246,0.14); color: #2563eb; display: inline-flex; align-items: center; justify-content: center; font-size: 14px;">
+                    <i class="fa-solid fa-people-arrows"></i>
+                </span>
+                <div>
+                    <div style="font-size: 14.5px; font-weight: 700; color: var(--text);">Bulk Reassign Upcoming Events</div>
+                    <div style="font-size: 11.5px; color: var(--text2);">Transfer upcoming Pending &amp; Confirmed schedules to another Priest</div>
+                </div>
+            </div>
+            <button type="button" class="modal-close" onclick="closeModal('modal-reassign-events')" style="border: none; background: transparent; font-size: 18px; cursor: pointer; color: var(--text2);">&times;</button>
+        </div>
+        <form method="POST" action="dashboard.php?section=users">
+            <input type="hidden" name="form_section" value="users">
+            <input type="hidden" name="action" value="reassign_events">
+            <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf ?? ''); ?>">
+            <input type="hidden" name="from_pastor_id" id="reassign-from-pastor-id">
+
+            <div style="padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;">
+                <div id="reassign-summary-box" style="padding: 11px 14px; border-radius: 8px; background: var(--bg2, #FAFAFA); border: 1px solid var(--border); font-size: 12.5px; color: var(--text); line-height: 1.5;"></div>
+
+                <div>
+                    <label for="reassign-to-pastor" style="display: block; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 5px;">
+                        Assign Upcoming Events To
+                    </label>
+                    <select name="to_pastor_id" id="reassign-to-pastor" style="width: 100%; height: 36px; padding: 0 10px; font-size: 12.5px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); box-sizing: border-box;">
+                        <option value="">— Leave Unassigned (Pending Priest Assignment) —</option>
+                        <?php foreach (($active_priests_list ?? []) as $ap): ?>
+                        <option value="<?php echo (int)$ap['id']; ?>">
+                            <?php echo htmlspecialchars(!empty($ap['full_name']) ? ($ap['full_name'] . ' (@' . $ap['user'] . ')') : ('@' . $ap['user'])); ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <label id="reassign-deactivate-wrap" style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12.5px; color: var(--text);">
+                    <input type="checkbox" name="deactivate_after" id="reassign-deactivate-chk" value="1" style="width: auto; margin: 0;">
+                    <span>Also deactivate source priest account after reassigning</span>
+                </label>
+
+                <div style="font-size: 11.5px; color: var(--text2); line-height: 1.45;">
+                    <i class="fa-solid fa-circle-info" style="color: var(--accent);"></i>
+                    Only upcoming active (Pending/Confirmed) events are moved. Completed/past events keep their historical celebrant, and individual events can still be edited anytime on the Calendar.
+                </div>
+            </div>
+
+            <div style="padding: 12px 20px; background: var(--bg2, #FAFAFA); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="btn btn-gray btn-sm" onclick="closeModal('modal-reassign-events')" style="padding: 6px 14px; border-radius: 6px; font-size: 12px;">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm" style="padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; background: #111111; color: #FFFFFF; border: 1px solid #111111;">
+                    <i class="fa-solid fa-check text-gold"></i> Apply Reassignment
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -578,6 +776,8 @@ function openViewUserModal(u) {
         statusElem.style.color = '#c5a059';
     } else if (st === 'rejected') {
         statusElem.style.color = '#dc2626';
+    } else if (st === 'inactive') {
+        statusElem.style.color = '#64748b';
     } else {
         statusElem.style.color = '#16a34a';
     }
@@ -655,6 +855,8 @@ function applyUserFilters() {
             matchesRole = (role === 'priest' || role === 'pastor');
         } else if (currentRoleFilter === 'admin') {
             matchesRole = (role.indexOf('admin') > -1);
+        } else if (currentRoleFilter === 'inactive') {
+            matchesRole = (status === 'inactive');
         } else if (currentRoleFilter !== '') {
             matchesRole = (role === currentRoleFilter);
         }
@@ -700,7 +902,7 @@ function toggleUserSort(btn) {
     rows.forEach(r => tbody.appendChild(r));
 }
 
-function submitUserAction(action, idOrEl, username) {
+function submitUserAction(action, idOrEl, username, skipConfirm = false) {
     let id = idOrEl;
     if (idOrEl instanceof HTMLElement) {
         id = idOrEl.getAttribute('data-id');
@@ -708,12 +910,15 @@ function submitUserAction(action, idOrEl, username) {
         if (!action) action = idOrEl.getAttribute('data-action') || 'delete';
     }
 
-    let msg = 'Are you sure?';
-    if (action === 'approve') msg = 'Verify and approve member account for @' + username + '?';
-    else if (action === 'reject') msg = 'Decline registration for @' + username + '?';
-    else if (action === 'delete') msg = 'Delete user @' + username + '? This action cannot be undone.';
-    
-    if (!confirm(msg)) return;
+    if (!skipConfirm) {
+        let msg = 'Are you sure?';
+        if (action === 'approve') msg = 'Verify and approve member account for @' + username + '?';
+        else if (action === 'reject') msg = 'Decline registration for @' + username + '?';
+        else if (action === 'reactivate') msg = 'Reactivate account @' + username + '? They will regain login access and availability.';
+        else if (action === 'deactivate') msg = 'Deactivate account @' + username + '?';
+        else if (action === 'delete') msg = 'Delete user @' + username + '? This action cannot be undone.';
+        if (!confirm(msg)) return;
+    }
     
     if (action === 'approve' || action === 'reject') {
         window.location.href = 'dashboard.php?section=users&action=' + encodeURIComponent(action) + '&id=' + encodeURIComponent(id);
@@ -740,6 +945,149 @@ function submitUserAction(action, idOrEl, username) {
     form.submit();
 }
 
+function openUserRemovalModal(mode, el) {
+    if (!(el instanceof HTMLElement)) return;
+    const id       = el.getAttribute('data-id') || '';
+    const username = el.getAttribute('data-username') || '';
+    const fullName = el.getAttribute('data-fullname') || username;
+    const role     = el.getAttribute('data-role') || '';
+    const status   = (el.getAttribute('data-status') || 'active').toLowerCase();
+    const upcoming = parseInt(el.getAttribute('data-upcoming') || '0', 10);
+    const past     = parseInt(el.getAttribute('data-past') || '0', 10);
+    const totalEv  = parseInt(el.getAttribute('data-total-events') || '0', 10);
+    const isPriest = (role === 'Priest' || role === 'Pastor');
+
+    const titleEl  = document.getElementById('guard-modal-title');
+    const subEl    = document.getElementById('guard-modal-subtitle');
+    const iconEl   = document.getElementById('guard-modal-icon');
+    const bannerEl = document.getElementById('guard-impact-banner');
+    const descEl   = document.getElementById('guard-description');
+    const btnRe    = document.getElementById('guard-btn-reassign');
+    const btnDeact = document.getElementById('guard-btn-deactivate');
+    const btnDel   = document.getElementById('guard-btn-delete');
+
+    if (subEl) subEl.textContent = fullName + ' (@' + username + ' · ' + role + ')';
+
+    if (bannerEl) {
+        if (isPriest && totalEv > 0) {
+            bannerEl.style.display = 'block';
+            bannerEl.innerHTML = '<strong>Warning:</strong> This priest currently has <strong>' + upcoming + ' upcoming active</strong> and <strong>' + past + ' past/closed</strong> event(s) in the system.';
+        } else {
+            bannerEl.style.display = 'none';
+            bannerEl.innerHTML = '';
+        }
+    }
+
+    if (btnRe) {
+        if (isPriest && upcoming > 0) {
+            btnRe.style.display = 'inline-flex';
+            btnRe.onclick = function() {
+                closeModal('modal-user-removal-guard');
+                openReassignEventsModal(el);
+            };
+        } else {
+            btnRe.style.display = 'none';
+        }
+    }
+
+    if (btnDeact) {
+        if (status !== 'inactive') {
+            btnDeact.style.display = 'inline-flex';
+            btnDeact.onclick = function() {
+                closeModal('modal-user-removal-guard');
+                submitUserAction('deactivate', id, username, true);
+            };
+        } else {
+            btnDeact.style.display = 'none';
+        }
+    }
+
+    if (mode === 'deactivate') {
+        if (titleEl) titleEl.textContent = 'Deactivate Account';
+        if (iconEl) {
+            iconEl.style.background = 'rgba(245,158,11,0.16)';
+            iconEl.style.color = '#d97706';
+            iconEl.innerHTML = '<i class="fa-solid fa-user-slash"></i>';
+        }
+        if (descEl) {
+            descEl.textContent = (isPriest && upcoming > 0)
+                ? 'Deactivating blocks sign-in and hides this priest from new schedules while letting you continue editing existing events. You can bulk-reassign their upcoming events first or deactivate right away.'
+                : 'Deactivating blocks sign-in and hides this account from new assignments while keeping all historical records intact and editable.';
+        }
+        if (btnDel) btnDel.style.display = 'none';
+    } else {
+        if (titleEl) titleEl.textContent = (isPriest && totalEv > 0) ? 'Cannot Delete Priest With Events' : 'Confirm Account Deletion';
+        if (iconEl) {
+            iconEl.style.background = 'rgba(239,68,68,0.14)';
+            iconEl.style.color = '#dc2626';
+            iconEl.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+        }
+        if (isPriest && totalEv > 0) {
+            if (descEl) {
+                descEl.textContent = 'Hard deletion is blocked to preserve liturgical history. Please use Reassign Upcoming Events and/or Deactivate Account instead — you can still edit existing events anytime.';
+            }
+            if (btnDel) btnDel.style.display = 'none';
+        } else {
+            if (descEl) {
+                descEl.textContent = 'Deleting this account permanently removes it (note: accounts with authored donations, sacramental records, or requested events are also protected from deletion). You may deactivate it instead.';
+            }
+            if (btnDel) {
+                btnDel.style.display = 'inline-flex';
+                btnDel.onclick = function() {
+                    closeModal('modal-user-removal-guard');
+                    submitUserAction('delete', id, username, true);
+                };
+            }
+        }
+    }
+
+    openModal('modal-user-removal-guard');
+}
+
+function openReassignEventsModal(el) {
+    if (!(el instanceof HTMLElement)) return;
+    const id       = el.getAttribute('data-id') || '';
+    const username = el.getAttribute('data-username') || '';
+    const fullName = el.getAttribute('data-fullname') || username;
+    const upcoming = parseInt(el.getAttribute('data-upcoming') || '0', 10);
+    const status   = (el.getAttribute('data-status') || 'active').toLowerCase();
+
+    const fromInput = document.getElementById('reassign-from-pastor-id');
+    if (fromInput) fromInput.value = id;
+
+    const summaryEl = document.getElementById('reassign-summary-box');
+    if (summaryEl) {
+        summaryEl.innerHTML = '';
+        const strong1 = document.createElement('strong');
+        strong1.textContent = fullName + ' (@' + username + ')';
+        summaryEl.appendChild(strong1);
+        summaryEl.appendChild(document.createTextNode(' currently has '));
+        const strong2 = document.createElement('strong');
+        strong2.textContent = upcoming + ' upcoming active event(s)';
+        summaryEl.appendChild(strong2);
+        summaryEl.appendChild(document.createTextNode(' ready for bulk reassignment.'));
+    }
+
+    const sel = document.getElementById('reassign-to-pastor');
+    if (sel) {
+        sel.value = '';
+        Array.from(sel.options).forEach(opt => {
+            opt.disabled = (opt.value && String(opt.value) === String(id));
+        });
+    }
+
+    const deactWrap = document.getElementById('reassign-deactivate-wrap');
+    const deactChk  = document.getElementById('reassign-deactivate-chk');
+    if (deactWrap && deactChk) {
+        deactWrap.style.display = (status === 'inactive') ? 'none' : 'flex';
+        deactChk.checked = false;
+    }
+
+    openModal('modal-reassign-events');
+}
+
 window.openViewUserModal = openViewUserModal;
 window.submitUserAction = submitUserAction;
+window.openUserRemovalModal = openUserRemovalModal;
+window.openReassignEventsModal = openReassignEventsModal;
 </script>

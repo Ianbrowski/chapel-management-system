@@ -760,8 +760,8 @@ function loadPastorCards(eventType, datetime, scope, customDuration = 0, chapelI
                             ${conflictLabel}
                            </div>
                            <div class="pastor-tooltip">${escapeAvailHtml(pastor.conflict_reason || (statusClass === 'off-duty' ? 'Unavailable (outside working hours)' : 'Not available due to an existing booking'))}</div>`
-                        : `<div class="pastor-status-badge" style="font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; background:rgba(34,197,94,0.1); color:#16a34a; border:1px solid rgba(34,197,94,0.25); flex-shrink:0;">
-                            Available
+                        : `<div class="pastor-status-badge" style="font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; background:${pastor.is_inactive ? 'rgba(148,163,184,0.14)' : 'rgba(34,197,94,0.1)'}; color:${pastor.is_inactive ? '#64748b' : '#16a34a'}; border:1px solid ${pastor.is_inactive ? 'rgba(148,163,184,0.3)' : 'rgba(34,197,94,0.25)'}; flex-shrink:0;">
+                            ${pastor.is_inactive ? 'Deactivated' : 'Available'}
                            </div>`
                     }
                 `;

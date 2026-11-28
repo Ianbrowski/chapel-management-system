@@ -222,6 +222,12 @@ class AuthController extends BaseController {
             } elseif ($userStatus === 'rejected') {
                 $this->auditLog('rejected_login', "Member login blocked (Registration Declined) for '{$identity}'");
                 $this->respondLoginError('account_rejected', 'Your registration could not be verified by the Cathedral Administration.', [], 403);
+            } elseif ($userStatus === 'inactive') {
+                $this->auditLog('inactive_login', "Account login blocked (Deactivated) for '{$identity}'");
+                $this->respondLoginError('account_inactive', 'This account has been deactivated by the Parish Administration.', [], 403);
+            } elseif ($userStatus !== 'active') {
+                $this->auditLog('blocked_login', "Account login blocked (Status: {$userStatus}) for '{$identity}'");
+                $this->respondLoginError('account_inactive', 'This account is currently unavailable. Please contact the Parish Administration.', [], 403);
             } else {
                 $this->handleSuccessfulLogin($user, $password, $isCurrentHash, $identity);
             }

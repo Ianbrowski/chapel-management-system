@@ -1850,17 +1850,36 @@ class Event
         $placeholders = implode(',', array_fill(0, count($matchTypes), '?'));
         $bindTypes = str_repeat('s', count($matchTypes));
 
-        // 1. Get priests authorized for any matching canonical or exact event type
-        $sql = "SELECT u.id, u.user, u.full_name, u.chapel_coverage, u.duty_start_time, u.duty_end_time
+        $preservedPastorId = 0;
+        if ($excludeId !== null && (int)$excludeId > 0) {
+            $exIdInt = (int)$excludeId;
+            $stPres = $this->conn->prepare("SELECT pastor_id FROM events WHERE event_id = ? LIMIT 1");
+            if ($stPres) {
+                $stPres->bind_param('i', $exIdInt);
+                $stPres->execute();
+                $pRow = $stPres->get_result()->fetch_assoc();
+                $preservedPastorId = (int)($pRow['pastor_id'] ?? 0);
+                $stPres->close();
+            }
+        }
+
+        // 1. Get active priests authorized for any matching canonical or exact event type
+        // (plus the currently assigned priest when editing an existing event so edits preserve assignment)
+        $sql = "SELECT u.id, u.user, u.full_name, u.status, u.chapel_coverage, u.duty_start_time, u.duty_end_time
                 FROM users u
-                INNER JOIN pastor_event_types pet ON pet.pastor_id = u.id
+                LEFT JOIN pastor_event_types pet ON pet.pastor_id = u.id
                 WHERE u.role = 'Priest'
-                AND pet.event_type IN ({$placeholders})
-                GROUP BY u.id, u.user, u.full_name, u.chapel_coverage, u.duty_start_time, u.duty_end_time
+                AND (
+                    (LOWER(COALESCE(u.status, 'active')) = 'active' AND pet.event_type IN ({$placeholders}))
+                    OR (? > 0 AND u.id = ?)
+                )
+                GROUP BY u.id, u.user, u.full_name, u.status, u.chapel_coverage, u.duty_start_time, u.duty_end_time
                 ORDER BY u.user ASC";
 
         if ($stmt = $this->conn->prepare($sql)) {
-            $stmt->bind_param($bindTypes, ...$matchTypes);
+            $fullTypes = $bindTypes . 'ii';
+            $fullParams = array_merge($matchTypes, [$preservedPastorId, $preservedPastorId]);
+            $stmt->bind_param($fullTypes, ...$fullParams);
             $stmt->execute();
             $res = $stmt->get_result();
 
@@ -1880,13 +1899,15 @@ class Event
             }
 
             while ($p = $res->fetch_assoc()) {
-                // Chapel Coverage Filter
+                $isInactivePreserved = ($preservedPastorId > 0 && (int)$p['id'] === $preservedPastorId && strtolower(trim((string)($p['status'] ?? 'active'))) !== 'active');
+
+                // Chapel Coverage Filter (skip when preserving an existing assignment during event edit)
                 $targetVenue = 'Main Cathedral';
                 if ($chapelId !== null && $chapelId !== '' && $chapelId != 0) {
                     $targetVenue = $chapelName;
                 }
 
-                if ($targetVenue !== '') {
+                if (!$isInactivePreserved && $targetVenue !== '') {
                     $coverage = $p['chapel_coverage'] ? explode(',', $p['chapel_coverage']) : [];
                     // If pastor has specific coverage defined and this chapel isn't in it, skip them
                     if (!empty($coverage) && !in_array($targetVenue, $coverage)) {
@@ -1912,6 +1933,9 @@ class Event
                 }
 
                 $displayName = !empty($p['full_name']) ? $p['full_name'] : $p['user'];
+                if ($isInactivePreserved) {
+                    $displayName .= ' (Deactivated)';
+                }
                 $pastors[] = [
                     'id'                => $p['id'],
                     'name'              => $displayName,
@@ -1919,6 +1943,7 @@ class Event
                         ? strtoupper(substr($displayName, 0, 1) . substr(strrchr($displayName, ' '), 1, 1))
                         : strtoupper(substr($displayName, 0, 2)),
                     'available'         => $available,
+                    'is_inactive'       => $isInactivePreserved,
                     'conflict_reason'   => $conflict,
                     'conflict_masked'   => $conflictMasked,
                     'conflict_location' => $conflictLocation,

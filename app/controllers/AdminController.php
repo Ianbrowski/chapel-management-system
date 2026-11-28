@@ -43,7 +43,7 @@ class AdminController extends BaseController {
     private function handleUserActions($action) {
         if (!$this->permissions['can_manage_users']) return;
         
-        $id = (int)($_POST['id'] ?? 0);
+        $id = (int)($_POST['id'] ?? ($_POST['from_pastor_id'] ?? 0));
         $user = trim((string)($_POST['user'] ?? ''));
         $role = trim((string)($_POST['role'] ?? ''));
         $email = trim((string)($_POST['email'] ?? ''));
@@ -178,6 +178,17 @@ class AdminController extends BaseController {
                 }
                 
                 $oldData = $this->userModel->getById($id);
+                if (!$oldData) {
+                    $this->flash('error', 'User not found.');
+                    break;
+                }
+                if (in_array($oldData['role'] ?? '', ['Priest', 'Pastor'], true) && !in_array($role, ['Priest', 'Pastor'], true)) {
+                    $evCounts = $this->userModel->getPriestEventCounts($id);
+                    if ($evCounts['upcoming_active'] > 0) {
+                        $this->flash('error', "Cannot change role away from Priest: @{$user} still has {$evCounts['upcoming_active']} upcoming active event(s). Reassign those events first.");
+                        break;
+                    }
+                }
                 $hashed = !empty($pass) ? password_hash($pass, PASSWORD_BCRYPT, ['cost' => 12]) : null;
                 
                 if ($this->userModel->update($id, $user, $role, $hashed, $email, $chapelId, $fullName)) {
@@ -254,6 +265,110 @@ class AdminController extends BaseController {
                     $this->flash('success', "Member registration @{$targetUser['user']} has been declined.");
                 } else {
                     $this->flash('error', 'Failed to decline member registration.');
+                }
+                break;
+            case 'deactivate':
+                if ($id <= 0) {
+                    $this->flash('error', 'Invalid user ID.');
+                    break;
+                }
+                if ($id === (int)$this->userId) {
+                    $this->flash('error', 'Cannot deactivate your own logged-in account.');
+                    break;
+                }
+                $target = $this->userModel->getById($id);
+                if (!$target) {
+                    $this->flash('error', 'User not found.');
+                    break;
+                }
+                if ($this->userModel->setUserStatus($id, 'inactive')) {
+                    $isPriestTarget = in_array($target['role'] ?? '', ['Priest', 'Pastor'], true);
+                    $evCounts = $isPriestTarget ? $this->userModel->getPriestEventCounts($id) : ['upcoming_active' => 0, 'past_or_closed' => 0, 'total' => 0];
+                    AuditLogger::logFromSession(
+                        $this->conn,
+                        'deactivated',
+                        'Users',
+                        "Deactivated account @{$target['user']} ({$target['role']})",
+                        ['status' => $target['status'] ?? 'active'],
+                        ['status' => 'inactive', 'upcoming_events' => $evCounts['upcoming_active']]
+                    );
+                    if ($evCounts['upcoming_active'] > 0) {
+                        $this->flash('success', "Account @{$target['user']} deactivated (login blocked & hidden from new assignments). Reminder: {$evCounts['upcoming_active']} upcoming event(s) still remain assigned until reassigned.");
+                    } else {
+                        $this->flash('success', "Account @{$target['user']} deactivated. Historical records remain preserved and editable.");
+                    }
+                } else {
+                    $this->flash('error', 'Failed to deactivate account.');
+                }
+                break;
+            case 'reactivate':
+                if ($id <= 0) {
+                    $this->flash('error', 'Invalid user ID.');
+                    break;
+                }
+                $target = $this->userModel->getById($id);
+                if (!$target) {
+                    $this->flash('error', 'User not found.');
+                    break;
+                }
+                if ($this->userModel->setUserStatus($id, 'active')) {
+                    AuditLogger::logFromSession(
+                        $this->conn,
+                        'reactivated',
+                        'Users',
+                        "Reactivated account @{$target['user']} ({$target['role']})",
+                        ['status' => $target['status'] ?? 'inactive'],
+                        ['status' => 'active']
+                    );
+                    $this->flash('success', "Account @{$target['user']} reactivated.");
+                } else {
+                    $this->flash('error', 'Failed to reactivate account.');
+                }
+                break;
+            case 'reassign_events':
+                $fromId = (int)($_POST['from_pastor_id'] ?? $id);
+                $toRaw = trim((string)($_POST['to_pastor_id'] ?? ''));
+                $toId = ($toRaw !== '' && (int)$toRaw > 0) ? (int)$toRaw : null;
+                $deactivateAfter = !empty($_POST['deactivate_after']);
+
+                if ($fromId <= 0) {
+                    $this->flash('error', 'Invalid source priest account.');
+                    break;
+                }
+                $fromUser = $this->userModel->getById($fromId);
+                if (!$fromUser || !in_array($fromUser['role'] ?? '', ['Priest', 'Pastor'], true)) {
+                    $this->flash('error', 'Source account is not a Priest.');
+                    break;
+                }
+                if ($this->role === 'Cathedral Admin' && $fromUser['role'] === 'Admin') {
+                    $this->flash('error', 'Cathedral Admins cannot modify System Administrator accounts.');
+                    break;
+                }
+                try {
+                    $moved = $this->userModel->reassignUpcomingEvents($fromId, $toId);
+                    $toName = 'Unassigned (Pending Assignment)';
+                    if ($toId !== null) {
+                        $toUser = $this->userModel->getById($toId);
+                        $toName = $toUser ? (!empty($toUser['full_name']) ? $toUser['full_name'] : $toUser['user']) : ('Priest #' . $toId);
+                    }
+                    $fromName = !empty($fromUser['full_name']) ? $fromUser['full_name'] : $fromUser['user'];
+                    $extraMsg = '';
+                    if ($deactivateAfter && $fromId !== (int)$this->userId && $fromUser['role'] !== 'Admin') {
+                        if ($this->userModel->setUserStatus($fromId, 'inactive')) {
+                            $extraMsg = ' Account deactivated.';
+                        }
+                    }
+                    AuditLogger::logFromSession(
+                        $this->conn,
+                        'reassigned_events',
+                        'Users',
+                        "Bulk reassigned {$moved} upcoming active event(s) from {$fromName} to {$toName}" . ($extraMsg ? ' and deactivated account' : ''),
+                        ['from_pastor_id' => $fromId],
+                        ['to_pastor_id' => $toId, 'moved_count' => $moved, 'deactivated' => (bool)$extraMsg]
+                    );
+                    $this->flash('success', "Reassigned {$moved} upcoming active event(s) from {$fromName} to {$toName}.{$extraMsg}");
+                } catch (Exception $e) {
+                    $this->flash('error', $e->getMessage());
                 }
                 break;
             case 'delete':
@@ -709,6 +824,8 @@ class AdminController extends BaseController {
             $data['total_count'] = $result['total'];
             $data['user_stats'] = $this->userModel->getMemberStats($chapelFilter);
             $data['pending_count'] = $this->userModel->getPendingCount($chapelFilter);
+            $data['user_event_counts'] = $this->userModel->getEventStatsByUserIds(array_column($data['users'], 'id'));
+            $data['active_priests_list'] = $this->userModel->getPriestsWithPrefs(true);
         } elseif ($section === 'chapels') {
             $chapelFilter = $this->resolveScopedChapelFilter();
             // Since there are few chapels, we might not strictly NEED pagination, but for consistency:
